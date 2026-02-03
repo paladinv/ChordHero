@@ -6,6 +6,7 @@ import ChordDiagram, { Chord } from "../components/ChordDiagram";
 const MAX_CHORDS = 10;
 const INTERVAL_MS = 3000;
 const FLASH_MS = 650;
+const COUNTDOWN_TICK_MS = 120;
 
 type Level = {
   name: string;
@@ -51,6 +52,117 @@ const LEVELS: Level[] = [
       { name: "C#m", frets: [-1, 4, 6, 6, 5, 4], barre: { fret: 4, from: 1, to: 5 } },
       { name: "F#", frets: [2, 4, 4, 3, 2, 2], barre: { fret: 2, from: 0, to: 5 } }
     ]
+  },
+  {
+    name: "Inversions",
+    description: "Slash chords to sharpen bass movement.",
+    chords: [
+      { name: "C/G", frets: [3, 3, 2, 0, 1, 0] },
+      { name: "G/B", frets: [-1, 2, 0, 0, 0, 3] },
+      { name: "D/F#", frets: [2, 0, 0, 2, 3, 2] },
+      { name: "Am/C", frets: [-1, 3, 2, 2, 1, 0] },
+      { name: "Em/B", frets: [-1, 2, 2, 0, 0, 0] },
+      { name: "F/A", frets: [-1, 0, 3, 2, 1, 1] }
+    ]
+  }
+];
+
+const CHORD_LIBRARY: Chord[] = Array.from(
+  new Map(LEVELS.flatMap((level) => level.chords).map((chord) => [chord.name, chord])).values()
+);
+
+type Song = {
+  title: string;
+  source: string;
+  difficulty: "easy" | "medium";
+  bpm: number;
+  chords: string[];
+};
+
+const SONGS: Song[] = [
+  {
+    title: "Amazing Grace",
+    source: "Public domain hymn",
+    difficulty: "easy",
+    bpm: 80,
+    chords: ["G", "C", "G", "D", "G", "Em", "G", "D", "G"]
+  },
+  {
+    title: "Oh! Susanna",
+    source: "Public domain folk",
+    difficulty: "easy",
+    bpm: 92,
+    chords: ["C", "F", "C", "G", "C", "F", "C", "G", "C"]
+  },
+  {
+    title: "This Little Light of Mine",
+    source: "Traditional spiritual",
+    difficulty: "easy",
+    bpm: 96,
+    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"]
+  },
+  {
+    title: "Scarborough Fair",
+    source: "Traditional English ballad",
+    difficulty: "medium",
+    bpm: 84,
+    chords: ["Am", "C", "Am", "G", "Am", "C", "Am", "Em"]
+  },
+  {
+    title: "Greensleeves",
+    source: "Traditional English folk",
+    difficulty: "medium",
+    bpm: 88,
+    chords: ["Am", "G", "F", "E", "Am", "C", "G", "E", "Am"]
+  },
+  {
+    title: "When the Saints Go Marching In",
+    source: "Traditional jazz standard",
+    difficulty: "easy",
+    bpm: 100,
+    chords: ["C", "F", "C", "G", "C", "F", "C", "G", "C"]
+  },
+  {
+    title: "House of the Rising Sun (Trad.)",
+    source: "Traditional folk",
+    difficulty: "medium",
+    bpm: 78,
+    chords: ["Am", "C", "D", "F", "Am", "C", "E", "E"]
+  },
+  {
+    title: "Skip to My Lou",
+    source: "Traditional American folk",
+    difficulty: "easy",
+    bpm: 104,
+    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"]
+  },
+  {
+    title: "The Red River Valley",
+    source: "Traditional folk",
+    difficulty: "easy",
+    bpm: 90,
+    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"]
+  },
+  {
+    title: "Shenandoah",
+    source: "Traditional folk",
+    difficulty: "medium",
+    bpm: 72,
+    chords: ["G", "D", "Em", "C", "G", "D", "G"]
+  },
+  {
+    title: "The Bear Went Over the Mountain",
+    source: "Traditional folk",
+    difficulty: "easy",
+    bpm: 102,
+    chords: ["C", "G", "C", "F", "C", "G", "C"]
+  },
+  {
+    title: "Auld Lang Syne",
+    source: "Traditional Scottish",
+    difficulty: "medium",
+    bpm: 80,
+    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"]
   }
 ];
 
@@ -74,13 +186,31 @@ export default function HomePage() {
   const [history, setHistory] = useState<Chord[]>([]);
   const [flash, setFlash] = useState(false);
   const [count, setCount] = useState(0);
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [selectedChord, setSelectedChord] = useState<Chord | null>(null);
+  const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
+  const [libraryChordName, setLibraryChordName] = useState(CHORD_LIBRARY[0]?.name ?? "");
+  const [songIndex, setSongIndex] = useState(0);
+  const [songStep, setSongStep] = useState(0);
+  const [songStatus, setSongStatus] = useState<"idle" | "running" | "paused">("idle");
+  const [metronomeOn, setMetronomeOn] = useState(true);
+  const [songTempoBpm, setSongTempoBpm] = useState(SONGS[0]?.bpm ?? 90);
 
   const countRef = useRef(0);
   const historyRef = useRef<Chord[]>([]);
   const flashTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nextChangeAt = useRef<number | null>(null);
+  const songTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
 
   const activeLevelIndex = difficultyMode === "auto" ? levelIndex : manualLevelIndex;
   const activeLevel = LEVELS[activeLevelIndex];
+  const selectedLibraryChord = CHORD_LIBRARY.find((chord) => chord.name === libraryChordName) ?? null;
+  const activeSong = SONGS[songIndex];
+  const currentSongChordName = activeSong.chords[Math.min(songStep, activeSong.chords.length - 1)];
+  const currentSongChord =
+    CHORD_LIBRARY.find((chord) => chord.name === currentSongChordName) ?? null;
+  const songTempoMs = Math.round(60000 / songTempoBpm);
 
   const progressLabel = `${Math.min(count, MAX_CHORDS)}/${MAX_CHORDS}`;
 
@@ -90,6 +220,10 @@ export default function HomePage() {
     setCount(0);
     setHistory([]);
     setCurrentChord(null);
+    setSelectedChord(null);
+    setSelectedHistoryIndex(null);
+    setSecondsLeft(0);
+    nextChangeAt.current = null;
   };
 
   const startRound = (nextLevelIndex?: number) => {
@@ -98,6 +232,35 @@ export default function HomePage() {
     }
     resetRound();
     setStatus("running");
+  };
+
+  const ensureAudioContext = async () => {
+    if (!metronomeOn) return null;
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext();
+    }
+    if (audioContextRef.current.state === "suspended") {
+      await audioContextRef.current.resume();
+    }
+    return audioContextRef.current;
+  };
+
+  const playClick = async (frequency = 900) => {
+    if (!metronomeOn) return;
+    const ctx = await ensureAudioContext();
+    if (!ctx) return;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "square";
+    osc.frequency.value = frequency;
+    gain.gain.value = 0.0001;
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    const now = ctx.currentTime;
+    gain.gain.exponentialRampToValueAtTime(0.3, now + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
+    osc.start(now);
+    osc.stop(now + 0.09);
   };
 
   const advance = () => {
@@ -123,6 +286,8 @@ export default function HomePage() {
 
     countRef.current += 1;
     setCount(countRef.current);
+    nextChangeAt.current = Date.now() + INTERVAL_MS;
+    setSecondsLeft(Math.ceil(INTERVAL_MS / 1000));
 
     if (countRef.current >= MAX_CHORDS) {
       setStatus("levelComplete");
@@ -141,12 +306,61 @@ export default function HomePage() {
   }, [status, activeLevelIndex]);
 
   useEffect(() => {
+    if (status !== "running") {
+      setSecondsLeft(0);
+      return;
+    }
+    const id = setInterval(() => {
+      if (!nextChangeAt.current) return;
+      const msLeft = Math.max(0, nextChangeAt.current - Date.now());
+      setSecondsLeft(Math.max(0, Math.ceil(msLeft / 1000)));
+    }, COUNTDOWN_TICK_MS);
+    return () => clearInterval(id);
+  }, [status]);
+
+  useEffect(() => {
+    if (!metronomeOn) return;
+    if (status === "running" && secondsLeft > 0) {
+      playClick(secondsLeft === 1 ? 1200 : 900);
+    }
+  }, [metronomeOn, secondsLeft, status]);
+
+  useEffect(() => {
     return () => {
       if (flashTimeout.current) {
         clearTimeout(flashTimeout.current);
       }
     };
   }, []);
+
+  useEffect(() => {
+    if (songStatus !== "running") return;
+    if (songTimer.current) {
+      clearInterval(songTimer.current);
+    }
+    songTimer.current = setInterval(() => {
+      setSongStep((prev) => {
+        const next = prev + 1;
+        if (next >= activeSong.chords.length) {
+          setSongStatus("paused");
+          return prev;
+        }
+        return next;
+      });
+    }, songTempoMs);
+    return () => {
+      if (songTimer.current) {
+        clearInterval(songTimer.current);
+      }
+    };
+  }, [activeSong.chords.length, songStatus, songTempoMs]);
+
+  useEffect(() => {
+    if (!metronomeOn) return;
+    if (songStatus === "running") {
+      playClick(700);
+    }
+  }, [metronomeOn, songStatus, songStep]);
 
   const handleContinue = () => {
     if (difficultyMode === "auto") {
@@ -168,6 +382,17 @@ export default function HomePage() {
     if (status === "paused") {
       setStatus("running");
     }
+  };
+
+  const handleSelectHistory = (chord: Chord, index: number) => {
+    setSelectedChord(chord);
+    setSelectedHistoryIndex(index);
+  };
+
+  const handleSongStart = async () => {
+    await ensureAudioContext();
+    setSongStep(0);
+    setSongStatus("running");
   };
 
   const levelTitle = useMemo(() => {
@@ -200,6 +425,9 @@ export default function HomePage() {
               <span className={`badge ${status === "running" ? "live" : ""}`}>
                 {status === "running" ? "Live" : status === "paused" ? "Paused" : "Ready"}
               </span>
+              <span className="badge muted">
+                {status === "running" ? `Next chord in ${secondsLeft}s` : "Timer ready"}
+              </span>
             </div>
           </div>
 
@@ -217,7 +445,10 @@ export default function HomePage() {
           <div className="controls">
             <button
               className="btn primary"
-              onClick={() => startRound()}
+              onClick={async () => {
+                await ensureAudioContext();
+                startRound();
+              }}
               disabled={status === "running"}
             >
               Start Round
@@ -236,6 +467,12 @@ export default function HomePage() {
               }}
             >
               Reset
+            </button>
+            <button
+              className={`btn ${metronomeOn ? "primary" : ""}`}
+              onClick={() => setMetronomeOn((prev) => !prev)}
+            >
+              {metronomeOn ? "Metronome on" : "Metronome off"}
             </button>
           </div>
 
@@ -277,6 +514,52 @@ export default function HomePage() {
         </div>
       </section>
 
+      <section className="library">
+        <div>
+          <h2>Chord library</h2>
+          <p>Select any chord and review the fingering.</p>
+        </div>
+        <div className="library-card">
+          <div>
+            <label className="label" htmlFor="chord-library">
+              Choose a chord
+            </label>
+            <select
+              id="chord-library"
+              value={libraryChordName}
+              onChange={(event) => setLibraryChordName(event.target.value)}
+            >
+              {CHORD_LIBRARY.map((chord) => (
+                <option key={chord.name} value={chord.name}>
+                  {chord.name}
+                </option>
+              ))}
+            </select>
+            {selectedLibraryChord && (
+              <div className="fingering">
+                <p className="label">How to press</p>
+                <p>
+                  Strings: E A D G B e
+                </p>
+                <p>
+                  Frets:{" "}
+                  {selectedLibraryChord.frets
+                    .map((fret) => (fret < 0 ? "X" : fret === 0 ? "O" : fret))
+                    .join(" ")}
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="diagram-wrap">
+            {selectedLibraryChord ? (
+              <ChordDiagram chord={selectedLibraryChord} />
+            ) : (
+              <div className="diagram-empty" />
+            )}
+          </div>
+        </div>
+      </section>
+
       <section className="history">
         <div>
           <h2>Chord history</h2>
@@ -287,12 +570,128 @@ export default function HomePage() {
             <div className="history-empty">No chords yet. Start a round to begin.</div>
           ) : (
             history.map((chord, index) => (
-              <div key={`${chord.name}-${index}`} className="history-item">
+              <button
+                key={`${chord.name}-${index}`}
+                className={`history-item ${selectedHistoryIndex === index ? "active" : ""}`}
+                type="button"
+                onClick={() => handleSelectHistory(chord, index)}
+              >
                 <span className="history-count">{String(index + 1).padStart(2, "0")}</span>
                 <span className="history-name">{chord.name}</span>
-              </div>
+              </button>
             ))
           )}
+        </div>
+      </section>
+
+      <section className="selected">
+        <div>
+          <h2>Selected chord</h2>
+          <p>Click any chord from history to inspect it here.</p>
+        </div>
+        <div className="selected-card">
+          <div className="selected-info">
+            <span className="label">Selected</span>
+            <h3>{selectedChord ? selectedChord.name : "None yet"}</h3>
+            <p>Use this space to double-check your fingering before the next round.</p>
+          </div>
+          <div className="diagram-wrap">
+            {selectedChord ? <ChordDiagram chord={selectedChord} /> : <div className="diagram-empty" />}
+          </div>
+        </div>
+      </section>
+
+      <section className="song-coach">
+        <div>
+          <h2>Song coach</h2>
+          <p>Learn public domain songs by looping the chord progression.</p>
+        </div>
+        <div className="song-card">
+          <div className="song-meta">
+            <label className="label" htmlFor="song-select">
+              Choose a song
+            </label>
+            <select
+              id="song-select"
+              value={songIndex}
+              onChange={(event) => {
+                const nextIndex = Number(event.target.value);
+                setSongIndex(nextIndex);
+                setSongTempoBpm(SONGS[nextIndex]?.bpm ?? 90);
+                setSongStep(0);
+                setSongStatus("idle");
+              }}
+            >
+              {SONGS.map((song, index) => (
+                <option key={song.title} value={index}>
+                  {song.title} • {song.difficulty}
+                </option>
+              ))}
+            </select>
+            <p className="song-source">{activeSong.source}</p>
+            <div className="tempo-control">
+              <label className="label" htmlFor="song-tempo">
+                Tempo: {songTempoBpm} BPM
+              </label>
+              <input
+                id="song-tempo"
+                type="range"
+                min={60}
+                max={140}
+                step={2}
+                value={songTempoBpm}
+                onChange={(event) => setSongTempoBpm(Number(event.target.value))}
+              />
+            </div>
+            <div className="song-controls">
+              <button className="btn primary" onClick={handleSongStart}>
+                Start lesson
+              </button>
+              <button
+                className="btn"
+                onClick={() => setSongStatus("paused")}
+                disabled={songStatus !== "running"}
+              >
+                Pause
+              </button>
+              <button
+                className="btn"
+                onClick={() => setSongStatus("running")}
+                disabled={songStatus !== "paused"}
+              >
+                Resume
+              </button>
+              <button
+                className="btn ghost"
+                onClick={() => {
+                  setSongStep(0);
+                  setSongStatus("idle");
+                }}
+              >
+                Reset
+              </button>
+            </div>
+          </div>
+          <div className="song-progress">
+            <span className="label">Current chord</span>
+            <h3>{currentSongChordName}</h3>
+            <p>
+              Step {Math.min(songStep + 1, activeSong.chords.length)} of {activeSong.chords.length}
+            </p>
+            <div className="diagram-wrap">
+              {currentSongChord ? <ChordDiagram chord={currentSongChord} /> : <div className="diagram-empty" />}
+            </div>
+            <div className="song-chords">
+              {activeSong.chords.map((chord, index) => (
+                <span
+                  key={`${chord}-${index}`}
+                  className={`song-chip ${index === songStep ? "active" : ""}`}
+                >
+                  {chord}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 

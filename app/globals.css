@@ -22,6 +22,42 @@ body {
   color: var(--ink);
 }
 
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 24px clamp(20px, 6vw, 90px) 0;
+}
+
+.brand-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.logo {
+  width: 120px;
+  height: auto;
+}
+
+.site-nav {
+  display: flex;
+  gap: 18px;
+  font-weight: 700;
+}
+
+.site-nav a {
+  text-decoration: none;
+  color: var(--ink);
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.55);
+}
+
 .page {
   min-height: 100vh;
   display: flex;
@@ -56,6 +92,14 @@ body {
   font-weight: 700;
   font-size: 0.75rem;
   color: var(--teal);
+}
+
+.label {
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  font-size: 0.7rem;
+  color: var(--teal);
+  font-weight: 700;
 }
 
 .panel {
@@ -106,6 +150,11 @@ body {
   background: var(--sun);
 }
 
+.badge.muted {
+  background: rgba(255, 255, 255, 0.8);
+  color: rgba(0, 0, 0, 0.6);
+}
+
 .chord-card {
   display: grid;
   grid-template-columns: minmax(180px, 1fr) 260px;
@@ -144,10 +193,7 @@ body {
 }
 
 .chord-info .label {
-  text-transform: uppercase;
-  letter-spacing: 3px;
   font-size: 0.7rem;
-  color: var(--teal);
 }
 
 .chord-info p {
@@ -318,6 +364,12 @@ select {
   font-weight: 700;
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
   animation: rise 0.4s ease;
+  border: none;
+  cursor: pointer;
+}
+
+.history-item.active {
+  outline: 2px solid var(--teal);
 }
 
 .history-count {
@@ -344,6 +396,166 @@ select {
     transform: translateY(0);
     opacity: 1;
   }
+}
+
+.library,
+.selected,
+.song-coach {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+.library-card,
+.selected-card,
+.song-card {
+  background: #fffaf1;
+  border-radius: 20px;
+  padding: 20px;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) 260px;
+  gap: 20px;
+  align-items: center;
+  box-shadow: 0 12px 30px var(--shadow);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.selected-info h3,
+.song-progress h3 {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 2.4rem;
+  margin: 6px 0 8px;
+}
+
+.fingering {
+  margin-top: 16px;
+  font-weight: 600;
+}
+
+.song-card {
+  grid-template-columns: minmax(260px, 1.1fr) minmax(260px, 0.9fr);
+}
+
+.song-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.song-source {
+  color: rgba(0, 0, 0, 0.6);
+  margin-top: 6px;
+}
+
+.tempo-control {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.tempo-control input[type="range"] {
+  width: 100%;
+}
+
+.song-chords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.song-chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.7);
+  font-weight: 700;
+}
+
+.song-chip.active {
+  background: var(--teal);
+  color: white;
+}
+
+.about-hero {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) minmax(260px, 0.8fr);
+  gap: 28px;
+  align-items: start;
+}
+
+.about h1 {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(36px, 5vw, 64px);
+  margin: 12px 0 12px;
+}
+
+.about-card {
+  background: var(--cream);
+  padding: 20px;
+  border-radius: 18px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+}
+
+.about-card ol {
+  margin: 12px 0 0;
+  padding-left: 18px;
+}
+
+.about-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 24px;
+}
+
+.chords-hero {
+  display: grid;
+  grid-template-columns: minmax(260px, 1.2fr) minmax(240px, 0.8fr);
+  gap: 24px;
+  align-items: start;
+}
+
+.print-card {
+  background: var(--cream);
+  border-radius: 18px;
+  padding: 18px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+}
+
+.print-card ul {
+  margin: 10px 0 0;
+  padding-left: 18px;
+}
+
+.chord-section {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 20px;
+  padding: 20px;
+}
+
+.chord-section h2 {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 2.2rem;
+  margin: 0 0 6px;
+}
+
+.chord-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.chord-tile {
+  background: white;
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
 }
 
 .modal {
@@ -401,5 +613,44 @@ select {
   .panel-header {
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .library,
+  .selected,
+  .song-coach,
+  .about-hero,
+  .chords-hero {
+    grid-template-columns: 1fr;
+  }
+
+  .library-card,
+  .selected-card,
+  .song-card {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media print {
+  body {
+    background: white;
+  }
+
+  .site-header,
+  .print-card {
+    display: none;
+  }
+
+  .page {
+    padding: 24px;
+  }
+
+  .chord-section,
+  .chord-tile {
+    box-shadow: none;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+  }
+
+  .diagram-bg {
+    fill: white;
   }
 }
