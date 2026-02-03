@@ -75,7 +75,7 @@ type Song = {
   title: string;
   source: string;
   difficulty: "easy" | "medium";
-  tempoMs: number;
+  bpm: number;
   chords: string[];
 };
 
@@ -84,50 +84,85 @@ const SONGS: Song[] = [
     title: "Amazing Grace",
     source: "Public domain hymn",
     difficulty: "easy",
-    tempoMs: 2200,
+    bpm: 80,
     chords: ["G", "C", "G", "D", "G", "Em", "G", "D", "G"]
   },
   {
     title: "Oh! Susanna",
     source: "Public domain folk",
     difficulty: "easy",
-    tempoMs: 2000,
+    bpm: 92,
     chords: ["C", "F", "C", "G", "C", "F", "C", "G", "C"]
   },
   {
     title: "This Little Light of Mine",
     source: "Traditional spiritual",
     difficulty: "easy",
-    tempoMs: 1900,
+    bpm: 96,
     chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"]
   },
   {
     title: "Scarborough Fair",
     source: "Traditional English ballad",
     difficulty: "medium",
-    tempoMs: 2100,
+    bpm: 84,
     chords: ["Am", "C", "Am", "G", "Am", "C", "Am", "Em"]
   },
   {
     title: "Greensleeves",
     source: "Traditional English folk",
     difficulty: "medium",
-    tempoMs: 2000,
+    bpm: 88,
     chords: ["Am", "G", "F", "E", "Am", "C", "G", "E", "Am"]
   },
   {
     title: "When the Saints Go Marching In",
     source: "Traditional jazz standard",
     difficulty: "easy",
-    tempoMs: 1900,
+    bpm: 100,
     chords: ["C", "F", "C", "G", "C", "F", "C", "G", "C"]
   },
   {
     title: "House of the Rising Sun (Trad.)",
     source: "Traditional folk",
     difficulty: "medium",
-    tempoMs: 2300,
+    bpm: 78,
     chords: ["Am", "C", "D", "F", "Am", "C", "E", "E"]
+  },
+  {
+    title: "Skip to My Lou",
+    source: "Traditional American folk",
+    difficulty: "easy",
+    bpm: 104,
+    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"]
+  },
+  {
+    title: "The Red River Valley",
+    source: "Traditional folk",
+    difficulty: "easy",
+    bpm: 90,
+    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"]
+  },
+  {
+    title: "Shenandoah",
+    source: "Traditional folk",
+    difficulty: "medium",
+    bpm: 72,
+    chords: ["G", "D", "Em", "C", "G", "D", "G"]
+  },
+  {
+    title: "The Bear Went Over the Mountain",
+    source: "Traditional folk",
+    difficulty: "easy",
+    bpm: 102,
+    chords: ["C", "G", "C", "F", "C", "G", "C"]
+  },
+  {
+    title: "Auld Lang Syne",
+    source: "Traditional Scottish",
+    difficulty: "medium",
+    bpm: 80,
+    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"]
   }
 ];
 
@@ -159,6 +194,7 @@ export default function HomePage() {
   const [songStep, setSongStep] = useState(0);
   const [songStatus, setSongStatus] = useState<"idle" | "running" | "paused">("idle");
   const [metronomeOn, setMetronomeOn] = useState(true);
+  const [songTempoBpm, setSongTempoBpm] = useState(SONGS[0]?.bpm ?? 90);
 
   const countRef = useRef(0);
   const historyRef = useRef<Chord[]>([]);
@@ -174,6 +210,7 @@ export default function HomePage() {
   const currentSongChordName = activeSong.chords[Math.min(songStep, activeSong.chords.length - 1)];
   const currentSongChord =
     CHORD_LIBRARY.find((chord) => chord.name === currentSongChordName) ?? null;
+  const songTempoMs = Math.round(60000 / songTempoBpm);
 
   const progressLabel = `${Math.min(count, MAX_CHORDS)}/${MAX_CHORDS}`;
 
@@ -310,13 +347,13 @@ export default function HomePage() {
         }
         return next;
       });
-    }, activeSong.tempoMs);
+    }, songTempoMs);
     return () => {
       if (songTimer.current) {
         clearInterval(songTimer.current);
       }
     };
-  }, [activeSong.chords.length, activeSong.tempoMs, songStatus]);
+  }, [activeSong.chords.length, songStatus, songTempoMs]);
 
   useEffect(() => {
     if (!metronomeOn) return;
@@ -578,7 +615,9 @@ export default function HomePage() {
               id="song-select"
               value={songIndex}
               onChange={(event) => {
-                setSongIndex(Number(event.target.value));
+                const nextIndex = Number(event.target.value);
+                setSongIndex(nextIndex);
+                setSongTempoBpm(SONGS[nextIndex]?.bpm ?? 90);
                 setSongStep(0);
                 setSongStatus("idle");
               }}
@@ -590,6 +629,20 @@ export default function HomePage() {
               ))}
             </select>
             <p className="song-source">{activeSong.source}</p>
+            <div className="tempo-control">
+              <label className="label" htmlFor="song-tempo">
+                Tempo: {songTempoBpm} BPM
+              </label>
+              <input
+                id="song-tempo"
+                type="range"
+                min={60}
+                max={140}
+                step={2}
+                value={songTempoBpm}
+                onChange={(event) => setSongTempoBpm(Number(event.target.value))}
+              />
+            </div>
             <div className="song-controls">
               <button className="btn primary" onClick={handleSongStart}>
                 Start lesson

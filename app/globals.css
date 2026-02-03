@@ -449,6 +449,16 @@ select {
   margin-top: 6px;
 }
 
+.tempo-control {
+  margin-top: 12px;
+  display: grid;
+  gap: 8px;
+}
+
+.tempo-control input[type="range"] {
+  width: 100%;
+}
+
 .song-chords {
   display: flex;
   flex-wrap: wrap;
