@@ -107,6 +107,8 @@ type Song = {
   difficulty: "easy" | "medium";
   bpm: number;
   chords: string[];
+  strumPattern: string;
+  strumFeel: string;
 };
 
 const SONGS: Song[] = [
@@ -115,86 +117,156 @@ const SONGS: Song[] = [
     source: "Public domain hymn",
     difficulty: "easy",
     bpm: 80,
-    chords: ["G", "C", "G", "D", "G", "Em", "G", "D", "G"]
+    chords: ["G", "C", "G", "D", "G", "Em", "G", "D", "G"],
+    strumPattern: "D - D - D - D -",
+    strumFeel: "Slow 4/4, let the chords ring."
   },
   {
     title: "Oh! Susanna",
     source: "Public domain folk",
     difficulty: "easy",
     bpm: 92,
-    chords: ["C", "F", "C", "G", "C", "F", "C", "G", "C"]
+    chords: ["C", "F", "C", "G", "C", "F", "C", "G", "C"],
+    strumPattern: "D D U U D U",
+    strumFeel: "Classic pop feel at 8th notes."
   },
   {
     title: "This Little Light of Mine",
     source: "Traditional spiritual",
     difficulty: "easy",
     bpm: 96,
-    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"]
+    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"],
+    strumPattern: "D - D U - U D U",
+    strumFeel: "Gospel swing; keep the upstrokes light."
   },
   {
     title: "Scarborough Fair",
     source: "Traditional English ballad",
     difficulty: "medium",
     bpm: 84,
-    chords: ["Am", "C", "Am", "G", "Am", "C", "Am", "Em"]
+    chords: ["Am", "C", "Am", "G", "Am", "C", "Am", "Em"],
+    strumPattern: "D - D - D U - U",
+    strumFeel: "Gentle folk ballad."
   },
   {
     title: "Greensleeves",
     source: "Traditional English folk",
     difficulty: "medium",
     bpm: 88,
-    chords: ["Am", "G", "F", "E", "Am", "C", "G", "E", "Am"]
+    chords: ["Am", "G", "F", "E", "Am", "C", "G", "E", "Am"],
+    strumPattern: "D - D U - U D U",
+    strumFeel: "Waltz-like flow, keep the bass strong."
   },
   {
     title: "When the Saints Go Marching In",
     source: "Traditional jazz standard",
     difficulty: "easy",
     bpm: 100,
-    chords: ["C", "F", "C", "G", "C", "F", "C", "G", "C"]
+    chords: ["C", "F", "C", "G", "C", "F", "C", "G", "C"],
+    strumPattern: "D D D D",
+    strumFeel: "March feel, accent beats 1 and 3."
   },
   {
     title: "House of the Rising Sun (Trad.)",
     source: "Traditional folk",
     difficulty: "medium",
     bpm: 78,
-    chords: ["Am", "C", "D", "F", "Am", "C", "E", "E"]
+    chords: ["Am", "C", "D", "F", "Am", "C", "E", "E"],
+    strumPattern: "D - D - D U - U",
+    strumFeel: "Slow arpeggiated vibe; strum softly."
   },
   {
     title: "Skip to My Lou",
     source: "Traditional American folk",
     difficulty: "easy",
     bpm: 104,
-    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"]
+    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"],
+    strumPattern: "D D U U D U",
+    strumFeel: "Bright, bouncy folk."
   },
   {
     title: "The Red River Valley",
     source: "Traditional folk",
     difficulty: "easy",
     bpm: 90,
-    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"]
+    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"],
+    strumPattern: "D - D - D - D -",
+    strumFeel: "Ballad timing, let chords ring."
   },
   {
     title: "Shenandoah",
     source: "Traditional folk",
     difficulty: "medium",
     bpm: 72,
-    chords: ["G", "D", "Em", "C", "G", "D", "G"]
+    chords: ["G", "D", "Em", "C", "G", "D", "G"],
+    strumPattern: "D - D - D U - U",
+    strumFeel: "Slow, wide strums."
   },
   {
     title: "The Bear Went Over the Mountain",
     source: "Traditional folk",
     difficulty: "easy",
     bpm: 102,
-    chords: ["C", "G", "C", "F", "C", "G", "C"]
+    chords: ["C", "G", "C", "F", "C", "G", "C"],
+    strumPattern: "D D U U D U",
+    strumFeel: "Playful campfire groove."
   },
   {
     title: "Auld Lang Syne",
     source: "Traditional Scottish",
     difficulty: "medium",
     bpm: 80,
-    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"]
+    chords: ["G", "C", "G", "D", "G", "C", "G", "D", "G"],
+    strumPattern: "D - D - D - D -",
+    strumFeel: "Slow, stately feel."
   }
 ];
+
+const CHORD_TIPS: Record<
+  string,
+  { fingering: string; transition: string; commonMistake: string }
+> = {
+  C: {
+    fingering: "Index on B1, middle on D2, ring on A3. Let high E ring.",
+    transition: "Pivot your ring finger when moving between C and Am/F.",
+    commonMistake: "Mute the high E string; keep it open."
+  },
+  G: {
+    fingering: "Ring on low E3, middle on A2, pinky on high E3.",
+    transition: "Keep ring/pinky planted when moving to D or Em.",
+    commonMistake: "Letting the B string mute; curl your fingers."
+  },
+  D: {
+    fingering: "Index on G2, ring on B3, middle on high E2.",
+    transition: "Make a triangle shape and lift together for quick changes.",
+    commonMistake: "Low strings ringing; mute low E/A."
+  },
+  Em: {
+    fingering: "Middle on A2, ring on D2.",
+    transition: "Slide from G by dropping the middle finger first.",
+    commonMistake: "Pressing too hard; keep it relaxed."
+  },
+  Am: {
+    fingering: "Index on B1, middle on D2, ring on G2.",
+    transition: "From C, keep the index on B1 and pivot.",
+    commonMistake: "B string muted; keep knuckles arched."
+  },
+  F: {
+    fingering: "Barre at 1st fret, ring on A3, pinky on D3, middle on G2.",
+    transition: "Practice mini‑barre on B/E first, then add bass.",
+    commonMistake: "Buzzing on high strings; roll index slightly."
+  },
+  E: {
+    fingering: "Index on G1, middle on A2, ring on D2.",
+    transition: "Move as a block from Em (add index).",
+    commonMistake: "Muted G string; keep index arched."
+  },
+  A: {
+    fingering: "Index on D2, middle on G2, ring on B2.",
+    transition: "Keep fingers compact to avoid muting high E.",
+    commonMistake: "High E muted; angle fingers toward the nut."
+  }
+};
 
 function pickChord(chords: Chord[], last?: Chord | null) {
   if (chords.length === 1) return chords[0];
@@ -281,9 +353,12 @@ export default function HomePage() {
   const [libraryVariantIndex, setLibraryVariantIndex] = useState(0);
   const [songIndex, setSongIndex] = useState(0);
   const [songStep, setSongStep] = useState(0);
-  const [songStatus, setSongStatus] = useState<"idle" | "running" | "paused">("idle");
+  const [songStatus, setSongStatus] = useState<"idle" | "countin" | "running" | "paused">("idle");
   const [metronomeOn, setMetronomeOn] = useState(true);
   const [songTempoBpm, setSongTempoBpm] = useState(SONGS[0]?.bpm ?? 90);
+  const [songBeatsPerChord, setSongBeatsPerChord] = useState(4);
+  const [songBeat, setSongBeat] = useState(0);
+  const [songCountIn, setSongCountIn] = useState(4);
 
   const countRef = useRef(0);
   const historyRef = useRef<Chord[]>([]);
@@ -453,18 +528,37 @@ export default function HomePage() {
   }, []);
 
   useEffect(() => {
-    if (songStatus !== "running") return;
+    if (songStatus !== "running" && songStatus !== "countin") return;
     if (songTimer.current) {
       clearInterval(songTimer.current);
     }
     songTimer.current = setInterval(() => {
-      setSongStep((prev) => {
-        const next = prev + 1;
-        if (next >= activeSong.chords.length) {
-          setSongStatus("paused");
-          return prev;
+      if (songStatus === "countin") {
+        setSongCountIn((prev) => {
+          const next = prev - 1;
+          if (next <= 0) {
+            setSongStatus("running");
+            setSongBeat(0);
+            return 0;
+          }
+          return next;
+        });
+        return;
+      }
+      setSongBeat((prevBeat) => {
+        const nextBeat = prevBeat + 1;
+        if (nextBeat >= songBeatsPerChord) {
+          setSongStep((prevStep) => {
+            const nextStep = prevStep + 1;
+            if (nextStep >= activeSong.chords.length) {
+              setSongStatus("paused");
+              return prevStep;
+            }
+            return nextStep;
+          });
+          return 0;
         }
-        return next;
+        return nextBeat;
       });
     }, songTempoMs);
     return () => {
@@ -472,14 +566,14 @@ export default function HomePage() {
         clearInterval(songTimer.current);
       }
     };
-  }, [activeSong.chords.length, songStatus, songTempoMs]);
+  }, [activeSong.chords.length, songBeatsPerChord, songStatus, songTempoMs]);
 
   useEffect(() => {
     if (!metronomeOn) return;
-    if (songStatus === "running") {
-      playClick(700);
+    if (songStatus === "running" || songStatus === "countin") {
+      playClick(songBeat === 0 ? 900 : 700);
     }
-  }, [metronomeOn, songStatus, songStep]);
+  }, [metronomeOn, songStatus, songBeat]);
 
   useEffect(() => {
     setLibraryVariantIndex(0);
@@ -515,7 +609,9 @@ export default function HomePage() {
   const handleSongStart = async () => {
     await ensureAudioContext();
     setSongStep(0);
-    setSongStatus("running");
+    setSongBeat(0);
+    setSongCountIn(4);
+    setSongStatus("countin");
   };
 
   const levelTitle = useMemo(() => {
@@ -776,6 +872,8 @@ export default function HomePage() {
                 setSongIndex(nextIndex);
                 setSongTempoBpm(SONGS[nextIndex]?.bpm ?? 90);
                 setSongStep(0);
+                setSongBeat(0);
+                setSongCountIn(4);
                 setSongStatus("idle");
               }}
             >
@@ -800,6 +898,21 @@ export default function HomePage() {
                 onChange={(event) => setSongTempoBpm(Number(event.target.value))}
               />
             </div>
+            <div className="beats-control">
+              <span className="label">Beats per chord</span>
+              <div className="chip-row">
+                {[2, 4, 6].map((beats) => (
+                  <button
+                    key={beats}
+                    type="button"
+                    className={`chip ${songBeatsPerChord === beats ? "active" : ""}`}
+                    onClick={() => setSongBeatsPerChord(beats)}
+                  >
+                    {beats} beats
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="song-controls">
               <button className="btn primary" onClick={handleSongStart}>
                 Start lesson
@@ -807,7 +920,7 @@ export default function HomePage() {
               <button
                 className="btn"
                 onClick={() => setSongStatus("paused")}
-                disabled={songStatus !== "running"}
+                disabled={songStatus !== "running" && songStatus !== "countin"}
               >
                 Pause
               </button>
@@ -822,22 +935,56 @@ export default function HomePage() {
                 className="btn ghost"
                 onClick={() => {
                   setSongStep(0);
+                  setSongBeat(0);
+                  setSongCountIn(4);
                   setSongStatus("idle");
                 }}
               >
                 Reset
               </button>
             </div>
+            <div className="song-guidance">
+              <div className="song-guidance-card">
+                <span className="label">Strumming pattern</span>
+                <p className="strum-pattern">{activeSong.strumPattern}</p>
+                <p className="muted">{activeSong.strumFeel}</p>
+              </div>
+              <div className="song-guidance-card">
+                <span className="label">Count-in</span>
+                <p className="muted">4 clicks before we start. Tap start, then get ready.</p>
+              </div>
+            </div>
           </div>
           <div className="song-progress">
             <span className="label">Current chord</span>
             <h3>{currentSongChordName}</h3>
             <p>
-              Step {Math.min(songStep + 1, activeSong.chords.length)} of {activeSong.chords.length}
+              Step {Math.min(songStep + 1, activeSong.chords.length)} of {activeSong.chords.length} •
+              Beat {songBeat + 1} of {songBeatsPerChord}
             </p>
+            {songStatus === "countin" && (
+              <div className="count-in">
+                <span className="label">Count-in</span>
+                <p>Starting in {songCountIn}...</p>
+              </div>
+            )}
             <div className="diagram-wrap">
               {currentSongChord ? <ChordDiagram chord={currentSongChord} /> : <div className="diagram-empty" />}
             </div>
+            {CHORD_TIPS[currentSongChordName] && (
+              <div className="song-tip">
+                <span className="label">Chord tips</span>
+                <p>
+                  <strong>Fingering:</strong> {CHORD_TIPS[currentSongChordName].fingering}
+                </p>
+                <p>
+                  <strong>Transition:</strong> {CHORD_TIPS[currentSongChordName].transition}
+                </p>
+                <p>
+                  <strong>Common mistake:</strong> {CHORD_TIPS[currentSongChordName].commonMistake}
+                </p>
+              </div>
+            )}
             <div className="song-chords">
               {activeSong.chords.map((chord, index) => (
                 <span

@@ -469,6 +469,61 @@ select {
   width: 100%;
 }
 
+.beats-control {
+  margin-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.song-guidance {
+  margin-top: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.song-guidance-card {
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 14px;
+  padding: 10px 12px;
+}
+
+.strum-pattern {
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  margin: 6px 0;
+}
+
+.muted {
+  color: rgba(0, 0, 0, 0.6);
+  margin: 0;
+}
+
+.count-in {
+  margin: 10px 0 0;
+  background: rgba(31, 122, 116, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+.song-tip {
+  margin-top: 12px;
+  background: rgba(255, 255, 255, 0.75);
+  border-radius: 14px;
+  padding: 12px 14px;
+  display: grid;
+  gap: 6px;
+}
+
+.song-tip strong {
+  font-weight: 700;
+}
+
 .song-chords {
   display: flex;
   flex-wrap: wrap;
