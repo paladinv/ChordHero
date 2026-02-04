@@ -31,6 +31,10 @@ export default function RootLayout({
           </nav>
         </header>
         {children}
+        <footer className="site-footer">
+          <strong>License:</strong> GNU GPL v3.0. You are free to share and adapt this project
+          under the terms of the GPL-3.0 license.
+        </footer>
       </body>
     </html>
   );
