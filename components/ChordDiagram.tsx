@@ -30,10 +30,10 @@ function getBaseFret(chord: Chord) {
 }
 
 export default function ChordDiagram({ chord }: ChordDiagramProps) {
-  const width = 220;
-  const height = 260;
-  const paddingX = 24;
-  const paddingY = 36;
+  const width = 200;
+  const height = 230;
+  const paddingX = 22;
+  const paddingY = 32;
   const gridWidth = width - paddingX * 2;
   const gridHeight = height - paddingY * 2;
   const stringGap = gridWidth / (STRING_COUNT - 1);

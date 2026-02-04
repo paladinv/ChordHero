@@ -14,6 +14,17 @@ type Level = {
   chords: Chord[];
 };
 
+type ChordAlternative = {
+  label: string;
+  chord: Chord;
+};
+
+type ChordLibraryEntry = {
+  name: string;
+  chord: Chord;
+  alternatives: ChordAlternative[];
+};
+
 const LEVELS: Level[] = [
   {
     name: "Open Chords",
@@ -70,6 +81,25 @@ const LEVELS: Level[] = [
 const CHORD_LIBRARY: Chord[] = Array.from(
   new Map(LEVELS.flatMap((level) => level.chords).map((chord) => [chord.name, chord])).values()
 );
+
+const createShiftedChord = (chord: Chord, shift: number, label: string): ChordAlternative => ({
+  label,
+  chord: {
+    ...chord,
+    name: `${chord.name} +${shift}`,
+    frets: chord.frets.map((fret) => (fret > 0 ? fret + shift : fret)),
+    barre: chord.barre ? { ...chord.barre, fret: chord.barre.fret + shift } : undefined
+  }
+});
+
+const CHORD_LIBRARY_ENTRIES: ChordLibraryEntry[] = CHORD_LIBRARY.map((chord) => ({
+  name: chord.name,
+  chord,
+  alternatives: [
+    createShiftedChord(chord, 2, "Up the neck (+2)"),
+    createShiftedChord(chord, 4, "Higher voicing (+4)")
+  ]
+}));
 
 type Song = {
   title: string;
@@ -177,6 +207,64 @@ function pickChord(chords: Chord[], last?: Chord | null) {
   return next;
 }
 
+const NOTE_OFFSETS: Record<string, number> = {
+  C: 0,
+  "C#": 1,
+  Db: 1,
+  D: 2,
+  "D#": 3,
+  Eb: 3,
+  E: 4,
+  F: 5,
+  "F#": 6,
+  Gb: 6,
+  G: 7,
+  "G#": 8,
+  Ab: 8,
+  A: 9,
+  "A#": 10,
+  Bb: 10,
+  B: 11
+};
+
+const noteToFrequency = (note: string, octave: number) => {
+  const offset = NOTE_OFFSETS[note];
+  if (offset === undefined) return null;
+  const midi = 12 * (octave + 1) + offset;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+};
+
+const getChordIntervals = (quality: string) => {
+  const descriptor = quality.toLowerCase();
+  if (descriptor.includes("sus2")) return [0, 2, 7];
+  if (descriptor.includes("sus4")) return [0, 5, 7];
+  if (descriptor.includes("add9")) return [0, 4, 7, 14];
+  if (descriptor.includes("maj7")) return [0, 4, 7, 11];
+  if (descriptor.includes("m7")) return [0, 3, 7, 10];
+  if (descriptor.includes("m")) return [0, 3, 7];
+  if (descriptor.includes("7")) return [0, 4, 7, 10];
+  return [0, 4, 7];
+};
+
+const getChordFrequencies = (chordName: string) => {
+  const [main, bass] = chordName.split("/");
+  const rootMatch = main.match(/^([A-G](?:#|b)?)/);
+  if (!rootMatch) return [];
+  const rootNote = rootMatch[1];
+  const quality = main.slice(rootNote.length);
+  const intervals = getChordIntervals(quality);
+  const rootFrequency = noteToFrequency(rootNote, 4);
+  if (!rootFrequency) return [];
+  const frequencies = intervals
+    .map((interval) => rootFrequency * Math.pow(2, interval / 12))
+    .filter((freq) => Number.isFinite(freq));
+  if (bass) {
+    const bassFrequency = noteToFrequency(bass, 3);
+    if (bassFrequency) frequencies.unshift(bassFrequency);
+  }
+  return frequencies;
+};
+
 export default function HomePage() {
   const [status, setStatus] = useState<"idle" | "running" | "paused" | "levelComplete">("idle");
   const [levelIndex, setLevelIndex] = useState(0);
@@ -190,6 +278,7 @@ export default function HomePage() {
   const [selectedChord, setSelectedChord] = useState<Chord | null>(null);
   const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
   const [libraryChordName, setLibraryChordName] = useState(CHORD_LIBRARY[0]?.name ?? "");
+  const [libraryVariantIndex, setLibraryVariantIndex] = useState(0);
   const [songIndex, setSongIndex] = useState(0);
   const [songStep, setSongStep] = useState(0);
   const [songStatus, setSongStatus] = useState<"idle" | "running" | "paused">("idle");
@@ -205,7 +294,17 @@ export default function HomePage() {
 
   const activeLevelIndex = difficultyMode === "auto" ? levelIndex : manualLevelIndex;
   const activeLevel = LEVELS[activeLevelIndex];
-  const selectedLibraryChord = CHORD_LIBRARY.find((chord) => chord.name === libraryChordName) ?? null;
+  const selectedLibraryEntry =
+    CHORD_LIBRARY_ENTRIES.find((entry) => entry.name === libraryChordName) ?? null;
+  const libraryVariants = useMemo(() => {
+    if (!selectedLibraryEntry) return [];
+    return [
+      { label: "Primary shape", chord: selectedLibraryEntry.chord },
+      ...selectedLibraryEntry.alternatives
+    ];
+  }, [selectedLibraryEntry]);
+  const activeLibraryVariant = libraryVariants[libraryVariantIndex] ?? libraryVariants[0] ?? null;
+  const selectedLibraryChord = activeLibraryVariant?.chord ?? null;
   const activeSong = SONGS[songIndex];
   const currentSongChordName = activeSong.chords[Math.min(songStep, activeSong.chords.length - 1)];
   const currentSongChord =
@@ -235,7 +334,6 @@ export default function HomePage() {
   };
 
   const ensureAudioContext = async () => {
-    if (!metronomeOn) return null;
     if (!audioContextRef.current) {
       audioContextRef.current = new AudioContext();
     }
@@ -261,6 +359,27 @@ export default function HomePage() {
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
     osc.start(now);
     osc.stop(now + 0.09);
+  };
+
+  const playChordSample = async (chordName: string) => {
+    const ctx = await ensureAudioContext();
+    if (!ctx) return;
+    const frequencies = getChordFrequencies(chordName);
+    if (!frequencies.length) return;
+    const now = ctx.currentTime;
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = 0.0001;
+    masterGain.connect(ctx.destination);
+    masterGain.gain.exponentialRampToValueAtTime(0.25, now + 0.05);
+    masterGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.4);
+    frequencies.forEach((frequency, index) => {
+      const osc = ctx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.value = frequency;
+      osc.connect(masterGain);
+      osc.start(now + index * 0.02);
+      osc.stop(now + 1.5);
+    });
   };
 
   const advance = () => {
@@ -362,6 +481,10 @@ export default function HomePage() {
     }
   }, [metronomeOn, songStatus, songStep]);
 
+  useEffect(() => {
+    setLibraryVariantIndex(0);
+  }, [libraryChordName]);
+
   const handleContinue = () => {
     if (difficultyMode === "auto") {
       const nextIndex = Math.min(levelIndex + 1, LEVELS.length - 1);
@@ -407,11 +530,12 @@ export default function HomePage() {
       <section className="hero">
         <div className="brand">
           <span className="tag">Chord Hero</span>
-          <h1>Switch faster. Play cleaner.</h1>
-          <p>
-            Train your hands with a 3‑second chord flash. Ten chords per round, then level up and
-            graduate to barre shapes.
-          </p>
+          <div className="hero-summary">
+            <span>3s flashes</span>
+            <span>10-chord rounds</span>
+            <span>4 levels</span>
+          </div>
+          <p className="hero-note">Tap start, keep eyes forward, and ride the metronome click.</p>
         </div>
 
         <div className="panel">
@@ -514,52 +638,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="library">
-        <div>
-          <h2>Chord library</h2>
-          <p>Select any chord and review the fingering.</p>
-        </div>
-        <div className="library-card">
-          <div>
-            <label className="label" htmlFor="chord-library">
-              Choose a chord
-            </label>
-            <select
-              id="chord-library"
-              value={libraryChordName}
-              onChange={(event) => setLibraryChordName(event.target.value)}
-            >
-              {CHORD_LIBRARY.map((chord) => (
-                <option key={chord.name} value={chord.name}>
-                  {chord.name}
-                </option>
-              ))}
-            </select>
-            {selectedLibraryChord && (
-              <div className="fingering">
-                <p className="label">How to press</p>
-                <p>
-                  Strings: E A D G B e
-                </p>
-                <p>
-                  Frets:{" "}
-                  {selectedLibraryChord.frets
-                    .map((fret) => (fret < 0 ? "X" : fret === 0 ? "O" : fret))
-                    .join(" ")}
-                </p>
-              </div>
-            )}
-          </div>
-          <div className="diagram-wrap">
-            {selectedLibraryChord ? (
-              <ChordDiagram chord={selectedLibraryChord} />
-            ) : (
-              <div className="diagram-empty" />
-            )}
-          </div>
-        </div>
-      </section>
-
       <section className="history">
         <div>
           <h2>Chord history</h2>
@@ -597,6 +675,85 @@ export default function HomePage() {
           </div>
           <div className="diagram-wrap">
             {selectedChord ? <ChordDiagram chord={selectedChord} /> : <div className="diagram-empty" />}
+          </div>
+        </div>
+      </section>
+
+      <section className="library">
+        <div>
+          <h2>Chord library</h2>
+          <p>Pick a chord, explore alternate voicings, and tap to hear it.</p>
+        </div>
+        <div className="library-card">
+          <div>
+            <label className="label" htmlFor="chord-library">
+              Choose a chord
+            </label>
+            <select
+              id="chord-library"
+              value={libraryChordName}
+              onChange={(event) => setLibraryChordName(event.target.value)}
+            >
+              {CHORD_LIBRARY_ENTRIES.map((entry) => (
+                <option key={entry.name} value={entry.name}>
+                  {entry.name}
+                </option>
+              ))}
+            </select>
+            <div className="library-actions">
+              <button
+                className="btn primary"
+                type="button"
+                onClick={() => {
+                  if (selectedLibraryEntry) {
+                    playChordSample(selectedLibraryEntry.name);
+                  }
+                }}
+              >
+                Play sample
+              </button>
+              <span className="library-label">
+                {activeLibraryVariant ? activeLibraryVariant.label : "Select a voicing"}
+              </span>
+            </div>
+            {libraryVariants.length > 0 && (
+              <div className="library-variants">
+                <p className="label">Voicings</p>
+                <div className="variant-list">
+                  {libraryVariants.map((variant, index) => (
+                    <button
+                      key={variant.label}
+                      type="button"
+                      className={`chip ${index === libraryVariantIndex ? "active" : ""}`}
+                      onClick={() => setLibraryVariantIndex(index)}
+                    >
+                      {variant.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+            {selectedLibraryChord && (
+              <div className="fingering">
+                <p className="label">How to press</p>
+                <p>
+                  Strings: E A D G B e
+                </p>
+                <p>
+                  Frets:{" "}
+                  {selectedLibraryChord.frets
+                    .map((fret) => (fret < 0 ? "X" : fret === 0 ? "O" : fret))
+                    .join(" ")}
+                </p>
+              </div>
+            )}
+          </div>
+          <div className="diagram-wrap">
+            {selectedLibraryChord ? (
+              <ChordDiagram chord={selectedLibraryChord} />
+            ) : (
+              <div className="diagram-empty" />
+            )}
           </div>
         </div>
       </section>
