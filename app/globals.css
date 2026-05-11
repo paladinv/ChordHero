@@ -478,6 +478,7 @@ select {
 .chip-row {
   display: flex;
   flex-wrap: wrap;
+<<<<<<< ours
   gap: 8px;
 }
 
@@ -527,6 +528,8 @@ select {
 .song-chords {
   display: flex;
   flex-wrap: wrap;
+=======
+>>>>>>> theirs
   gap: 6px;
   margin-top: 10px;
 }

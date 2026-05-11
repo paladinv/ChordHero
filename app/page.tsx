@@ -579,6 +579,10 @@ export default function HomePage() {
     setLibraryVariantIndex(0);
   }, [libraryChordName]);
 
+  useEffect(() => {
+    setLibraryVariantIndex(0);
+  }, [libraryChordName]);
+
   const handleContinue = () => {
     if (difficultyMode === "auto") {
       const nextIndex = Math.min(levelIndex + 1, LEVELS.length - 1);
