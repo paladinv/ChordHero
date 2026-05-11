@@ -1,105 +1,19 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import ChordDiagram, { Chord } from "../components/ChordDiagram";
+import {
+  CHORD_LIBRARY,
+  CHORD_LIBRARY_ROOTS,
+  CHORD_LOOKUP,
+  CHORD_QUALITY_OPTIONS,
+  LEVELS
+} from "../lib/chords";
 
 const MAX_CHORDS = 10;
 const INTERVAL_MS = 3000;
 const FLASH_MS = 650;
 const COUNTDOWN_TICK_MS = 120;
-
-type Level = {
-  name: string;
-  description: string;
-  chords: Chord[];
-};
-
-type ChordAlternative = {
-  label: string;
-  chord: Chord;
-};
-
-type ChordLibraryEntry = {
-  name: string;
-  chord: Chord;
-  alternatives: ChordAlternative[];
-};
-
-const LEVELS: Level[] = [
-  {
-    name: "Open Chords",
-    description: "Comfortable open shapes to build speed.",
-    chords: [
-      { name: "C", frets: [-1, 3, 2, 0, 1, 0] },
-      { name: "G", frets: [3, 2, 0, 0, 0, 3] },
-      { name: "D", frets: [-1, -1, 0, 2, 3, 2] },
-      { name: "Em", frets: [0, 2, 2, 0, 0, 0] },
-      { name: "Am", frets: [-1, 0, 2, 2, 1, 0] },
-      { name: "E", frets: [0, 2, 2, 1, 0, 0] },
-      { name: "A", frets: [-1, 0, 2, 2, 2, 0] }
-    ]
-  },
-  {
-    name: "Open + Spice",
-    description: "Add sus and dominant flavors for quicker switches.",
-    chords: [
-      { name: "Cadd9", frets: [-1, 3, 2, 0, 3, 0] },
-      { name: "Dsus4", frets: [-1, -1, 0, 2, 3, 3] },
-      { name: "G", frets: [3, 2, 0, 0, 0, 3] },
-      { name: "Em7", frets: [0, 2, 0, 0, 0, 0] },
-      { name: "Am7", frets: [-1, 0, 2, 0, 1, 0] },
-      { name: "E7", frets: [0, 2, 0, 1, 0, 0] },
-      { name: "D", frets: [-1, -1, 0, 2, 3, 2] }
-    ]
-  },
-  {
-    name: "Barre Chords",
-    description: "Full grip shapes for strength and clarity.",
-    chords: [
-      { name: "F", frets: [1, 3, 3, 2, 1, 1], barre: { fret: 1, from: 0, to: 5 } },
-      { name: "Bm", frets: [-1, 2, 4, 4, 3, 2], barre: { fret: 2, from: 1, to: 5 } },
-      { name: "Bb", frets: [1, 3, 3, 2, 1, 1], barre: { fret: 1, from: 0, to: 5 } },
-      { name: "Gm", frets: [3, 5, 5, 3, 3, 3], barre: { fret: 3, from: 0, to: 5 } },
-      { name: "C#m", frets: [-1, 4, 6, 6, 5, 4], barre: { fret: 4, from: 1, to: 5 } },
-      { name: "F#", frets: [2, 4, 4, 3, 2, 2], barre: { fret: 2, from: 0, to: 5 } }
-    ]
-  },
-  {
-    name: "Inversions",
-    description: "Slash chords to sharpen bass movement.",
-    chords: [
-      { name: "C/G", frets: [3, 3, 2, 0, 1, 0] },
-      { name: "G/B", frets: [-1, 2, 0, 0, 0, 3] },
-      { name: "D/F#", frets: [2, 0, 0, 2, 3, 2] },
-      { name: "Am/C", frets: [-1, 3, 2, 2, 1, 0] },
-      { name: "Em/B", frets: [-1, 2, 2, 0, 0, 0] },
-      { name: "F/A", frets: [-1, 0, 3, 2, 1, 1] }
-    ]
-  }
-];
-
-const CHORD_LIBRARY: Chord[] = Array.from(
-  new Map(LEVELS.flatMap((level) => level.chords).map((chord) => [chord.name, chord])).values()
-);
-
-const createShiftedChord = (chord: Chord, shift: number, label: string): ChordAlternative => ({
-  label,
-  chord: {
-    ...chord,
-    name: `${chord.name} +${shift}`,
-    frets: chord.frets.map((fret) => (fret > 0 ? fret + shift : fret)),
-    barre: chord.barre ? { ...chord.barre, fret: chord.barre.fret + shift } : undefined
-  }
-});
-
-const CHORD_LIBRARY_ENTRIES: ChordLibraryEntry[] = CHORD_LIBRARY.map((chord) => ({
-  name: chord.name,
-  chord,
-  alternatives: [
-    createShiftedChord(chord, 2, "Up the neck (+2)"),
-    createShiftedChord(chord, 4, "Higher voicing (+4)")
-  ]
-}));
 
 type Song = {
   title: string;
@@ -337,6 +251,8 @@ const getChordFrequencies = (chordName: string) => {
   return frequencies;
 };
 
+const DEFAULT_LIBRARY_ITEM = CHORD_LIBRARY[0] ?? null;
+
 export default function HomePage() {
   const [status, setStatus] = useState<"idle" | "running" | "paused" | "levelComplete">("idle");
   const [levelIndex, setLevelIndex] = useState(0);
@@ -349,8 +265,12 @@ export default function HomePage() {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [selectedChord, setSelectedChord] = useState<Chord | null>(null);
   const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
-  const [libraryChordName, setLibraryChordName] = useState(CHORD_LIBRARY[0]?.name ?? "");
-  const [libraryVariantIndex, setLibraryVariantIndex] = useState(0);
+  const [libraryRoot, setLibraryRoot] = useState(DEFAULT_LIBRARY_ITEM?.root ?? "");
+  const [libraryQuality, setLibraryQuality] = useState(DEFAULT_LIBRARY_ITEM?.quality ?? "");
+  const [libraryInversion, setLibraryInversion] = useState<"standard" | "inverted">(
+    DEFAULT_LIBRARY_ITEM?.inversion ?? "standard"
+  );
+  const [libraryChordId, setLibraryChordId] = useState(DEFAULT_LIBRARY_ITEM?.id ?? "");
   const [songIndex, setSongIndex] = useState(0);
   const [songStep, setSongStep] = useState(0);
   const [songStatus, setSongStatus] = useState<"idle" | "countin" | "running" | "paused">("idle");
@@ -369,21 +289,41 @@ export default function HomePage() {
 
   const activeLevelIndex = difficultyMode === "auto" ? levelIndex : manualLevelIndex;
   const activeLevel = LEVELS[activeLevelIndex];
+  const rootLibraryEntries = useMemo(
+    () => CHORD_LIBRARY.filter((entry) => entry.root === libraryRoot),
+    [libraryRoot]
+  );
+  const availableLibraryQualities = useMemo(
+    () =>
+      CHORD_QUALITY_OPTIONS.filter((option) =>
+        rootLibraryEntries.some((entry) => entry.quality === option.value)
+      ),
+    [rootLibraryEntries]
+  );
+  const filteredLibraryEntries = useMemo(
+    () =>
+      rootLibraryEntries.filter(
+        (entry) => entry.quality === libraryQuality && entry.inversion === libraryInversion
+      ),
+    [libraryInversion, libraryQuality, rootLibraryEntries]
+  );
+  const availableInversions = useMemo(() => {
+    const inversions = new Set(
+      rootLibraryEntries
+        .filter((entry) => entry.quality === libraryQuality)
+        .map((entry) => entry.inversion)
+    );
+    return {
+      standard: inversions.has("standard"),
+      inverted: inversions.has("inverted")
+    };
+  }, [libraryQuality, rootLibraryEntries]);
   const selectedLibraryEntry =
-    CHORD_LIBRARY_ENTRIES.find((entry) => entry.name === libraryChordName) ?? null;
-  const libraryVariants = useMemo(() => {
-    if (!selectedLibraryEntry) return [];
-    return [
-      { label: "Primary shape", chord: selectedLibraryEntry.chord },
-      ...selectedLibraryEntry.alternatives
-    ];
-  }, [selectedLibraryEntry]);
-  const activeLibraryVariant = libraryVariants[libraryVariantIndex] ?? libraryVariants[0] ?? null;
-  const selectedLibraryChord = activeLibraryVariant?.chord ?? null;
+    filteredLibraryEntries.find((entry) => entry.id === libraryChordId) ?? filteredLibraryEntries[0] ?? null;
+  const selectedLibraryChord = selectedLibraryEntry?.chord ?? null;
   const activeSong = SONGS[songIndex];
   const currentSongChordName = activeSong.chords[Math.min(songStep, activeSong.chords.length - 1)];
-  const currentSongChord =
-    CHORD_LIBRARY.find((chord) => chord.name === currentSongChordName) ?? null;
+  const currentSongChord = CHORD_LOOKUP.get(currentSongChordName) ?? null;
   const songTempoMs = Math.round(60000 / songTempoBpm);
 
   const progressLabel = `${Math.min(count, MAX_CHORDS)}/${MAX_CHORDS}`;
@@ -576,12 +516,22 @@ export default function HomePage() {
   }, [metronomeOn, songStatus, songBeat]);
 
   useEffect(() => {
-    setLibraryVariantIndex(0);
-  }, [libraryChordName]);
+    if (!availableLibraryQualities.some((option) => option.value === libraryQuality)) {
+      setLibraryQuality(availableLibraryQualities[0]?.value ?? "");
+    }
+  }, [availableLibraryQualities, libraryQuality]);
 
   useEffect(() => {
-    setLibraryVariantIndex(0);
-  }, [libraryChordName]);
+    if (!availableInversions[libraryInversion]) {
+      setLibraryInversion(availableInversions.standard ? "standard" : "inverted");
+    }
+  }, [availableInversions, libraryInversion]);
+
+  useEffect(() => {
+    if (!filteredLibraryEntries.some((entry) => entry.id === libraryChordId)) {
+      setLibraryChordId(filteredLibraryEntries[0]?.id ?? "");
+    }
+  }, [filteredLibraryEntries, libraryChordId]);
 
   const handleContinue = () => {
     if (difficultyMode === "auto") {
@@ -782,52 +732,89 @@ export default function HomePage() {
       <section className="library">
         <div>
           <h2>Chord library</h2>
-          <p>Pick a chord, explore alternate voicings, and tap to hear it.</p>
+          <p>Choose a key, chord color, and inversion style instead of digging through one long list.</p>
         </div>
         <div className="library-card">
           <div>
-            <label className="label" htmlFor="chord-library">
-              Choose a chord
-            </label>
-            <select
-              id="chord-library"
-              value={libraryChordName}
-              onChange={(event) => setLibraryChordName(event.target.value)}
-            >
-              {CHORD_LIBRARY_ENTRIES.map((entry) => (
-                <option key={entry.name} value={entry.name}>
-                  {entry.name}
-                </option>
-              ))}
-            </select>
+            <div className="library-filters">
+              <div>
+                <label className="label" htmlFor="library-root">
+                  Main key
+                </label>
+                <select
+                  id="library-root"
+                  value={libraryRoot}
+                  onChange={(event) => setLibraryRoot(event.target.value)}
+                >
+                  {CHORD_LIBRARY_ROOTS.map((root) => (
+                    <option key={root} value={root}>
+                      {root}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label" htmlFor="library-quality">
+                  Chord type
+                </label>
+                <select
+                  id="library-quality"
+                  value={libraryQuality}
+                  onChange={(event) => setLibraryQuality(event.target.value)}
+                >
+                  {availableLibraryQualities.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="label" htmlFor="library-inversion">
+                  Inversion
+                </label>
+                <select
+                  id="library-inversion"
+                  value={libraryInversion}
+                  onChange={(event) =>
+                    setLibraryInversion(event.target.value as "standard" | "inverted")
+                  }
+                >
+                  {availableInversions.standard && <option value="standard">Standard</option>}
+                  {availableInversions.inverted && <option value="inverted">Inverted</option>}
+                </select>
+              </div>
+            </div>
             <div className="library-actions">
               <button
                 className="btn primary"
                 type="button"
                 onClick={() => {
                   if (selectedLibraryEntry) {
-                    playChordSample(selectedLibraryEntry.name);
+                    playChordSample(selectedLibraryEntry.chord.name);
                   }
                 }}
               >
                 Play sample
               </button>
               <span className="library-label">
-                {activeLibraryVariant ? activeLibraryVariant.label : "Select a voicing"}
+                {selectedLibraryEntry
+                  ? `${selectedLibraryEntry.qualityLabel} • ${selectedLibraryEntry.position}`
+                  : "Select a voicing"}
               </span>
             </div>
-            {libraryVariants.length > 0 && (
+            {filteredLibraryEntries.length > 0 && (
               <div className="library-variants">
                 <p className="label">Voicings</p>
                 <div className="variant-list">
-                  {libraryVariants.map((variant, index) => (
+                  {filteredLibraryEntries.map((entry) => (
                     <button
-                      key={variant.label}
+                      key={entry.id}
                       type="button"
-                      className={`chip ${index === libraryVariantIndex ? "active" : ""}`}
-                      onClick={() => setLibraryVariantIndex(index)}
+                      className={`chip ${entry.id === selectedLibraryEntry?.id ? "active" : ""}`}
+                      onClick={() => setLibraryChordId(entry.id)}
                     >
-                      {variant.label}
+                      {entry.position}
                     </button>
                   ))}
                 </div>
@@ -835,6 +822,8 @@ export default function HomePage() {
             )}
             {selectedLibraryChord && (
               <div className="fingering">
+                <p className="label">Selected chord</p>
+                <p>{selectedLibraryChord.name}</p>
                 <p className="label">How to press</p>
                 <p>
                   Strings: E A D G B e

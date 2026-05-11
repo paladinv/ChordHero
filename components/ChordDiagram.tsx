@@ -1,5 +1,3 @@
-import React from "react";
-
 export type Barre = {
   fret: number;
   from: number; // string index 0..5 (low E to high E)

@@ -438,9 +438,28 @@ select {
   margin: 4px 0 6px;
 }
 
+.library-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.library-filters > div {
+  display: grid;
+  gap: 6px;
+}
+
+.library-filters select {
+  width: 100%;
+}
+
 .fingering {
   margin-top: 12px;
   font-weight: 600;
+}
+
+.fingering p {
+  margin: 4px 0;
 }
 
 .song-card {
@@ -478,7 +497,6 @@ select {
 .chip-row {
   display: flex;
   flex-wrap: wrap;
-<<<<<<< ours
   gap: 8px;
 }
 
@@ -528,8 +546,6 @@ select {
 .song-chords {
   display: flex;
   flex-wrap: wrap;
-=======
->>>>>>> theirs
   gap: 6px;
   margin-top: 10px;
 }
@@ -601,6 +617,10 @@ select {
   background: rgba(255, 255, 255, 0.7);
   border-radius: 20px;
   padding: 16px;
+}
+
+.chord-section-header p {
+  margin: 0;
 }
 
 .chord-section h2 {
