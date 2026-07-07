@@ -341,11 +341,28 @@ select {
   background: white;
 }
 
+input[type="search"],
+input[type="text"],
+.custom-pack-builder input,
+textarea {
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid rgba(0, 0, 0, 0.18);
+  background: white;
+  font: inherit;
+}
+
+textarea {
+  width: 100%;
+  min-height: 112px;
+  resize: vertical;
+}
+
 .history {
   display: grid;
   grid-template-columns: 200px 1fr;
   gap: 20px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .history h2 {
@@ -414,7 +431,7 @@ select {
   display: grid;
   grid-template-columns: 200px 1fr;
   gap: 20px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .library-card,
@@ -440,7 +457,7 @@ select {
 
 .library-filters {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
 }
 
@@ -567,7 +584,7 @@ select {
   display: grid;
   grid-template-columns: minmax(260px, 1.2fr) minmax(260px, 0.8fr);
   gap: 28px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .about h1 {
@@ -598,7 +615,7 @@ select {
   display: grid;
   grid-template-columns: minmax(260px, 1.2fr) minmax(240px, 0.8fr);
   gap: 24px;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .print-card {
@@ -655,6 +672,226 @@ select {
   margin-top: 12px;
 }
 
+.library-advanced {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 18px;
+}
+
+.library-toolbar,
+.library-results,
+.library-pack-detail {
+  display: grid;
+  gap: 16px;
+}
+
+.library-search-row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+  gap: 16px;
+  align-items: end;
+}
+
+.library-search,
+.library-view-switch,
+.library-jump-results,
+.library-quicklists {
+  display: grid;
+  gap: 8px;
+}
+
+.library-search input {
+  width: 100%;
+}
+
+.library-pack-strip {
+  display: grid;
+  gap: 12px;
+}
+
+.library-pack-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.library-pack-header p,
+.library-pack-detail p,
+.library-inspector-header p,
+.library-compare p,
+.pack-card p,
+.library-nearby > div p {
+  margin: 0;
+}
+
+.library-pack-grid,
+.library-nearby-grid,
+.library-detail-grid,
+.library-tools-grid,
+.library-focus-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.pack-card,
+.library-detail-card,
+.library-tool-panel,
+.library-compare,
+.library-inspector {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.74);
+  border-radius: 18px;
+  padding: 14px;
+  text-align: left;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.06);
+}
+
+.pack-card {
+  cursor: pointer;
+}
+
+.pack-card h3,
+.library-inspector h3,
+.library-compare h3,
+.library-pack-detail h3 {
+  margin: 6px 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.8rem;
+}
+
+.pack-card.active {
+  outline: 2px solid var(--teal);
+}
+
+.custom-pack-builder {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(220px, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.custom-pack-builder > div,
+.library-tool-panel {
+  display: grid;
+  gap: 8px;
+}
+
+.custom-pack-builder input,
+.custom-pack-builder select {
+  width: 100%;
+}
+
+.range-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.range-row input {
+  width: 100%;
+}
+
+.ear-training-box {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.library-focus-grid {
+  margin: 14px 0;
+}
+
+.library-detail-card h4 {
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.8rem;
+  margin: 6px 0;
+}
+
+.inline-link {
+  border: none;
+  background: transparent;
+  color: var(--teal);
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.compare-selects {
+  display: grid;
+  gap: 8px;
+  min-width: min(260px, 100%);
+}
+
+.print-compare-sheet {
+  display: none;
+}
+
+.library-preview-buttons,
+.library-compare-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.comparison-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(280px, 0.65fr);
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.library-inspector-header,
+.library-compare-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+}
+
+.library-compare {
+  display: grid;
+  gap: 14px;
+}
+
+.library-compare select {
+  width: 100%;
+}
+
+.library-tag-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.meta-chip {
+  background: rgba(31, 122, 116, 0.12);
+  color: var(--teal);
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.library-detail-card ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+}
+
+.library-detail-card li + li {
+  margin-top: 4px;
+}
+
+.library-nearby {
+  display: grid;
+  gap: 12px;
+}
+
 .library-label {
   font-size: 0.8rem;
   color: rgba(0, 0, 0, 0.6);
@@ -684,6 +921,13 @@ select {
 .chip.active {
   background: var(--teal);
   color: white;
+}
+
+.diagram-finger {
+  fill: white;
+  font-size: 11px;
+  font-weight: 700;
+  text-anchor: middle;
 }
 
 .site-footer {
@@ -762,6 +1006,18 @@ select {
   .song-card {
     grid-template-columns: 1fr;
   }
+
+  .library-search-row,
+  .comparison-grid,
+  .custom-pack-builder {
+    grid-template-columns: 1fr;
+  }
+
+  .library-inspector-header,
+  .library-compare-header,
+  .library-pack-header {
+    flex-direction: column;
+  }
 }
 
 @media print {
@@ -770,12 +1026,47 @@ select {
   }
 
   .site-header,
+  .site-footer,
+  .library-toolbar,
+  .library-actions,
+  .library-nearby,
+  .library-pack-detail,
+  .library-inspector,
+  .library-compare,
   .print-card {
     display: none;
   }
 
   .page {
     padding: 24px;
+  }
+
+  .library,
+  .library-card,
+  .library-results {
+    display: block;
+    box-shadow: none;
+    border: none;
+    padding: 0;
+    background: white;
+  }
+
+  .print-compare-sheet {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+
+  .print-compare-card {
+    break-inside: avoid;
+    border: 1px solid rgba(0, 0, 0, 0.22);
+    padding: 12px;
+  }
+
+  .print-compare-card h3 {
+    font-family: "Bebas Neue", sans-serif;
+    font-size: 2rem;
+    margin: 0 0 4px;
   }
 
   .chord-section,

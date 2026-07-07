@@ -8,6 +8,7 @@ export type Chord = {
   name: string;
   frets: number[]; // length 6, -1 mute, 0 open, >0 fret
   barre?: Barre;
+  fingers?: Array<1 | 2 | 3 | 4 | null>;
 };
 
 type ChordDiagramProps = {
@@ -18,7 +19,7 @@ const STRING_COUNT = 6;
 const FRET_COUNT = 5; // includes nut/base line
 
 function getBaseFret(chord: Chord) {
-  const positive = chord.frets.filter((f) => f > 0);
+  const positive = chord.frets.filter((fret) => fret > 0);
   const maxFret = positive.length ? Math.max(...positive) : 1;
   const minFret = positive.length ? Math.min(...positive) : 1;
   if (maxFret <= 4) {
@@ -36,7 +37,6 @@ export default function ChordDiagram({ chord }: ChordDiagramProps) {
   const gridHeight = height - paddingY * 2;
   const stringGap = gridWidth / (STRING_COUNT - 1);
   const fretGap = gridHeight / (FRET_COUNT - 1);
-
   const baseFret = getBaseFret(chord);
 
   return (
@@ -49,11 +49,12 @@ export default function ChordDiagram({ chord }: ChordDiagramProps) {
       aria-label={`Chord diagram for ${chord.name}`}
     >
       <rect x="0" y="0" width={width} height={height} rx="18" className="diagram-bg" />
-      {Array.from({ length: STRING_COUNT }).map((_, i) => {
-        const x = paddingX + i * stringGap;
+
+      {Array.from({ length: STRING_COUNT }).map((_, index) => {
+        const x = paddingX + index * stringGap;
         return (
           <line
-            key={`string-${i}`}
+            key={`string-${index}`}
             x1={x}
             y1={paddingY}
             x2={x}
@@ -63,16 +64,16 @@ export default function ChordDiagram({ chord }: ChordDiagramProps) {
         );
       })}
 
-      {Array.from({ length: FRET_COUNT }).map((_, i) => {
-        const y = paddingY + i * fretGap;
+      {Array.from({ length: FRET_COUNT }).map((_, index) => {
+        const y = paddingY + index * fretGap;
         return (
           <line
-            key={`fret-${i}`}
+            key={`fret-${index}`}
             x1={paddingX}
             y1={y}
             x2={width - paddingX}
             y2={y}
-            className={i === 0 && baseFret === 1 ? "diagram-nut" : "diagram-fret"}
+            className={index === 0 && baseFret === 1 ? "diagram-nut" : "diagram-fret"}
           />
         );
       })}
@@ -82,46 +83,6 @@ export default function ChordDiagram({ chord }: ChordDiagramProps) {
           {baseFret}fr
         </text>
       )}
-
-      {chord.frets.map((fret, stringIndex) => {
-        const x = paddingX + stringIndex * stringGap;
-        if (fret === 0) {
-          return (
-            <text
-              key={`open-${stringIndex}`}
-              x={x}
-              y={paddingY - 12}
-              className="diagram-open"
-            >
-              O
-            </text>
-          );
-        }
-        if (fret < 0) {
-          return (
-            <text
-              key={`mute-${stringIndex}`}
-              x={x}
-              y={paddingY - 12}
-              className="diagram-mute"
-            >
-              X
-            </text>
-          );
-        }
-
-        const position = fret - baseFret + 1;
-        const y = paddingY + position * fretGap - fretGap / 2;
-        return (
-          <circle
-            key={`dot-${stringIndex}`}
-            cx={x}
-            cy={y}
-            r={9}
-            className="diagram-dot"
-          />
-        );
-      })}
 
       {chord.barre && (
         <rect
@@ -133,6 +94,39 @@ export default function ChordDiagram({ chord }: ChordDiagramProps) {
           className="diagram-barre"
         />
       )}
+
+      {chord.frets.map((fret, stringIndex) => {
+        const x = paddingX + stringIndex * stringGap;
+        if (fret === 0) {
+          return (
+            <text key={`open-${stringIndex}`} x={x} y={paddingY - 12} className="diagram-open">
+              O
+            </text>
+          );
+        }
+        if (fret < 0) {
+          return (
+            <text key={`mute-${stringIndex}`} x={x} y={paddingY - 12} className="diagram-mute">
+              X
+            </text>
+          );
+        }
+
+        const position = fret - baseFret + 1;
+        const y = paddingY + position * fretGap - fretGap / 2;
+        const finger = chord.fingers?.[stringIndex] ?? null;
+
+        return (
+          <g key={`dot-${stringIndex}`}>
+            <circle cx={x} cy={y} r={11} className="diagram-dot" />
+            {finger ? (
+              <text x={x} y={y + 4} className="diagram-finger">
+                {finger}
+              </text>
+            ) : null}
+          </g>
+        );
+      })}
     </svg>
   );
 }

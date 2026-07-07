@@ -1,14 +1,24 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ChordDiagram, { Chord } from "../components/ChordDiagram";
-import {
-  CHORD_LIBRARY,
-  CHORD_LIBRARY_ROOTS,
-  CHORD_LOOKUP,
-  CHORD_QUALITY_OPTIONS,
-  LEVELS
-} from "../lib/chords";
+import { CHORD_LOOKUP, LEVELS } from "../lib/chords";
+
+const ChordLibraryExplorer = dynamic(() => import("../components/ChordLibraryExplorer"), {
+  ssr: false,
+  loading: () => (
+    <section className="library">
+      <div>
+        <h2>Chord library</h2>
+        <p>Loading your saved chords, filters, and voicing explorer...</p>
+      </div>
+      <div className="library-card">
+        <div className="history-empty">Preparing the library explorer...</div>
+      </div>
+    </section>
+  )
+});
 
 const MAX_CHORDS = 10;
 const INTERVAL_MS = 3000;
@@ -193,66 +203,6 @@ function pickChord(chords: Chord[], last?: Chord | null) {
   return next;
 }
 
-const NOTE_OFFSETS: Record<string, number> = {
-  C: 0,
-  "C#": 1,
-  Db: 1,
-  D: 2,
-  "D#": 3,
-  Eb: 3,
-  E: 4,
-  F: 5,
-  "F#": 6,
-  Gb: 6,
-  G: 7,
-  "G#": 8,
-  Ab: 8,
-  A: 9,
-  "A#": 10,
-  Bb: 10,
-  B: 11
-};
-
-const noteToFrequency = (note: string, octave: number) => {
-  const offset = NOTE_OFFSETS[note];
-  if (offset === undefined) return null;
-  const midi = 12 * (octave + 1) + offset;
-  return 440 * Math.pow(2, (midi - 69) / 12);
-};
-
-const getChordIntervals = (quality: string) => {
-  const descriptor = quality.toLowerCase();
-  if (descriptor.includes("sus2")) return [0, 2, 7];
-  if (descriptor.includes("sus4")) return [0, 5, 7];
-  if (descriptor.includes("add9")) return [0, 4, 7, 14];
-  if (descriptor.includes("maj7")) return [0, 4, 7, 11];
-  if (descriptor.includes("m7")) return [0, 3, 7, 10];
-  if (descriptor.includes("m")) return [0, 3, 7];
-  if (descriptor.includes("7")) return [0, 4, 7, 10];
-  return [0, 4, 7];
-};
-
-const getChordFrequencies = (chordName: string) => {
-  const [main, bass] = chordName.split("/");
-  const rootMatch = main.match(/^([A-G](?:#|b)?)/);
-  if (!rootMatch) return [];
-  const rootNote = rootMatch[1];
-  const quality = main.slice(rootNote.length);
-  const intervals = getChordIntervals(quality);
-  const rootFrequency = noteToFrequency(rootNote, 4);
-  if (!rootFrequency) return [];
-  const frequencies = intervals
-    .map((interval) => rootFrequency * Math.pow(2, interval / 12))
-    .filter((freq) => Number.isFinite(freq));
-  if (bass) {
-    const bassFrequency = noteToFrequency(bass, 3);
-    if (bassFrequency) frequencies.unshift(bassFrequency);
-  }
-  return frequencies;
-};
-
-const DEFAULT_LIBRARY_ITEM = CHORD_LIBRARY[0] ?? null;
-
 export default function HomePage() {
   const [status, setStatus] = useState<"idle" | "running" | "paused" | "levelComplete">("idle");
   const [levelIndex, setLevelIndex] = useState(0);
@@ -265,12 +215,6 @@ export default function HomePage() {
   const [secondsLeft, setSecondsLeft] = useState(0);
   const [selectedChord, setSelectedChord] = useState<Chord | null>(null);
   const [selectedHistoryIndex, setSelectedHistoryIndex] = useState<number | null>(null);
-  const [libraryRoot, setLibraryRoot] = useState(DEFAULT_LIBRARY_ITEM?.root ?? "");
-  const [libraryQuality, setLibraryQuality] = useState(DEFAULT_LIBRARY_ITEM?.quality ?? "");
-  const [libraryInversion, setLibraryInversion] = useState<"standard" | "inverted">(
-    DEFAULT_LIBRARY_ITEM?.inversion ?? "standard"
-  );
-  const [libraryChordId, setLibraryChordId] = useState(DEFAULT_LIBRARY_ITEM?.id ?? "");
   const [songIndex, setSongIndex] = useState(0);
   const [songStep, setSongStep] = useState(0);
   const [songStatus, setSongStatus] = useState<"idle" | "countin" | "running" | "paused">("idle");
@@ -289,43 +233,10 @@ export default function HomePage() {
 
   const activeLevelIndex = difficultyMode === "auto" ? levelIndex : manualLevelIndex;
   const activeLevel = LEVELS[activeLevelIndex];
-  const rootLibraryEntries = useMemo(
-    () => CHORD_LIBRARY.filter((entry) => entry.root === libraryRoot),
-    [libraryRoot]
-  );
-  const availableLibraryQualities = useMemo(
-    () =>
-      CHORD_QUALITY_OPTIONS.filter((option) =>
-        rootLibraryEntries.some((entry) => entry.quality === option.value)
-      ),
-    [rootLibraryEntries]
-  );
-  const filteredLibraryEntries = useMemo(
-    () =>
-      rootLibraryEntries.filter(
-        (entry) => entry.quality === libraryQuality && entry.inversion === libraryInversion
-      ),
-    [libraryInversion, libraryQuality, rootLibraryEntries]
-  );
-  const availableInversions = useMemo(() => {
-    const inversions = new Set(
-      rootLibraryEntries
-        .filter((entry) => entry.quality === libraryQuality)
-        .map((entry) => entry.inversion)
-    );
-    return {
-      standard: inversions.has("standard"),
-      inverted: inversions.has("inverted")
-    };
-  }, [libraryQuality, rootLibraryEntries]);
-  const selectedLibraryEntry =
-    filteredLibraryEntries.find((entry) => entry.id === libraryChordId) ?? filteredLibraryEntries[0] ?? null;
-  const selectedLibraryChord = selectedLibraryEntry?.chord ?? null;
   const activeSong = SONGS[songIndex];
   const currentSongChordName = activeSong.chords[Math.min(songStep, activeSong.chords.length - 1)];
   const currentSongChord = CHORD_LOOKUP.get(currentSongChordName) ?? null;
   const songTempoMs = Math.round(60000 / songTempoBpm);
-
   const progressLabel = `${Math.min(count, MAX_CHORDS)}/${MAX_CHORDS}`;
 
   const resetRound = () => {
@@ -361,7 +272,6 @@ export default function HomePage() {
   const playClick = async (frequency = 900) => {
     if (!metronomeOn) return;
     const ctx = await ensureAudioContext();
-    if (!ctx) return;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "square";
@@ -376,27 +286,6 @@ export default function HomePage() {
     osc.stop(now + 0.09);
   };
 
-  const playChordSample = async (chordName: string) => {
-    const ctx = await ensureAudioContext();
-    if (!ctx) return;
-    const frequencies = getChordFrequencies(chordName);
-    if (!frequencies.length) return;
-    const now = ctx.currentTime;
-    const masterGain = ctx.createGain();
-    masterGain.gain.value = 0.0001;
-    masterGain.connect(ctx.destination);
-    masterGain.gain.exponentialRampToValueAtTime(0.25, now + 0.05);
-    masterGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.4);
-    frequencies.forEach((frequency, index) => {
-      const osc = ctx.createOscillator();
-      osc.type = "triangle";
-      osc.frequency.value = frequency;
-      osc.connect(masterGain);
-      osc.start(now + index * 0.02);
-      osc.stop(now + 1.5);
-    });
-  };
-
   const advance = () => {
     if (countRef.current >= MAX_CHORDS) {
       return;
@@ -406,8 +295,8 @@ export default function HomePage() {
     const next = pickChord(activeLevel.chords, lastChord ?? null);
 
     setCurrentChord(next);
-    setHistory((prev) => {
-      const updated = [...prev, next];
+    setHistory((previous) => {
+      const updated = [...previous, next];
       historyRef.current = updated;
       return updated;
     });
@@ -474,8 +363,8 @@ export default function HomePage() {
     }
     songTimer.current = setInterval(() => {
       if (songStatus === "countin") {
-        setSongCountIn((prev) => {
-          const next = prev - 1;
+        setSongCountIn((previous) => {
+          const next = previous - 1;
           if (next <= 0) {
             setSongStatus("running");
             setSongBeat(0);
@@ -485,14 +374,14 @@ export default function HomePage() {
         });
         return;
       }
-      setSongBeat((prevBeat) => {
-        const nextBeat = prevBeat + 1;
+      setSongBeat((previousBeat) => {
+        const nextBeat = previousBeat + 1;
         if (nextBeat >= songBeatsPerChord) {
-          setSongStep((prevStep) => {
-            const nextStep = prevStep + 1;
+          setSongStep((previousStep) => {
+            const nextStep = previousStep + 1;
             if (nextStep >= activeSong.chords.length) {
               setSongStatus("paused");
-              return prevStep;
+              return previousStep;
             }
             return nextStep;
           });
@@ -514,24 +403,6 @@ export default function HomePage() {
       playClick(songBeat === 0 ? 900 : 700);
     }
   }, [metronomeOn, songStatus, songBeat]);
-
-  useEffect(() => {
-    if (!availableLibraryQualities.some((option) => option.value === libraryQuality)) {
-      setLibraryQuality(availableLibraryQualities[0]?.value ?? "");
-    }
-  }, [availableLibraryQualities, libraryQuality]);
-
-  useEffect(() => {
-    if (!availableInversions[libraryInversion]) {
-      setLibraryInversion(availableInversions.standard ? "standard" : "inverted");
-    }
-  }, [availableInversions, libraryInversion]);
-
-  useEffect(() => {
-    if (!filteredLibraryEntries.some((entry) => entry.id === libraryChordId)) {
-      setLibraryChordId(filteredLibraryEntries[0]?.id ?? "");
-    }
-  }, [filteredLibraryEntries, libraryChordId]);
 
   const handleContinue = () => {
     if (difficultyMode === "auto") {
@@ -644,7 +515,7 @@ export default function HomePage() {
             </button>
             <button
               className={`btn ${metronomeOn ? "primary" : ""}`}
-              onClick={() => setMetronomeOn((prev) => !prev)}
+              onClick={() => setMetronomeOn((previous) => !previous)}
             >
               {metronomeOn ? "Metronome on" : "Metronome off"}
             </button>
@@ -729,123 +600,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="library">
-        <div>
-          <h2>Chord library</h2>
-          <p>Choose a key, chord color, and inversion style instead of digging through one long list.</p>
-        </div>
-        <div className="library-card">
-          <div>
-            <div className="library-filters">
-              <div>
-                <label className="label" htmlFor="library-root">
-                  Main key
-                </label>
-                <select
-                  id="library-root"
-                  value={libraryRoot}
-                  onChange={(event) => setLibraryRoot(event.target.value)}
-                >
-                  {CHORD_LIBRARY_ROOTS.map((root) => (
-                    <option key={root} value={root}>
-                      {root}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label" htmlFor="library-quality">
-                  Chord type
-                </label>
-                <select
-                  id="library-quality"
-                  value={libraryQuality}
-                  onChange={(event) => setLibraryQuality(event.target.value)}
-                >
-                  {availableLibraryQualities.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="label" htmlFor="library-inversion">
-                  Inversion
-                </label>
-                <select
-                  id="library-inversion"
-                  value={libraryInversion}
-                  onChange={(event) =>
-                    setLibraryInversion(event.target.value as "standard" | "inverted")
-                  }
-                >
-                  {availableInversions.standard && <option value="standard">Standard</option>}
-                  {availableInversions.inverted && <option value="inverted">Inverted</option>}
-                </select>
-              </div>
-            </div>
-            <div className="library-actions">
-              <button
-                className="btn primary"
-                type="button"
-                onClick={() => {
-                  if (selectedLibraryEntry) {
-                    playChordSample(selectedLibraryEntry.chord.name);
-                  }
-                }}
-              >
-                Play sample
-              </button>
-              <span className="library-label">
-                {selectedLibraryEntry
-                  ? `${selectedLibraryEntry.qualityLabel} • ${selectedLibraryEntry.position}`
-                  : "Select a voicing"}
-              </span>
-            </div>
-            {filteredLibraryEntries.length > 0 && (
-              <div className="library-variants">
-                <p className="label">Voicings</p>
-                <div className="variant-list">
-                  {filteredLibraryEntries.map((entry) => (
-                    <button
-                      key={entry.id}
-                      type="button"
-                      className={`chip ${entry.id === selectedLibraryEntry?.id ? "active" : ""}`}
-                      onClick={() => setLibraryChordId(entry.id)}
-                    >
-                      {entry.position}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {selectedLibraryChord && (
-              <div className="fingering">
-                <p className="label">Selected chord</p>
-                <p>{selectedLibraryChord.name}</p>
-                <p className="label">How to press</p>
-                <p>
-                  Strings: E A D G B e
-                </p>
-                <p>
-                  Frets:{" "}
-                  {selectedLibraryChord.frets
-                    .map((fret) => (fret < 0 ? "X" : fret === 0 ? "O" : fret))
-                    .join(" ")}
-                </p>
-              </div>
-            )}
-          </div>
-          <div className="diagram-wrap">
-            {selectedLibraryChord ? (
-              <ChordDiagram chord={selectedLibraryChord} />
-            ) : (
-              <div className="diagram-empty" />
-            )}
-          </div>
-        </div>
-      </section>
+      <ChordLibraryExplorer />
 
       <section className="song-coach">
         <div>
