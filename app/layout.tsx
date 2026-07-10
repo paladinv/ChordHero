@@ -1,10 +1,11 @@
 import "./globals.css";
 import type { Metadata } from "next";
+import Image from "next/image";
 import Link from "next/link";
 
 export const metadata: Metadata = {
   title: "Chord Hero",
-  description: "Practice fast chord changes with timed chord flashes and level progression."
+  description: "Focused guitar chord practice tools for fast changes, songs, and voicing study."
 };
 
 export default function RootLayout({
@@ -17,15 +18,20 @@ export default function RootLayout({
       <body>
         <header className="site-header">
           <Link href="/" className="brand-link">
-            <img
+            <Image
               src="/chord-hero-logo.svg"
               alt="Chord Hero logo"
               className="logo"
+              width={92}
+              height={92}
             />
             <span>Chord Hero</span>
           </Link>
           <nav className="site-nav">
-            <Link href="/">Trainer</Link>
+            <Link href="/">Home</Link>
+            <Link href="/trainer">Trainer</Link>
+            <Link href="/songs">Songs</Link>
+            <Link href="/library">Library</Link>
             <Link href="/chords">Chord Chart</Link>
             <Link href="/about">About</Link>
           </nav>
