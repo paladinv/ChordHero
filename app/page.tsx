@@ -203,6 +203,64 @@ function pickChord(chords: Chord[], last?: Chord | null) {
   return next;
 }
 
+const NOTE_OFFSETS: Record<string, number> = {
+  C: 0,
+  "C#": 1,
+  Db: 1,
+  D: 2,
+  "D#": 3,
+  Eb: 3,
+  E: 4,
+  F: 5,
+  "F#": 6,
+  Gb: 6,
+  G: 7,
+  "G#": 8,
+  Ab: 8,
+  A: 9,
+  "A#": 10,
+  Bb: 10,
+  B: 11
+};
+
+const noteToFrequency = (note: string, octave: number) => {
+  const offset = NOTE_OFFSETS[note];
+  if (offset === undefined) return null;
+  const midi = 12 * (octave + 1) + offset;
+  return 440 * Math.pow(2, (midi - 69) / 12);
+};
+
+const getChordIntervals = (quality: string) => {
+  const descriptor = quality.toLowerCase();
+  if (descriptor.includes("sus2")) return [0, 2, 7];
+  if (descriptor.includes("sus4")) return [0, 5, 7];
+  if (descriptor.includes("add9")) return [0, 4, 7, 14];
+  if (descriptor.includes("maj7")) return [0, 4, 7, 11];
+  if (descriptor.includes("m7")) return [0, 3, 7, 10];
+  if (descriptor.includes("m")) return [0, 3, 7];
+  if (descriptor.includes("7")) return [0, 4, 7, 10];
+  return [0, 4, 7];
+};
+
+const getChordFrequencies = (chordName: string) => {
+  const [main, bass] = chordName.split("/");
+  const rootMatch = main.match(/^([A-G](?:#|b)?)/);
+  if (!rootMatch) return [];
+  const rootNote = rootMatch[1];
+  const quality = main.slice(rootNote.length);
+  const intervals = getChordIntervals(quality);
+  const rootFrequency = noteToFrequency(rootNote, 4);
+  if (!rootFrequency) return [];
+  const frequencies = intervals
+    .map((interval) => rootFrequency * Math.pow(2, interval / 12))
+    .filter((freq) => Number.isFinite(freq));
+  if (bass) {
+    const bassFrequency = noteToFrequency(bass, 3);
+    if (bassFrequency) frequencies.unshift(bassFrequency);
+  }
+  return frequencies;
+};
+
 export default function HomePage() {
   const [status, setStatus] = useState<"idle" | "running" | "paused" | "levelComplete">("idle");
   const [levelIndex, setLevelIndex] = useState(0);
@@ -284,6 +342,27 @@ export default function HomePage() {
     gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.08);
     osc.start(now);
     osc.stop(now + 0.09);
+  };
+
+  const playChordSample = async (chordName: string) => {
+    const ctx = await ensureAudioContext();
+    if (!ctx) return;
+    const frequencies = getChordFrequencies(chordName);
+    if (!frequencies.length) return;
+    const now = ctx.currentTime;
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = 0.0001;
+    masterGain.connect(ctx.destination);
+    masterGain.gain.exponentialRampToValueAtTime(0.25, now + 0.05);
+    masterGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.4);
+    frequencies.forEach((frequency, index) => {
+      const osc = ctx.createOscillator();
+      osc.type = "triangle";
+      osc.frequency.value = frequency;
+      osc.connect(masterGain);
+      osc.start(now + index * 0.02);
+      osc.stop(now + 1.5);
+    });
   };
 
   const advance = () => {

@@ -216,6 +216,12 @@ body {
   justify-content: center;
 }
 
+.chord-chart-panel {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+
 .diagram-empty {
   width: 200px;
   height: 230px;
@@ -680,7 +686,9 @@ textarea {
 
 .library-toolbar,
 .library-results,
-.library-pack-detail {
+.library-pack-detail,
+.teacher-export,
+.library-heatmap {
   display: grid;
   gap: 16px;
 }
@@ -729,7 +737,8 @@ textarea {
 .library-nearby-grid,
 .library-detail-grid,
 .library-tools-grid,
-.library-focus-grid {
+.library-focus-grid,
+.teacher-sheet-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
@@ -738,6 +747,7 @@ textarea {
 .pack-card,
 .library-detail-card,
 .library-tool-panel,
+.teacher-sheet-card,
 .library-compare,
 .library-inspector {
   border: 1px solid rgba(0, 0, 0, 0.08);
@@ -892,6 +902,90 @@ textarea {
   gap: 12px;
 }
 
+.library-heatmap,
+.teacher-export {
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  padding-top: 16px;
+}
+
+.library-heatmap p,
+.teacher-export p {
+  margin: 0;
+}
+
+.heatmap-grid {
+  display: grid;
+  grid-template-columns: repeat(13, minmax(28px, 1fr));
+  gap: 5px;
+}
+
+.heatmap-cell {
+  min-height: 30px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  background: rgba(255, 255, 255, 0.65);
+  color: rgba(0, 0, 0, 0.58);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.heatmap-cell.primary {
+  background: rgba(31, 122, 116, 0.18);
+  color: var(--teal);
+}
+
+.heatmap-cell.comparison {
+  background: rgba(212, 87, 59, 0.18);
+  color: var(--brick);
+}
+
+.heatmap-cell.shared {
+  background: rgba(244, 179, 80, 0.42);
+  color: var(--ink);
+  outline: 2px solid rgba(31, 122, 116, 0.38);
+}
+
+.heatmap-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  display: inline-block;
+  border-radius: 999px;
+  margin-right: 4px;
+}
+
+.legend-dot.primary {
+  background: var(--teal);
+}
+
+.legend-dot.comparison {
+  background: var(--brick);
+}
+
+.legend-dot.shared {
+  background: var(--sun);
+}
+
+.teacher-sheet-card {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+}
+
+.teacher-sheet-card h3 {
+  margin: 0;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.8rem;
+}
+
 .library-label {
   font-size: 0.8rem;
   color: rgba(0, 0, 0, 0.6);
@@ -1018,6 +1112,10 @@ textarea {
   .library-pack-header {
     flex-direction: column;
   }
+
+  .heatmap-grid {
+    grid-template-columns: repeat(7, minmax(32px, 1fr));
+  }
 }
 
 @media print {
@@ -1030,7 +1128,9 @@ textarea {
   .library-toolbar,
   .library-actions,
   .library-nearby,
+  .library-heatmap,
   .library-pack-detail,
+  .teacher-export .library-filters,
   .library-inspector,
   .library-compare,
   .print-card {
@@ -1055,6 +1155,19 @@ textarea {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 14px;
+  }
+
+  .teacher-export {
+    display: block;
+    break-before: page;
+  }
+
+  .teacher-export .library-pack-header {
+    display: block;
+  }
+
+  .teacher-sheet-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .print-compare-card {
