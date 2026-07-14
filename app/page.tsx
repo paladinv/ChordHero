@@ -9,6 +9,13 @@ const dashboardCards = [
     meta: ["3s flashes", "10 chords", "Auto levels"]
   },
   {
+    href: "/right-hand",
+    eyebrow: "Technique lab",
+    title: "Right-Hand Studio",
+    description: "Follow animated strumming, plectrum, and fingerpicking drills at your own speed.",
+    meta: ["30 exercises", "40–180 BPM", "3 skill levels"]
+  },
+  {
     href: "/songs",
     eyebrow: "Play-along",
     title: "Song Coach",

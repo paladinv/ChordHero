@@ -1,0 +1,7 @@
+Original prompt: Add in a new tab, this tab is specifically for right hand practices, e.g. strumming patterns, plectrum pickings, and fingerpickings. Add in a lot of different practice exercises for each technique, demonstrations for users to follow along, with speed adjustable. There should be different difficulties for user to choose from, so it can cater to beginners, intermediate level players, and experts. Optimize the UI should it is not cluttered and overwhelms the user.
+
+- 2026-07-14: Inspected the Next.js app structure and existing UI. The new experience will live at `/right-hand` and preserve unrelated uncommitted library/CSS work.
+- 2026-07-14: Added `/right-hand`, 30 exercises across strumming, plectrum, and fingerpicking, three difficulty filters, animated step-by-step demos, tempo range, audio clicks, coaching cues, and responsive focused-workspace styling. Added navigation and dashboard entry.
+- 2026-07-14: `npm run build` passed with lint and TypeScript checks. Browser-tested technique/difficulty switching, advanced exercise selection, active playback stepping, audio initialization, and console output (no errors/warnings).
+- 2026-07-14: Visually inspected desktop at 1440px and mobile at 390px. Both report zero document overflow; mobile filters, horizontal exercise/pattern strips, and single-column transport are usable and legible.
+- TODO: None for the requested feature.

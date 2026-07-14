@@ -93,6 +93,7 @@ const SONG_EXAMPLES = [
 
 type SampleVoice = (typeof SAMPLE_VOICES)[number];
 type TuningId = (typeof TUNINGS)[number]["id"];
+type InversionSelection = "all" | string;
 type CustomPack = ProgressionPack & { custom: true };
 type PracticeStats = Record<
   string,
@@ -118,6 +119,7 @@ type HeatmapNote = {
   note: string;
   state: "primary" | "comparison" | "shared" | "idle";
 };
+type LibraryWorkspace = "browse" | "practice" | "compare" | "tools";
 
 const noteAt = (index: number) => NOTES[((index % 12) + 12) % 12];
 
@@ -219,11 +221,10 @@ const getCommonMistakes = (entry: ChordLibraryItem) => {
 };
 
 export default function ChordLibraryExplorer() {
+  const [workspace, setWorkspace] = useState<LibraryWorkspace>("browse");
   const [libraryRoot, setLibraryRoot] = useState(DEFAULT_LIBRARY_ITEM?.root ?? "");
   const [libraryQuality, setLibraryQuality] = useState(DEFAULT_LIBRARY_ITEM?.quality ?? "");
-  const [libraryInversion, setLibraryInversion] = useState<"standard" | "inverted">(
-    DEFAULT_LIBRARY_ITEM?.inversion ?? "standard"
-  );
+  const [libraryInversion, setLibraryInversion] = useState<InversionSelection>("all");
   const [libraryTag, setLibraryTag] = useState<"all" | DifficultyTag>("all");
   const [libraryFunctionKey, setLibraryFunctionKey] = useState<"any" | string>("G");
   const [libraryFunctionRole, setLibraryFunctionRole] = useState<"any" | HarmonicRole>("any");
@@ -305,16 +306,20 @@ export default function ChordLibraryExplorer() {
       ),
     [rootPool]
   );
-  const availableInversions = useMemo(() => {
-    const inversions = new Set(
-      rootPool
-        .filter((entry) => entry.quality === libraryQuality)
-        .map((entry) => entry.inversion)
-    );
-    return {
-      standard: inversions.has("standard"),
-      inverted: inversions.has("inverted")
-    };
+  const availableInversionOptions = useMemo(() => {
+    const entries = rootPool
+      .filter((entry) => entry.quality === libraryQuality)
+      .sort((left, right) => left.id.localeCompare(right.id));
+    return [
+      { value: "all", label: "All positions" },
+      ...entries.map((entry) => ({
+        value: entry.id,
+        label:
+          entry.inversion === "standard"
+            ? `Standard • ${entry.position}`
+            : `${entry.chord.name} • ${entry.position}`
+      }))
+    ];
   }, [libraryQuality, rootPool]);
 
   const filteredLibraryEntries = useMemo(
@@ -322,7 +327,7 @@ export default function ChordLibraryExplorer() {
       libraryPool.filter((entry) => {
         if (entry.root !== libraryRoot) return false;
         if (entry.quality !== libraryQuality) return false;
-        if (entry.inversion !== libraryInversion) return false;
+        if (libraryInversion !== "all" && entry.id !== libraryInversion) return false;
         if (libraryTag !== "all" && !entry.difficultyTags.includes(libraryTag)) return false;
 
         if (libraryFunctionRole !== "any" || libraryFunctionKey !== "any") {
@@ -434,8 +439,15 @@ export default function ChordLibraryExplorer() {
     return (
       dueReviewEntries[0] ??
       CHORD_LIBRARY.find(
-        (entry) => !practicedIds.has(entry.id) && getDifficultyScore(entry) <= currentScore + 1
-      ) ?? CHORD_LIBRARY.find((entry) => !practicedIds.has(entry.id)) ?? null
+        (entry) =>
+          entry.id !== selectedLibraryEntry?.id &&
+          !practicedIds.has(entry.id) &&
+          getDifficultyScore(entry) <= currentScore + 1
+      ) ??
+      CHORD_LIBRARY.find(
+        (entry) => entry.id !== selectedLibraryEntry?.id && !practicedIds.has(entry.id)
+      ) ??
+      null
     );
   }, [dueReviewEntries, practiceStats, selectedLibraryEntry]);
 
@@ -545,7 +557,7 @@ export default function ChordLibraryExplorer() {
     setActivePackId("all");
     setLibraryRoot(nextEntry.root);
     setLibraryQuality(nextEntry.quality);
-    setLibraryInversion(nextEntry.inversion);
+    setLibraryInversion(nextEntry.id);
     setSelectedLibraryId(nextEntry.id);
   };
 
@@ -829,10 +841,10 @@ export default function ChordLibraryExplorer() {
   }, [availableLibraryQualities, libraryQuality]);
 
   useEffect(() => {
-    if (!availableInversions[libraryInversion]) {
-      setLibraryInversion(availableInversions.standard ? "standard" : "inverted");
+    if (!availableInversionOptions.some((option) => option.value === libraryInversion)) {
+      setLibraryInversion("all");
     }
-  }, [availableInversions, libraryInversion]);
+  }, [availableInversionOptions, libraryInversion]);
 
   useEffect(() => {
     if (!filteredLibraryEntries.length) return;
@@ -872,896 +884,372 @@ export default function ChordLibraryExplorer() {
   }, [selectedLibraryEntry?.id]);
 
   return (
-    <section className="library">
-      <div>
-        <h2>Chord library</h2>
-        <p>
-          Filter by key, harmonic role, and difficulty, then compare voicings with fingering,
-          coaching, and audio previews.
-        </p>
-      </div>
-      <div className="library-card library-advanced">
-        <div className="library-toolbar">
-          <div className="library-filters">
-            <div>
-              <label className="label" htmlFor="library-root">
-                Main key
-              </label>
-              <select
-                id="library-root"
-                value={libraryRoot}
-                onChange={(event) => setLibraryRoot(event.target.value)}
-              >
-                {(availableRoots.length ? availableRoots : CHORD_LIBRARY_ROOTS).map((root) => (
-                  <option key={root} value={root}>
-                    {root}
-                  </option>
+    <section className="library library-redesign">
+      <header className="library-heading">
+        <div>
+          <span className="tag">Interactive reference</span>
+          <h2>Chord library</h2>
+          <p>Find a shape, hear it, and focus on one task at a time.</p>
+        </div>
+        <div className="library-collection-switch" aria-label="Chord collection">
+          {[
+            { id: "all", label: "All" },
+            { id: "favorites", label: `Favorites ${favoriteIds.length}` },
+            { id: "recent", label: `Recent ${recentIds.length}` }
+          ].map((option) => (
+            <button
+              key={option.id}
+              type="button"
+              className={`chip ${activeCollection === option.id ? "active" : ""}`}
+              onClick={() => setActiveCollection(option.id as "all" | "favorites" | "recent")}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </header>
+
+      <div className="library-card library-shell">
+        <div className="library-findbar">
+          <div className="library-search">
+            <label className="label" htmlFor="library-search">Search chords</label>
+            <input
+              id="library-search"
+              type="search"
+              value={librarySearch}
+              onChange={(event) => setLibrarySearch(event.target.value)}
+              placeholder="Try Dm7, G/B, Fmaj7..."
+            />
+          </div>
+          <div>
+            <label className="label" htmlFor="library-root">Root</label>
+            <select id="library-root" value={libraryRoot} onChange={(event) => setLibraryRoot(event.target.value)}>
+              {(availableRoots.length ? availableRoots : CHORD_LIBRARY_ROOTS).map((root) => (
+                <option key={root} value={root}>{root}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="label" htmlFor="library-quality">Type</label>
+            <select id="library-quality" value={libraryQuality} onChange={(event) => setLibraryQuality(event.target.value)}>
+              {availableLibraryQualities.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
+              ))}
+            </select>
+          </div>
+          <details className="library-more-filters">
+            <summary>More filters</summary>
+            <div className="library-filter-popover">
+              <label htmlFor="library-inversion">Position</label>
+              <select id="library-inversion" value={libraryInversion} onChange={(event) => setLibraryInversion(event.target.value)}>
+                {availableInversionOptions.map((option) => (
+                  <option key={option.value} value={option.value}>{option.label}</option>
                 ))}
               </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="library-quality">
-                Chord type
-              </label>
-              <select
-                id="library-quality"
-                value={libraryQuality}
-                onChange={(event) => setLibraryQuality(event.target.value)}
-              >
-                {availableLibraryQualities.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+              <label htmlFor="library-tag">Difficulty</label>
+              <select id="library-tag" value={libraryTag} onChange={(event) => setLibraryTag(event.target.value as "all" | DifficultyTag)}>
+                <option value="all">All difficulties</option>
+                {CHORD_DIFFICULTY_TAGS.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
               </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="library-inversion">
-                Inversion
-              </label>
-              <select
-                id="library-inversion"
-                value={libraryInversion}
-                onChange={(event) =>
-                  setLibraryInversion(event.target.value as "standard" | "inverted")
-                }
-              >
-                {availableInversions.standard && <option value="standard">Standard</option>}
-                {availableInversions.inverted && <option value="inverted">Inverted</option>}
-              </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="library-tag">
-                Difficulty tag
-              </label>
-              <select
-                id="library-tag"
-                value={libraryTag}
-                onChange={(event) => setLibraryTag(event.target.value as "all" | DifficultyTag)}
-              >
-                <option value="all">All tags</option>
-                {CHORD_DIFFICULTY_TAGS.map((tag) => (
-                  <option key={tag} value={tag}>
-                    {tag}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="library-function-key">
-                Common in key of
-              </label>
-              <select
-                id="library-function-key"
-                value={libraryFunctionKey}
-                onChange={(event) => setLibraryFunctionKey(event.target.value)}
-              >
+              <label htmlFor="library-function-key">Common in key</label>
+              <select id="library-function-key" value={libraryFunctionKey} onChange={(event) => setLibraryFunctionKey(event.target.value)}>
                 <option value="any">Any key</option>
-                {CHORD_FUNCTION_KEYS.map((key) => (
-                  <option key={key} value={key}>
-                    {key}
-                  </option>
-                ))}
+                {CHORD_FUNCTION_KEYS.map((key) => <option key={key} value={key}>{key}</option>)}
               </select>
-            </div>
-            <div>
-              <label className="label" htmlFor="library-function-role">
-                Musical function
-              </label>
-              <select
-                id="library-function-role"
-                value={libraryFunctionRole}
-                onChange={(event) =>
-                  setLibraryFunctionRole(event.target.value as "any" | HarmonicRole)
-                }
-              >
+              <label htmlFor="library-function-role">Function</label>
+              <select id="library-function-role" value={libraryFunctionRole} onChange={(event) => setLibraryFunctionRole(event.target.value as "any" | HarmonicRole)}>
                 <option value="any">Any role</option>
-                {HARMONIC_FUNCTION_OPTIONS.map((role) => (
-                  <option key={role} value={role}>
-                    {role}
-                  </option>
-                ))}
+                {HARMONIC_FUNCTION_OPTIONS.map((role) => <option key={role} value={role}>{role}</option>)}
               </select>
             </div>
-          </div>
+          </details>
+        </div>
 
-          <div className="library-search-row">
-            <div className="library-search">
-              <label className="label" htmlFor="library-search">
-                Search by chord name
-              </label>
-              <input
-                id="library-search"
-                type="search"
-                value={librarySearch}
-                onChange={(event) => setLibrarySearch(event.target.value)}
-                placeholder="Try Dm7, G/B, Fmaj7..."
-              />
-            </div>
-            <div className="library-view-switch">
-              <span className="label">Collection</span>
-              <div className="chip-row">
-                {[
-                  { id: "all", label: "All" },
-                  { id: "favorites", label: `Favorites (${favoriteIds.length})` },
-                  { id: "recent", label: `Recent (${recentIds.length})` }
-                ].map((option) => (
-                  <button
-                    key={option.id}
-                    type="button"
-                    className={`chip ${activeCollection === option.id ? "active" : ""}`}
-                    onClick={() =>
-                      setActiveCollection(option.id as "all" | "favorites" | "recent")
-                    }
-                  >
-                    {option.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="library-tools-grid">
-            <div className="library-tool-panel">
-              <span className="label">Capo transposition</span>
-              <div className="range-row">
-                <input
-                  id="library-capo"
-                  type="range"
-                  min="0"
-                  max="7"
-                  value={capoFret}
-                  onChange={(event) => setCapoFret(Number(event.target.value))}
-                />
-                <strong>Capo {capoFret}</strong>
-              </div>
-              <p className="muted">
-                {selectedLibraryEntry
-                  ? `${selectedLibraryEntry.chord.name} shape sounds as ${selectedCapoName}.`
-                  : "Choose a chord to see capo-aware naming."}
-              </p>
-            </div>
-
-            <div className="library-tool-panel">
-              <span className="label">Recorded sample voice</span>
-              <div className="chip-row">
-                {SAMPLE_VOICES.map((voice) => (
-                  <button
-                    key={voice}
-                    type="button"
-                    className={`chip ${sampleVoice === voice ? "active" : ""}`}
-                    onClick={() => setSampleVoice(voice)}
-                  >
-                    {voice}
-                  </button>
-                ))}
-              </div>
-              <p className="muted">{sampleStatus}</p>
-            </div>
-
-            <div className="library-tool-panel">
-              <span className="label">Alternate tuning</span>
-              <select value={tuningId} onChange={(event) => setTuningId(event.target.value as TuningId)}>
-                {TUNINGS.map((tuning) => (
-                  <option key={tuning.id} value={tuning.id}>
-                    {tuning.label}
-                  </option>
-                ))}
-              </select>
-              <p className="muted">Strings: {selectedTuning.strings.join(" ")}</p>
-            </div>
-
-            <div className="library-tool-panel">
-              <span className="label">Ear training</span>
-              <div className="chip-row">
-                <button className="btn" type="button" onClick={() => startEarTraining("chord")}>
-                  Identify chord
-                </button>
-                <button className="btn" type="button" onClick={() => startEarTraining("function")}>
-                  Identify function
-                </button>
-              </div>
-              {earTarget ? (
-                <div className="ear-training-box">
-                  <p className="muted">
-                    {earTarget.prompt === "chord"
-                      ? "Which chord did you hear?"
-                      : "Which function did you hear?"}
-                  </p>
-                  <div className="chip-row">
-                    {earTarget.options.map((option) => (
-                      <button
-                        key={option}
-                        type="button"
-                        className={`chip ${earAnswer === option ? "active" : ""}`}
-                        onClick={() => answerEarTraining(option)}
-                      >
-                        {option}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="chip-row">
-                    <button className="btn" type="button" onClick={connectMidi}>
-                      Connect MIDI
-                    </button>
-                    <button
-                      className="btn ghost"
-                      type="button"
-                      onClick={() => playChordPreview(earTarget.entry.chord, "arpeggio")}
-                    >
-                      Replay arpeggio
-                    </button>
-                    {earResult ? <strong>{earResult}</strong> : null}
-                  </div>
-                  <p className="muted">{midiStatus}. Play the chord root on a MIDI keyboard or fretboard.</p>
-                </div>
-              ) : null}
-            </div>
-
-            <div className="library-tool-panel">
-              <span className="label">Due reviews</span>
-              {dueReviewEntries.length > 0 ? (
-                <div className="variant-list">
-                  {dueReviewEntries.map((entry) => (
-                    <button key={entry.id} className="chip" type="button" onClick={() => jumpToChord(entry.id)}>
-                      {entry.chord.name}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                <p className="muted">No weak voicings are due yet.</p>
-              )}
-            </div>
-
-            <div className="library-tool-panel">
-              <span className="label">Student progress profile</span>
-              <select value={activeStudentId} onChange={(event) => loadStudentProfile(event.target.value)}>
-                <option value="default-student">Current device profile</option>
-                {studentProfiles.map((profile) => (
-                  <option key={profile.id} value={profile.id}>{profile.name}</option>
-                ))}
-              </select>
-              <div className="chip-row">
-                <input
-                  value={newStudentName}
-                  onChange={(event) => setNewStudentName(event.target.value)}
-                  placeholder="New student name"
-                  aria-label="New student name"
-                />
-                <button className="btn" type="button" onClick={saveStudentProfile}>Save profile</button>
-              </div>
-              <p className="muted">Profiles keep favorites, recents, practice timing, reviews, and notes separate on this device.</p>
-            </div>
-          </div>
-
-          {searchMatches.length > 0 && (
-            <div className="library-jump-results">
-              <span className="label">Quick jump</span>
-              <div className="variant-list">
-                {searchMatches.map((entry) => (
-                  <button
-                    key={entry.id}
-                    type="button"
-                    className="chip"
-                    onClick={() => jumpToChord(entry.id)}
-                  >
-                    {entry.chord.name} • {entry.position}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="library-pack-strip">
-            <div className="library-pack-header">
-              <div>
-                <span className="label">Progression packs</span>
-                <p>Browse chords in musical groups instead of isolated shapes.</p>
-              </div>
-              <button className="btn ghost" type="button" onClick={() => setActivePackId("all")}>
-                Show all
-              </button>
-            </div>
-            <div className="library-pack-grid">
-              {allProgressionPacks.map((pack) => (
-                <button
-                  key={pack.id}
-                  type="button"
-                  className={`pack-card ${activePackId === pack.id ? "active" : ""}`}
-                  onClick={() => {
-                    setActivePackId(pack.id);
-                    if (pack.chordIds[0]) {
-                      jumpToChord(pack.chordIds[0]);
-                    }
-                  }}
-                >
-                  <span className="label">{pack.keyCenter}</span>
-                  <h3>{pack.title}</h3>
-                  <p>{pack.description}</p>
-                  <p className="muted">{pack.progression.join(" • ")}</p>
-                  <p className="muted">Pattern: {pack.rightHandPattern}</p>
+        {searchMatches.length > 0 ? (
+          <div className="library-jump-results">
+            <span className="label">Quick results</span>
+            <div className="variant-list">
+              {searchMatches.map((entry) => (
+                <button key={entry.id} type="button" className="chip" onClick={() => jumpToChord(entry.id)}>
+                  {entry.chord.name} · {entry.position}
                 </button>
               ))}
             </div>
-            <div className="custom-pack-builder">
-              <div>
-                <label className="label" htmlFor="custom-pack-name">
-                  Custom pack name
-                </label>
-                <input
-                  id="custom-pack-name"
-                  value={customPackName}
-                  onChange={(event) => setCustomPackName(event.target.value)}
-                />
-              </div>
-              <div>
-                <label className="label" htmlFor="custom-pack-pattern">
-                  Right-hand preset
-                </label>
-                <select
-                  id="custom-pack-pattern"
-                  value={customPackPattern}
-                  onChange={(event) => setCustomPackPattern(event.target.value)}
-                >
-                  {RIGHT_HAND_PATTERNS.map((pattern) => (
-                    <option key={pattern} value={pattern}>
-                      {pattern}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <button className="btn primary" type="button" onClick={saveCurrentCustomPack}>
-                Save current practice set
-              </button>
-            </div>
           </div>
+        ) : null}
 
-          {(favoriteEntries.length > 0 || recentEntries.length > 0) && (
-            <div className="library-quicklists">
-              {favoriteEntries.length > 0 && (
-                <div>
-                  <span className="label">Favorites</span>
-                  <div className="variant-list">
-                    {favoriteEntries.slice(0, 6).map((entry) => (
-                      <button
-                        key={entry.id}
-                        type="button"
-                        className="chip"
-                        onClick={() => jumpToChord(entry.id)}
-                      >
-                        {entry.chord.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {recentEntries.length > 0 && (
-                <div>
-                  <span className="label">Recent</span>
-                  <div className="variant-list">
-                    {recentEntries.slice(0, 6).map((entry) => (
-                      <button
-                        key={entry.id}
-                        type="button"
-                        className="chip"
-                        onClick={() => jumpToChord(entry.id)}
-                      >
-                        {entry.chord.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
+        <nav className="library-workspace-tabs" aria-label="Library tools">
+          {([
+            ["browse", "Browse"],
+            ["practice", "Practice"],
+            ["compare", "Compare"],
+            ["tools", "Packs & export"]
+          ] as const).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              className={workspace === id ? "active" : ""}
+              aria-current={workspace === id ? "page" : undefined}
+              onClick={() => setWorkspace(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </nav>
 
         {selectedLibraryEntry ? (
-          <div className="library-results">
-            <div className="library-actions">
-              <div>
-                <span className="library-label">
-                  {filteredLibraryEntries.length} matching voicing
-                  {filteredLibraryEntries.length === 1 ? "" : "s"} • each variant has its own chart
-                </span>
-                <div className="variant-list">
-                  {filteredLibraryEntries.map((entry) => (
-                    <button
-                      key={entry.id}
-                      type="button"
-                      className={`chip ${entry.id === selectedLibraryEntry.id ? "active" : ""}`}
-                      onClick={() => setSelectedLibraryId(entry.id)}
-                    >
-                      {entry.chord.name} • {entry.position}
-                    </button>
-                  ))}
-                </div>
+          <div className="library-workspace">
+            <aside className="library-voicing-list" aria-label="Matching chord voicings">
+              <div className="library-list-heading">
+                <span className="label">Voicings</span>
+                <strong>{filteredLibraryEntries.length}</strong>
               </div>
-              <div className="library-preview-buttons">
+              {filteredLibraryEntries.map((entry) => (
                 <button
-                  className="btn primary"
+                  key={entry.id}
                   type="button"
-                  onClick={() => playChordPreview(selectedLibraryEntry.chord, "strum")}
+                  className={`library-voicing-row ${entry.id === selectedLibraryEntry.id ? "active" : ""}`}
+                  onClick={() => setSelectedLibraryId(entry.id)}
                 >
-                  Play strum
+                  <span>
+                    <strong>{entry.chord.name}</strong>
+                    <small>{entry.position}</small>
+                  </span>
+                  <small>{getDifficultyScore(entry)}/8</small>
                 </button>
-                <button
-                  className="btn"
-                  type="button"
-                  onClick={() => playChordPreview(selectedLibraryEntry.chord, "arpeggio")}
-                >
-                  Play arpeggio
-                </button>
-                <button
-                  className={`btn ${favoriteSet.has(selectedLibraryEntry.id) ? "primary" : ""}`}
-                  type="button"
-                  onClick={() => toggleFavorite(selectedLibraryEntry.id)}
-                >
-                  {favoriteSet.has(selectedLibraryEntry.id) ? "Favorited" : "Add favorite"}
-                </button>
-              </div>
-            </div>
+              ))}
+            </aside>
 
-            <div className="comparison-grid">
-              <article className="library-inspector">
-                <div className="library-inspector-header">
-                  <div>
-                    <span className="label">Primary voicing</span>
-                    <h3>{selectedLibraryEntry.chord.name}</h3>
-                    <p>{selectedLibraryEntry.summary}</p>
-                  </div>
-                  <div className="diagram-wrap chord-chart-panel" aria-label="Selected chord chart">
-                    <span className="label">Chord chart</span>
+            <div className={`library-stage workspace-${workspace}`}>
+              <header className="library-stage-header">
+                <div>
+                  <span className="label">{selectedLibraryEntry.qualityLabel} · {selectedLibraryEntry.position}</span>
+                  <h3>{selectedLibraryEntry.chord.name}</h3>
+                  <p>{selectedLibraryEntry.summary}</p>
+                </div>
+                <div className="library-preview-buttons">
+                  <button className="btn primary" type="button" onClick={() => playChordPreview(selectedLibraryEntry.chord, "strum")}>Play</button>
+                  <button className="btn" type="button" onClick={() => playChordPreview(selectedLibraryEntry.chord, "arpeggio")}>Arpeggio</button>
+                  <button
+                    className={`btn ${favoriteSet.has(selectedLibraryEntry.id) ? "primary" : "ghost"}`}
+                    type="button"
+                    onClick={() => toggleFavorite(selectedLibraryEntry.id)}
+                  >
+                    {favoriteSet.has(selectedLibraryEntry.id) ? "Favorited" : "Favorite"}
+                  </button>
+                </div>
+              </header>
+
+              {workspace === "browse" ? (
+                <div className="library-browse-view">
+                  <div className="library-primary-diagram">
                     <ChordDiagram chord={selectedLibraryEntry.chord} />
                   </div>
-                </div>
-                <div className="library-tag-row">
-                  {selectedLibraryEntry.difficultyTags.map((tag) => (
-                    <span key={tag} className="meta-chip">
-                      {tag}
-                    </span>
-                  ))}
-                  {selectedLibraryEntry.functionContexts.map((context) => (
-                    <span key={`${context.key}-${context.roles.join("-")}`} className="meta-chip">
-                      {context.key}: {context.roles.join("/")}
-                    </span>
-                  ))}
-                </div>
-                <div className="library-focus-grid">
-                  <div className="library-detail-card">
-                    <span className="label">Practice timer</span>
-                    <h4>
-                      {Math.floor(selectedPracticeStats.seconds / 60)}:
-                      {String(selectedPracticeStats.seconds % 60).padStart(2, "0")}
-                    </h4>
-                    <p className="muted">{selectedPracticeStats.reps} focused reps logged.</p>
-                    <div className="chip-row">
-                      <button
-                        className={`btn ${activeTimerId === selectedLibraryEntry.id ? "primary" : ""}`}
-                        type="button"
-                        onClick={() =>
-                          setActiveTimerId((current) =>
-                            current === selectedLibraryEntry.id ? null : selectedLibraryEntry.id
-                          )
-                        }
-                      >
-                        {activeTimerId === selectedLibraryEntry.id ? "Pause timer" : "Start timer"}
-                      </button>
-                      <button
-                        className="btn"
-                        type="button"
-                        onClick={() => addPracticeRep(selectedLibraryEntry.id)}
-                      >
-                        Log rep
-                      </button>
+                  <div className="library-primary-copy">
+                    <div className="library-tag-row">
+                      {selectedLibraryEntry.difficultyTags.map((tag) => <span key={tag} className="meta-chip">{tag}</span>)}
+                      {selectedLibraryEntry.functionContexts.slice(0, 2).map((context) => (
+                        <span key={`${context.key}-${context.roles.join("-")}`} className="meta-chip">
+                          {context.key}: {context.roles.join("/")}
+                        </span>
+                      ))}
                     </div>
-                    <div className="chip-row">
-                      <button className="chip" type="button" onClick={() => scheduleReview(selectedLibraryEntry.id, "again")}>
-                        Again
-                      </button>
-                      <button className="chip" type="button" onClick={() => scheduleReview(selectedLibraryEntry.id, "good")}>
-                        Good
-                      </button>
-                      <button className="chip" type="button" onClick={() => scheduleReview(selectedLibraryEntry.id, "easy")}>
-                        Easy
-                      </button>
+                    <div className="library-key-facts">
+                      <div><span className="label">Fingering</span><p>{selectedLibraryEntry.recommendedVariant}</p></div>
+                      <div><span className="label">Practice focus</span><p>{selectedLibraryEntry.practiceFocus}</p></div>
+                      <div><span className="label">Frets</span><p>{selectedLibraryEntry.chord.frets.map((fret) => fret < 0 ? "X" : fret === 0 ? "O" : fret).join(" ")}</p></div>
                     </div>
-                    <p className="muted">
-                      Next review:{" "}
-                      {selectedPracticeStats.nextReviewAt
-                        ? new Date(selectedPracticeStats.nextReviewAt).toLocaleString()
-                        : "Rate this voicing to schedule it."}
-                    </p>
-                  </div>
-                  <div className="library-detail-card">
-                    <span className="label">Difficulty progression</span>
-                    <h4>Score {selectedDifficultyScore}/8</h4>
-                    <p>
-                      Next family:{" "}
-                      {recommendation ? (
-                        <button
-                          className="inline-link"
-                          type="button"
-                          onClick={() => jumpToChord(recommendation.id)}
-                        >
-                          {recommendation.chord.name} • {recommendation.position}
-                        </button>
-                      ) : (
-                        "All current families have practice logged."
-                      )}
-                    </p>
-                  </div>
-                  <div className="library-detail-card">
-                    <span className="label">Why this voicing works</span>
-                    {selectedTheory ? (
-                      <>
-                        <p>Scale degrees: {selectedTheory.degrees}</p>
-                        <p>Bass note: {selectedTheory.bass}</p>
-                        <p>{selectedTheory.voiceLeading}</p>
-                        <p className="muted">Open strings: {selectedTheory.openStrings}</p>
-                      </>
-                    ) : null}
-                  </div>
-                  <div className="library-detail-card">
-                    <span className="label">Song examples</span>
-                    {selectedSongExamples.length > 0 ? (
-                      <ul>
-                        {selectedSongExamples.map((example) => (
-                          <li key={example.family}>
-                            {example.title} • {example.context}
-                          </li>
+                    <details className="library-disclosure">
+                      <summary>Technique notes</summary>
+                      <div className="library-disclosure-content">
+                        <div><h4>Alternate fingerings</h4><ul>{selectedLibraryEntry.alternateFingerings.map((item) => <li key={item}>{item}</li>)}</ul></div>
+                        <div><h4>Muting and strings</h4><ul>{[...selectedLibraryEntry.mutingNotes, ...selectedLibraryEntry.avoidStrings].map((item) => <li key={item}>{item}</li>)}</ul></div>
+                        <div><h4>Common mistakes</h4><ul>{getCommonMistakes(selectedLibraryEntry).map((item) => <li key={item}>{item}</li>)}</ul></div>
+                      </div>
+                    </details>
+                    <details className="library-disclosure">
+                      <summary>Theory and song context</summary>
+                      <div className="library-disclosure-content">
+                        {selectedTheory ? <div><h4>Why it works</h4><p>Degrees: {selectedTheory.degrees}. Bass: {selectedTheory.bass}.</p><p>{selectedTheory.voiceLeading}</p></div> : null}
+                        <div><h4>Where to use it</h4>{selectedSongExamples.length ? <ul>{selectedSongExamples.map((item) => <li key={item.family}>{item.title}: {item.context}</li>)}</ul> : <p>Use it where the function tags match the song key.</p>}</div>
+                      </div>
+                    </details>
+                    <details className="library-disclosure">
+                      <summary>My notes</summary>
+                      <textarea
+                        aria-label="Notes for selected voicing"
+                        value={selectedUserNote}
+                        onChange={(event) => updateUserNote(selectedLibraryEntry.id, event.target.value)}
+                        placeholder="What feels best on your instrument?"
+                      />
+                    </details>
+                    {selectedLibraryEntry.nearbyAlternatives.length > 0 ? (
+                      <div className="library-nearby-inline">
+                        <span className="label">Try next</span>
+                        {selectedLibraryEntry.nearbyAlternatives.map((alternative) => (
+                          alternative.targetId ? (
+                            <button key={alternative.label} className="inline-link" type="button" onClick={() => jumpToChord(alternative.targetId!)}>
+                              {alternative.label}
+                            </button>
+                          ) : null
                         ))}
-                      </ul>
-                    ) : (
-                      <p>Try this voicing anywhere the function tags match the song key.</p>
-                    )}
-                  </div>
-                  <div className="library-detail-card">
-                    <span className="label">Tuning-aware notes</span>
-                    <p>{selectedTuning.label}: {getChordNoteNames(selectedLibraryEntry.chord, selectedTuning).join(" ")}</p>
-                    <p className="muted">The diagram keeps the physical fret shape; this panel shows sounding notes for the selected tuning.</p>
-                  </div>
-                  <div className="library-detail-card">
-                    <label className="label" htmlFor="user-voicing-note">
-                      User notes
-                    </label>
-                    <textarea
-                      id="user-voicing-note"
-                      value={selectedUserNote}
-                      onChange={(event) =>
-                        updateUserNote(selectedLibraryEntry.id, event.target.value)
-                      }
-                      placeholder="Mark what feels best on your instrument..."
-                    />
-                  </div>
-                </div>
-                <div className="library-detail-grid">
-                  <div className="library-detail-card">
-                    <span className="label">Recommended fingering</span>
-                    <p>{selectedLibraryEntry.recommendedVariant}</p>
-                    <p>
-                      Frets:{" "}
-                      {selectedLibraryEntry.chord.frets
-                        .map((fret) => (fret < 0 ? "X" : fret === 0 ? "O" : fret))
-                        .join(" ")}
-                    </p>
-                  </div>
-                  <div className="library-detail-card">
-                    <span className="label">Recommended variants</span>
-                    <ul>
-                      {selectedLibraryEntry.alternateFingerings.map((variant) => (
-                        <li key={variant}>{variant}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="library-detail-card">
-                    <span className="label">Left-hand muting notes</span>
-                    <ul>
-                      {selectedLibraryEntry.mutingNotes.map((note) => (
-                        <li key={note}>{note}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="library-detail-card">
-                    <span className="label">Avoid this string</span>
-                    <ul>
-                      {selectedLibraryEntry.avoidStrings.map((note) => (
-                        <li key={note}>{note}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="library-detail-card">
-                    <span className="label">Common mistakes</span>
-                    <ul>
-                      {getCommonMistakes(selectedLibraryEntry).map((mistake) => (
-                        <li key={mistake}>{mistake}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="library-detail-card">
-                    <span className="label">Practice focus</span>
-                    <p>{selectedLibraryEntry.practiceFocus}</p>
-                  </div>
-                  <div className="library-detail-card">
-                    <span className="label">Musical function</span>
-                    <ul>
-                      {selectedLibraryEntry.functionContexts.map((context) => (
-                        <li key={`${context.key}-${context.roles.join("-")}`}>
-                          {context.key}: {context.roles.join("/")} • {context.label}
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </article>
-
-              <aside className="library-compare">
-                <div className="library-compare-header">
-                  <div>
-                    <span className="label">Comparison mode</span>
-                    <h3>{compareEntry ? compareEntry.chord.name : "Add a second voicing"}</h3>
-                  </div>
-                  <div className="compare-selects">
-                    <select
-                      value={compareChordId}
-                      onChange={(event) => setCompareChordId(event.target.value)}
-                    >
-                      {comparisonCandidates.length === 0 ? (
-                        <option value="">No comparison voicings</option>
-                      ) : (
-                        comparisonCandidates.map((entry) => (
-                          <option key={entry.id} value={entry.id}>
-                            {entry.chord.name} • {entry.position}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                    <select
-                      value={thirdCompareChordId}
-                      onChange={(event) => setThirdCompareChordId(event.target.value)}
-                    >
-                      {comparisonCandidates.length === 0 ? (
-                        <option value="">No third voicing</option>
-                      ) : (
-                        comparisonCandidates.map((entry) => (
-                          <option key={entry.id} value={entry.id}>
-                            {entry.chord.name} • {entry.position}
-                          </option>
-                        ))
-                      )}
-                    </select>
-                  </div>
-                </div>
-                {compareEntry ? (
-                  <>
-                    <div className="diagram-wrap">
-                      <ChordDiagram chord={compareEntry.chord} />
-                    </div>
-                    <p>{compareEntry.summary}</p>
-                    <div className="library-compare-actions">
-                      <button
-                        className="btn"
-                        type="button"
-                        onClick={() => playChordPreview(compareEntry.chord, "strum")}
-                      >
-                        Compare strum
-                      </button>
-                      <button
-                        className="btn ghost"
-                        type="button"
-                        onClick={() => jumpToChord(compareEntry.id)}
-                      >
-                        Make primary
-                      </button>
-                    </div>
-                    <div className="library-detail-card">
-                      <span className="label">Why compare it</span>
-                      <p>{compareEntry.practiceFocus}</p>
-                    </div>
-                    {thirdCompareEntry ? (
-                      <div className="library-detail-card">
-                        <span className="label">Third voicing</span>
-                        <h3>{thirdCompareEntry.chord.name}</h3>
-                        <div className="diagram-wrap">
-                          <ChordDiagram chord={thirdCompareEntry.chord} />
-                        </div>
-                        <p>{thirdCompareEntry.summary}</p>
                       </div>
                     ) : null}
-                    <button className="btn primary" type="button" onClick={() => window.print()}>
-                      Print compare sheet
-                    </button>
-                  </>
-                ) : (
-                  <div className="history-empty">Pick another voicing to compare shapes side by side.</div>
-                )}
-              </aside>
-            </div>
-
-            <div className="library-heatmap">
-              <div>
-                <span className="label">Shared-note fretboard heatmap</span>
-                <p>
-                  Compare the selected voicing against the comparison voicing in {selectedTuning.label}.
-                </p>
-              </div>
-              <div className="heatmap-grid" aria-label="Fretboard shared-note heatmap">
-                {heatmapNotes.map((cell) => (
-                  <span
-                    key={cell.key}
-                    className={`heatmap-cell ${cell.state}`}
-                    title={`${selectedTuning.strings[cell.stringIndex]} string fret ${cell.fret}: ${cell.note}`}
-                  >
-                    {cell.fret === 0 ? selectedTuning.strings[cell.stringIndex] : cell.note}
-                  </span>
-                ))}
-              </div>
-              <div className="heatmap-legend">
-                <span><b className="legend-dot primary" /> Primary</span>
-                <span><b className="legend-dot comparison" /> Comparison</span>
-                <span><b className="legend-dot shared" /> Shared</span>
-              </div>
-            </div>
-
-            <div className="print-compare-sheet">
-              {[selectedLibraryEntry, compareEntry, thirdCompareEntry]
-                .filter((entry): entry is ChordLibraryItem => Boolean(entry))
-                .map((entry) => (
-                  <article key={`print-${entry.id}`} className="print-compare-card">
-                    <h3>{entry.chord.name}</h3>
-                    <p>{entry.position}</p>
-                    <ChordDiagram chord={entry.chord} />
-                    <p>{entry.recommendedVariant}</p>
-                  </article>
-                ))}
-            </div>
-
-            <div className="library-nearby">
-              <div>
-                <span className="label">Nearby alternatives</span>
-                <p>Jump to easier voicings, capo ideas, and partial-shape options.</p>
-              </div>
-              <div className="library-nearby-grid">
-                {selectedLibraryEntry.nearbyAlternatives.map((alternative) => (
-                  <div key={`${selectedLibraryEntry.id}-${alternative.label}`} className="library-detail-card">
-                    <span className="label">
-                      {alternative.type} • {alternative.label}
-                    </span>
-                    <p>{alternative.description}</p>
-                    {alternative.targetId ? (
-                      <button
-                        className="btn ghost"
-                        type="button"
-                        onClick={() => jumpToChord(alternative.targetId!)}
-                      >
-                        Jump there
-                      </button>
-                    ) : null}
                   </div>
-                ))}
-              </div>
-            </div>
+                </div>
+              ) : null}
 
-            {selectedPack ? (
-              <div className="library-pack-detail">
-                <span className="label">Active pack</span>
-                <h3>{selectedPack.title}</h3>
-                <p>{selectedPack.focus}</p>
-                <div className="variant-list">
-                  {selectedPack.chordIds.map((id) => {
-                    const entry = CHORD_ITEM_LOOKUP.get(id);
-                    if (!entry) return null;
-                    return (
-                      <button
-                        key={id}
-                        type="button"
-                        className={`chip ${entry.id === selectedLibraryEntry.id ? "active" : ""}`}
-                        onClick={() => jumpToChord(entry.id)}
-                      >
-                        {entry.chord.name}
+              {workspace === "practice" ? (
+                <div className="library-task-layout">
+                  <section className="library-task-primary">
+                    <div className="practice-metric">
+                      <span className="label">Focused practice</span>
+                      <strong>{Math.floor(selectedPracticeStats.seconds / 60)}:{String(selectedPracticeStats.seconds % 60).padStart(2, "0")}</strong>
+                      <p>{selectedPracticeStats.reps} repetitions · difficulty {selectedDifficultyScore}/8</p>
+                    </div>
+                    <div className="chip-row">
+                      <button className={`btn ${activeTimerId === selectedLibraryEntry.id ? "primary" : ""}`} type="button" onClick={() => setActiveTimerId((current) => current === selectedLibraryEntry.id ? null : selectedLibraryEntry.id)}>
+                        {activeTimerId === selectedLibraryEntry.id ? "Pause timer" : "Start timer"}
                       </button>
-                    );
-                  })}
+                      <button className="btn" type="button" onClick={() => addPracticeRep(selectedLibraryEntry.id)}>Log rep</button>
+                    </div>
+                    <div className="practice-rating">
+                      <span className="label">How did it feel?</span>
+                      <div className="chip-row">
+                        <button className="chip" type="button" onClick={() => scheduleReview(selectedLibraryEntry.id, "again")}>Again</button>
+                        <button className="chip" type="button" onClick={() => scheduleReview(selectedLibraryEntry.id, "good")}>Good</button>
+                        <button className="chip" type="button" onClick={() => scheduleReview(selectedLibraryEntry.id, "easy")}>Easy</button>
+                      </div>
+                      <p className="muted">Next review: {selectedPracticeStats.nextReviewAt ? new Date(selectedPracticeStats.nextReviewAt).toLocaleString() : "Not scheduled"}</p>
+                    </div>
+                    {recommendation ? <p>Suggested next: <button className="inline-link" type="button" onClick={() => jumpToChord(recommendation.id)}>{recommendation.chord.name} · {recommendation.position}</button></p> : null}
+                  </section>
+                  <aside className="library-task-secondary">
+                    <div>
+                      <span className="label">Due reviews</span>
+                      <div className="variant-list">
+                        {dueReviewEntries.length ? dueReviewEntries.map((entry) => <button key={entry.id} className="chip" type="button" onClick={() => jumpToChord(entry.id)}>{entry.chord.name}</button>) : <p className="muted">Nothing due yet.</p>}
+                      </div>
+                    </div>
+                    <div>
+                      <span className="label">Ear training</span>
+                      <div className="chip-row">
+                        <button className="btn" type="button" onClick={() => startEarTraining("chord")}>Identify chord</button>
+                        <button className="btn" type="button" onClick={() => startEarTraining("function")}>Identify function</button>
+                      </div>
+                      {earTarget ? (
+                        <div className="ear-training-box">
+                          <p>{earTarget.prompt === "chord" ? "Which chord did you hear?" : "Which function did you hear?"}</p>
+                          <div className="chip-row">{earTarget.options.map((option) => <button key={option} type="button" className={`chip ${earAnswer === option ? "active" : ""}`} onClick={() => answerEarTraining(option)}>{option}</button>)}</div>
+                          <div className="chip-row"><button className="btn ghost" type="button" onClick={() => playChordPreview(earTarget.entry.chord, "arpeggio")}>Replay</button><button className="btn ghost" type="button" onClick={connectMidi}>Connect MIDI</button></div>
+                          {earResult ? <strong>{earResult}</strong> : null}<p className="muted">{midiStatus}</p>
+                        </div>
+                      ) : null}
+                    </div>
+                  </aside>
                 </div>
-                <p className="muted">Suggested progression: {selectedPack.progression.join(" • ")}</p>
-                <p className="muted">Right-hand preset: {selectedPack.rightHandPattern}</p>
-              </div>
-            ) : null}
+              ) : null}
 
-            <div className="teacher-export">
-              <div className="library-pack-header">
-                <div>
-                  <span className="label">Teacher / PDF export</span>
-                  <p>Build a printable practice sheet by key, difficulty, or progression pack.</p>
-                </div>
-                <button className="btn primary" type="button" onClick={() => window.print()}>
-                  Print or save PDF
-                </button>
-              </div>
-              <div className="chip-row">
-                <button className="btn" type="button" onClick={exportTeacherPacks}>Export teacher packs</button>
-                <label className="btn ghost" htmlFor="teacher-pack-import">Import teacher packs</label>
-                <input
-                  id="teacher-pack-import"
-                  type="file"
-                  accept="application/json,.json"
-                  className="visually-hidden"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) importTeacherPacks(file);
-                    event.currentTarget.value = "";
-                  }}
-                />
-              </div>
-              <div className="library-filters">
-                <div>
-                  <label className="label" htmlFor="teacher-key">Key</label>
-                  <select id="teacher-key" value={teacherKey} onChange={(event) => setTeacherKey(event.target.value)}>
-                    {CHORD_FUNCTION_KEYS.map((key) => (
-                      <option key={key} value={key}>{key}</option>
+              {workspace === "compare" ? (
+                <div className="library-compare-view">
+                  <div className="compare-picker">
+                    <label className="label" htmlFor="compare-second">Second voicing</label>
+                    <select id="compare-second" value={compareChordId} onChange={(event) => setCompareChordId(event.target.value)}>
+                      {comparisonCandidates.length ? comparisonCandidates.map((entry) => <option key={entry.id} value={entry.id}>{entry.chord.name} · {entry.position}</option>) : <option value="">No matching voicings</option>}
+                    </select>
+                    <label className="label" htmlFor="compare-third">Third voicing</label>
+                    <select id="compare-third" value={thirdCompareChordId} onChange={(event) => setThirdCompareChordId(event.target.value)}>
+                      {comparisonCandidates.length ? comparisonCandidates.map((entry) => <option key={entry.id} value={entry.id}>{entry.chord.name} · {entry.position}</option>) : <option value="">No matching voicings</option>}
+                    </select>
+                  </div>
+                  <div className="library-comparison-cards">
+                    {[selectedLibraryEntry, compareEntry, thirdCompareEntry].filter((entry): entry is ChordLibraryItem => Boolean(entry)).map((entry, index) => (
+                      <article key={entry.id} className={index === 0 ? "active" : ""}>
+                        <span className="label">{index === 0 ? "Primary" : `Option ${index + 1}`}</span>
+                        <h4>{entry.chord.name}</h4>
+                        <ChordDiagram chord={entry.chord} />
+                        <p>{entry.summary}</p>
+                        <div className="chip-row"><button className="btn" type="button" onClick={() => playChordPreview(entry.chord, "strum")}>Play</button>{index > 0 ? <button className="btn ghost" type="button" onClick={() => jumpToChord(entry.id)}>Make primary</button> : null}</div>
+                      </article>
                     ))}
-                  </select>
+                  </div>
+                  <details className="library-disclosure">
+                    <summary>Show shared-note fretboard</summary>
+                    <div className="heatmap-grid" aria-label="Fretboard shared-note heatmap">
+                      {heatmapNotes.map((cell) => <span key={cell.key} className={`heatmap-cell ${cell.state}`} title={`${selectedTuning.strings[cell.stringIndex]} string fret ${cell.fret}: ${cell.note}`}>{cell.fret === 0 ? selectedTuning.strings[cell.stringIndex] : cell.note}</span>)}
+                    </div>
+                  </details>
+                  <button className="btn primary library-print-button" type="button" onClick={() => window.print()}>Print comparison</button>
                 </div>
-                <div>
-                  <label className="label" htmlFor="teacher-skill">Skill</label>
-                  <select
-                    id="teacher-skill"
-                    value={teacherSkill}
-                    onChange={(event) => setTeacherSkill(event.target.value as "all" | DifficultyTag)}
-                  >
-                    <option value="all">All skills</option>
-                    {CHORD_DIFFICULTY_TAGS.map((tag) => (
-                      <option key={tag} value={tag}>{tag}</option>
-                    ))}
-                  </select>
+              ) : null}
+
+              {workspace === "tools" ? (
+                <div className="library-tools-view">
+                  <section>
+                    <div className="library-section-heading"><div><span className="label">Sound and setup</span><h4>Instrument options</h4></div></div>
+                    <div className="library-compact-controls">
+                      <div><label htmlFor="library-capo">Capo {capoFret}</label><input id="library-capo" type="range" min="0" max="7" value={capoFret} onChange={(event) => setCapoFret(Number(event.target.value))}/><p>{selectedLibraryEntry.chord.name} sounds as {selectedCapoName}.</p></div>
+                      <div><label htmlFor="library-tuning">Tuning</label><select id="library-tuning" value={tuningId} onChange={(event) => setTuningId(event.target.value as TuningId)}>{TUNINGS.map((tuning) => <option key={tuning.id} value={tuning.id}>{tuning.label}</option>)}</select><p>{getChordNoteNames(selectedLibraryEntry.chord, selectedTuning).join(" ")}</p></div>
+                      <div><span>Sample voice</span><div className="chip-row">{SAMPLE_VOICES.map((voice) => <button key={voice} type="button" className={`chip ${sampleVoice === voice ? "active" : ""}`} onClick={() => setSampleVoice(voice)}>{voice}</button>)}</div><p>{sampleStatus}</p></div>
+                    </div>
+                  </section>
+                  <section>
+                    <div className="library-section-heading">
+                      <div><span className="label">Progression packs</span><h4>Practice in context</h4></div>
+                      <button className="btn ghost" type="button" onClick={() => setActivePackId("all")}>Clear pack</button>
+                    </div>
+                    <div className="library-pack-list">
+                      {allProgressionPacks.map((pack) => (
+                        <button key={pack.id} type="button" className={activePackId === pack.id ? "active" : ""} onClick={() => { setActivePackId(pack.id); if (pack.chordIds[0]) jumpToChord(pack.chordIds[0]); }}>
+                          <span><strong>{pack.title}</strong><small>{pack.keyCenter} · {pack.progression.join(" · ")}</small></span><small>{pack.rightHandPattern}</small>
+                        </button>
+                      ))}
+                    </div>
+                    <details className="library-disclosure"><summary>Create a custom pack</summary><div className="custom-pack-builder"><div><label htmlFor="custom-pack-name">Name</label><input id="custom-pack-name" value={customPackName} onChange={(event) => setCustomPackName(event.target.value)}/></div><div><label htmlFor="custom-pack-pattern">Right-hand pattern</label><select id="custom-pack-pattern" value={customPackPattern} onChange={(event) => setCustomPackPattern(event.target.value)}>{RIGHT_HAND_PATTERNS.map((pattern) => <option key={pattern} value={pattern}>{pattern}</option>)}</select></div><button className="btn primary" type="button" onClick={saveCurrentCustomPack}>Save current set</button></div></details>
+                  </section>
+                  <section>
+                    <div className="library-section-heading"><div><span className="label">Profiles</span><h4>Student progress</h4></div></div>
+                    <div className="library-profile-row">
+                      <select value={activeStudentId} onChange={(event) => loadStudentProfile(event.target.value)}><option value="default-student">Current device profile</option>{studentProfiles.map((profile) => <option key={profile.id} value={profile.id}>{profile.name}</option>)}</select>
+                      <input value={newStudentName} onChange={(event) => setNewStudentName(event.target.value)} placeholder="Student name" aria-label="New student name"/>
+                      <button className="btn" type="button" onClick={saveStudentProfile}>Save profile</button>
+                    </div>
+                  </section>
+                  <section className="teacher-export">
+                    <div className="library-section-heading"><div><span className="label">Teacher export</span><h4>Printable practice sheet</h4></div><button className="btn primary" type="button" onClick={() => window.print()}>Print or save PDF</button></div>
+                    <div className="library-profile-row">
+                      <select aria-label="Teacher key" value={teacherKey} onChange={(event) => setTeacherKey(event.target.value)}>{CHORD_FUNCTION_KEYS.map((key) => <option key={key} value={key}>{key}</option>)}</select>
+                      <select aria-label="Teacher skill" value={teacherSkill} onChange={(event) => setTeacherSkill(event.target.value as "all" | DifficultyTag)}><option value="all">All skills</option>{CHORD_DIFFICULTY_TAGS.map((tag) => <option key={tag} value={tag}>{tag}</option>)}</select>
+                      <select aria-label="Teacher pack" value={teacherPackId} onChange={(event) => setTeacherPackId(event.target.value)}><option value="all">No pack filter</option>{allProgressionPacks.map((pack) => <option key={pack.id} value={pack.id}>{pack.title}</option>)}</select>
+                    </div>
+                    <div className="chip-row"><button className="btn" type="button" onClick={exportTeacherPacks}>Export packs</button><label className="btn ghost" htmlFor="teacher-pack-import">Import packs</label><input id="teacher-pack-import" type="file" accept="application/json,.json" className="visually-hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) importTeacherPacks(file); event.currentTarget.value = ""; }}/></div>
+                    <p className="muted">{teacherSheetEntries.length} chords will be included in the printable sheet.</p>
+                    <details className="library-disclosure">
+                      <summary>Preview printable sheet</summary>
+                      <div className="teacher-sheet-grid">
+                        {teacherSheetEntries.map((entry) => (
+                          <article key={`teacher-${entry.id}`} className="teacher-sheet-card">
+                            <h3>{entry.chord.name}</h3>
+                            <ChordDiagram chord={entry.chord} />
+                            <p>{entry.position}</p>
+                            <p className="muted">{entry.practiceFocus}</p>
+                          </article>
+                        ))}
+                      </div>
+                    </details>
+                  </section>
                 </div>
-                <div>
-                  <label className="label" htmlFor="teacher-pack">Pack</label>
-                  <select id="teacher-pack" value={teacherPackId} onChange={(event) => setTeacherPackId(event.target.value)}>
-                    <option value="all">No pack filter</option>
-                    {allProgressionPacks.map((pack) => (
-                      <option key={pack.id} value={pack.id}>{pack.title}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="teacher-sheet-grid">
-                {teacherSheetEntries.map((entry) => (
-                  <article key={`teacher-${entry.id}`} className="teacher-sheet-card">
-                    <h3>{entry.chord.name}</h3>
-                    <ChordDiagram chord={entry.chord} />
-                    <p>{entry.position}</p>
-                    <p className="muted">{entry.practiceFocus}</p>
-                  </article>
+              ) : null}
+
+              <div className="print-compare-sheet">
+                {[selectedLibraryEntry, compareEntry, thirdCompareEntry].filter((entry): entry is ChordLibraryItem => Boolean(entry)).map((entry) => (
+                  <article key={`print-${entry.id}`} className="print-compare-card"><h3>{entry.chord.name}</h3><p>{entry.position}</p><ChordDiagram chord={entry.chord}/><p>{entry.recommendedVariant}</p></article>
                 ))}
               </div>
             </div>
           </div>
         ) : (
-          <div className="history-empty">
-            No voicings match this filter set yet. Try clearing the progression pack, search, or
-            difficulty tag.
-          </div>
+          <div className="history-empty">No voicings match these filters. Clear the pack or broaden the search.</div>
         )}
       </div>
     </section>

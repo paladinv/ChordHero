@@ -7,6 +7,9 @@ A timed chord‑switching practice game for guitar players. The app flashes a ch
 - 10‑chord rounds with level‑up modal
 - Open chord and barre chord progression
 - Manual difficulty selector or auto‑advance
+- Right-hand studio with 30 strumming, plectrum, and fingerpicking drills
+- Beginner, intermediate, and expert practice filters
+- Animated follow-along patterns with adjustable tempo and optional audio clicks
 
 ## Local development
 1. Install dependencies: `npm install`
