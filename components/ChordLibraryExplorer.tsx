@@ -885,13 +885,20 @@ export default function ChordLibraryExplorer() {
 
   return (
     <section className="library library-redesign">
-      <header className="library-heading">
+      <header className="library-heading studio-heading">
         <div>
           <span className="tag">Interactive reference</span>
           <h2>Chord library</h2>
           <p>Find a shape, hear it, and focus on one task at a time.</p>
         </div>
-        <div className="library-collection-switch" aria-label="Chord collection">
+        <div className="studio-session-note library-collection-note">
+          <span className="label">Your collection</span>
+          <strong>{CHORD_LIBRARY.length} playable shapes</strong>
+          <span>Filter the list, then keep one voicing in focus.</span>
+        </div>
+      </header>
+
+      <div className="library-collection-switch" aria-label="Chord collection">
           {[
             { id: "all", label: "All" },
             { id: "favorites", label: `Favorites ${favoriteIds.length}` },
@@ -906,8 +913,7 @@ export default function ChordLibraryExplorer() {
               {option.label}
             </button>
           ))}
-        </div>
-      </header>
+      </div>
 
       <div className="library-card library-shell">
         <div className="library-findbar">

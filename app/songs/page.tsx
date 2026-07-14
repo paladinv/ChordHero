@@ -281,17 +281,20 @@ export default function SongsPage() {
 
   return (
     <main className="page focused-page songs-page">
-      <section className="page-intro">
-        <span className="tag">Song Coach</span>
-        <h1>Practice progressions on their own page.</h1>
-        <p>Choose a public-domain tune, set the tempo, and follow the current chord without the trainer or library crowding the session.</p>
+      <section className="studio-heading songs-heading">
+        <div>
+          <span className="tag">Song Coach</span>
+          <h1>Turn chord changes into music.</h1>
+          <p>Choose a traditional tune, set a comfortable tempo, and follow the progression one change at a time.</p>
+        </div>
+        <div className="studio-session-note" aria-label="Play-along recommendation">
+          <span className="label">A good first pass</span>
+          <strong>{activeSong.title} · {activeSong.bpm} BPM</strong>
+          <span>Listen through once, then join after the four-count.</span>
+        </div>
       </section>
 
       <section className="song-coach song-coach-page">
-        <div>
-          <h2>Song controls</h2>
-          <p>Loop the chord progression and keep time with the built-in count-in.</p>
-        </div>
         <div className="song-card">
           <div className="song-meta">
             <label className="label" htmlFor="song-select">

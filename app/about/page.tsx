@@ -2,10 +2,10 @@
 
 export default function AboutPage() {
   return (
-    <main className="page about">
-      <section className="about-hero">
+    <main className="page about focused-page">
+      <section className="studio-heading about-hero">
         <div>
-          <p className="eyebrow">About</p>
+          <span className="tag">About</span>
           <h1>Built to make chord changes feel effortless.</h1>
           <p>
             Chord Hero is a focused practice companion for guitarists who want to switch chords
@@ -13,15 +13,17 @@ export default function AboutPage() {
             the library and song coach help you explore voicings and musical context.
           </p>
         </div>
-        <div className="about-card">
-          <h2>How it works</h2>
-          <ol>
-            <li>Start a timed round and watch the chord flashes.</li>
-            <li>Use the history panel to review tricky changes.</li>
-            <li>Jump into the library to explore new voicings.</li>
-            <li>Play along with public-domain songs in the coach.</li>
-          </ol>
+        <div className="studio-session-note">
+          <span className="label">The method</span>
+          <strong>See it · shape it · hear it</strong>
+          <span>Short loops turn deliberate movement into dependable muscle memory.</span>
         </div>
+      </section>
+
+      <section className="about-method" aria-label="How Chord Hero works">
+        {["Start a focused drill", "Review the hard changes", "Use the shape in a song"].map((step, index) => (
+          <div key={step}><span>{String(index + 1).padStart(2, "0")}</span><strong>{step}</strong></div>
+        ))}
       </section>
 
       <section className="about-details">

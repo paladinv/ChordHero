@@ -2643,3 +2643,544 @@ textarea {
     transition: none;
   }
 }
+
+/* Shared studio language: keeps every tool in step with the Right Hand workspace. */
+.site-header {
+  max-width: 1600px;
+  margin: 0 auto;
+  padding-top: 10px;
+}
+
+.logo {
+  width: 68px;
+  height: 68px;
+}
+
+.site-nav {
+  gap: 5px;
+  padding: 4px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 9px;
+  background: rgba(255, 250, 241, 0.62);
+}
+
+.site-nav a {
+  padding: 8px 11px;
+  border-radius: 6px;
+  background: transparent;
+  font-size: 0.83rem;
+}
+
+.site-nav a:hover,
+.site-nav a:focus-visible {
+  background: var(--teal);
+  color: white;
+  outline: none;
+}
+
+.page {
+  width: min(1600px, 100%);
+  min-height: auto;
+  margin: 0 auto;
+  gap: 20px;
+  padding-top: 22px;
+}
+
+.studio-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
+  gap: 24px;
+  align-items: end;
+}
+
+.studio-heading h1,
+.library-heading.studio-heading h2 {
+  margin: 5px 0 8px;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: clamp(3.4rem, 7vw, 6.4rem);
+  line-height: 0.9;
+}
+
+.studio-heading p {
+  max-width: 720px;
+  margin: 0;
+  color: rgba(0, 0, 0, 0.66);
+  font-size: 1.04rem;
+  line-height: 1.45;
+}
+
+.studio-session-note {
+  display: grid;
+  gap: 5px;
+  padding: 16px 18px;
+  border: 0;
+  border-left: 3px solid var(--teal);
+  border-radius: 0;
+  background: rgba(255, 250, 241, 0.64);
+  box-shadow: none;
+}
+
+.studio-session-note strong {
+  font-size: 1.15rem;
+}
+
+.studio-session-note > span:last-child {
+  color: rgba(0, 0, 0, 0.62);
+  font-size: 0.88rem;
+}
+
+.btn,
+.chip {
+  border-radius: 7px;
+}
+
+select,
+input[type="search"],
+input[type="text"],
+.custom-pack-builder input,
+textarea {
+  border-radius: 7px;
+}
+
+/* Home: mode rows echo the technique selector on the reference tab. */
+.dashboard-hero {
+  align-items: end;
+}
+
+.dashboard-primary {
+  color: var(--ink);
+}
+
+.dashboard-primary:hover {
+  color: white;
+  background: var(--teal);
+}
+
+.dashboard-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.09);
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.1);
+}
+
+.dashboard-card {
+  min-height: 190px;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr) auto;
+  gap: 15px;
+  align-items: start;
+  padding: 22px;
+  border: 0;
+  border-radius: 0;
+  background: rgba(255, 250, 241, 0.94);
+  box-shadow: none;
+}
+
+.dashboard-card:hover {
+  z-index: 1;
+  transform: none;
+  background: var(--teal);
+  color: white;
+  box-shadow: none;
+}
+
+.dashboard-card-copy {
+  display: grid;
+  gap: 8px;
+}
+
+.dashboard-card-symbol {
+  width: 48px;
+  height: 48px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(31, 122, 116, 0.11);
+  color: var(--teal);
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.3rem;
+}
+
+.dashboard-card:hover .dashboard-card-symbol {
+  background: rgba(255, 255, 255, 0.16);
+  color: white;
+}
+
+.dashboard-card-arrow {
+  align-self: center;
+  font-size: 1.7rem;
+}
+
+.dashboard-card h2 {
+  font-size: 2.05rem;
+  line-height: 1;
+}
+
+.dashboard-card p {
+  font-size: 0.94rem;
+}
+
+.dashboard-card:hover p,
+.dashboard-card:hover .label {
+  color: rgba(255, 255, 255, 0.78);
+}
+
+.dashboard-card-meta span {
+  padding: 4px 8px;
+  border-radius: 5px;
+}
+
+.dashboard-card:hover .dashboard-card-meta span {
+  background: rgba(255, 255, 255, 0.14);
+  color: white;
+}
+
+/* Trainer */
+.trainer-workspace,
+.trainer-review-grid {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: #fffaf1;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.11);
+}
+
+.trainer-workspace {
+  padding: clamp(20px, 3vw, 34px);
+}
+
+.trainer-workspace .panel-header {
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.trainer-workspace .panel-header h2 {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.trainer-workspace .status {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.trainer-workspace .chord-card {
+  min-height: 290px;
+  border: 0;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.55);
+  box-shadow: none;
+}
+
+.trainer-workspace .chord-info h3 {
+  font-size: clamp(3.5rem, 8vw, 7rem);
+  line-height: 0.85;
+}
+
+.trainer-workspace .controls {
+  padding: 16px 0;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.trainer-review-grid {
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 0.75fr);
+  gap: 0;
+  overflow: hidden;
+}
+
+.trainer-review-grid .history,
+.trainer-review-grid .selected {
+  padding: 20px;
+}
+
+.trainer-review-grid .selected {
+  border-left: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.trainer-review-grid .history-grid,
+.trainer-review-grid .selected-card {
+  border-radius: 8px;
+  background: rgba(239, 227, 210, 0.34);
+  box-shadow: none;
+}
+
+.history-item {
+  border-radius: 6px;
+  box-shadow: none;
+}
+
+/* Song coach */
+.song-coach-page {
+  display: block;
+}
+
+.song-card {
+  grid-template-columns: minmax(280px, 0.75fr) minmax(360px, 1.25fr);
+  align-items: stretch;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 10px;
+  background: #fffaf1;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.11);
+}
+
+.song-meta,
+.song-progress {
+  padding: clamp(20px, 3vw, 32px);
+}
+
+.song-meta {
+  border-right: 1px solid rgba(0, 0, 0, 0.09);
+  background: rgba(239, 227, 210, 0.36);
+}
+
+.song-meta > select {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 7px;
+}
+
+.song-progress h3 {
+  font-size: clamp(4rem, 9vw, 7rem);
+  line-height: 0.86;
+}
+
+.song-guidance-card,
+.song-tip,
+.count-in {
+  border-radius: 8px;
+}
+
+.song-tip {
+  border-left: 3px solid var(--teal);
+  background: rgba(31, 122, 116, 0.07);
+}
+
+.song-chip {
+  border-radius: 6px;
+}
+
+/* Library */
+.library-redesign {
+  gap: 12px;
+}
+
+.library-heading.studio-heading {
+  align-items: end;
+}
+
+.library-collection-note {
+  justify-self: stretch;
+}
+
+.library-collection-switch {
+  justify-content: flex-start;
+  padding: 4px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.library-collection-switch .chip {
+  border: 0;
+  background: transparent;
+}
+
+.library-collection-switch .chip.active {
+  background: white;
+  color: var(--teal);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
+}
+
+.library-redesign .library-shell {
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: #fffaf1;
+  box-shadow: 0 18px 55px rgba(0, 0, 0, 0.11);
+}
+
+/* Chord chart */
+.chords-hero {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
+}
+
+.print-card {
+  padding: 16px 18px;
+}
+
+.chord-section {
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  background: #fffaf1;
+  box-shadow: 0 12px 35px rgba(0, 0, 0, 0.07);
+}
+
+.chord-section-header {
+  padding: 16px 18px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(239, 227, 210, 0.38);
+}
+
+.chord-grid {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 1px;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.chord-tile {
+  border-radius: 0;
+  background: rgba(255, 250, 241, 0.98);
+  box-shadow: none;
+}
+
+/* About */
+.about-hero {
+  grid-template-columns: minmax(0, 1fr) minmax(240px, 340px);
+  align-items: end;
+}
+
+.about h1 {
+  margin: 5px 0 8px;
+}
+
+.about-method {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.09);
+}
+
+.about-method div {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 18px;
+  background: rgba(255, 250, 241, 0.94);
+}
+
+.about-method span {
+  width: 42px;
+  height: 42px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(31, 122, 116, 0.11);
+  color: var(--teal);
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 1.15rem;
+}
+
+.about-details {
+  gap: 1px;
+  overflow: hidden;
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.09);
+}
+
+.about-card {
+  min-height: 190px;
+  padding: 22px;
+  border-radius: 0;
+  background: rgba(255, 250, 241, 0.94);
+  box-shadow: none;
+}
+
+.about-card h3 {
+  margin: 0 0 8px;
+  font-family: "Bebas Neue", sans-serif;
+  font-size: 2rem;
+}
+
+.site-footer {
+  width: min(1600px, 100%);
+  margin: 0 auto;
+  border-top: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+@media (max-width: 900px) {
+  .site-header {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .site-nav {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trainer-review-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .trainer-review-grid .selected {
+    border-top: 1px solid rgba(0, 0, 0, 0.08);
+    border-left: 0;
+  }
+
+  .song-card {
+    grid-template-columns: 1fr;
+  }
+
+  .song-meta {
+    border-right: 0;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.09);
+  }
+}
+
+@media (max-width: 720px) {
+  .site-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .site-nav {
+    width: 100%;
+  }
+
+  .studio-heading,
+  .chords-hero,
+  .about-hero,
+  .library-heading.studio-heading {
+    grid-template-columns: 1fr;
+  }
+
+  .studio-heading h1,
+  .library-heading.studio-heading h2 {
+    font-size: clamp(3.4rem, 17vw, 5rem);
+  }
+
+  .studio-session-note {
+    display: none;
+  }
+
+  .dashboard-card {
+    grid-template-columns: 44px minmax(0, 1fr) auto;
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .dashboard-card-symbol {
+    width: 40px;
+    height: 40px;
+  }
+
+  .about-method {
+    grid-template-columns: 1fr;
+  }
+}

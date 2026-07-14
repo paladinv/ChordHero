@@ -178,19 +178,20 @@ export default function TrainerPage() {
 
   return (
     <main className="page focused-page trainer-page">
-      <section className="hero trainer-hero">
-        <div className="brand">
+      <section className="studio-heading trainer-heading">
+        <div>
           <span className="tag">Trainer</span>
           <h1>Timed chord switches without the page clutter.</h1>
-          <div className="hero-summary">
-            <span>3s flashes</span>
-            <span>10-chord rounds</span>
-            <span>4 levels</span>
-          </div>
-          <p className="hero-note">Tap start, keep eyes forward, and ride the metronome click.</p>
+          <p>Tap start, keep your eyes forward, and ride the metronome through ten clean changes.</p>
         </div>
+        <div className="studio-session-note" aria-label="Trainer format">
+          <span className="label">Round format</span>
+          <strong>3 seconds · 10 chords</strong>
+          <span>Start with relaxed hands. Accuracy comes before speed.</span>
+        </div>
+      </section>
 
-        <div className="panel">
+      <section className="panel trainer-workspace">
           <div className="panel-header">
             <div>
               <p className="eyebrow">{levelTitle}</p>
@@ -287,7 +288,6 @@ export default function TrainerPage() {
               ))}
             </select>
           </div>
-        </div>
       </section>
 
       <section className="trainer-review-grid">
