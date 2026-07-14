@@ -1482,49 +1482,33 @@ const makeGeneratedLibraryItems = (): ChordLibraryItem[] => {
 const makeGeneratedInversions = (): ChordLibraryItem[] => {
   const existingNames = new Set(CHORD_LIBRARY_ITEMS.map((item) => item.chord.name));
   const inversionShapes: Array<{
-    suffix: string;
-    quality: "major" | "minor";
+    quality: string;
     qualityLabel: string;
-    bassOffset: number;
+    nameSuffix: string;
+    intervals: number[];
   }> = [
-    {
-      suffix: "3rd bass",
-      quality: "major",
-      qualityLabel: "Major",
-      bassOffset: 4
-    },
-    {
-      suffix: "5th bass",
-      quality: "major",
-      qualityLabel: "Major",
-      bassOffset: 7
-    },
-    {
-      suffix: "minor 3rd bass",
-      quality: "minor",
-      qualityLabel: "Minor",
-      bassOffset: 3
-    },
-    {
-      suffix: "minor 5th bass",
-      quality: "minor",
-      qualityLabel: "Minor",
-      bassOffset: 7
-    }
+    { quality: "major", qualityLabel: "Major", nameSuffix: "", intervals: [0, 4, 7] },
+    { quality: "minor", qualityLabel: "Minor", nameSuffix: "m", intervals: [0, 3, 7] },
+    { quality: "dominant7", qualityLabel: "Dominant 7", nameSuffix: "7", intervals: [0, 4, 7, 10] },
+    { quality: "minor7", qualityLabel: "Minor 7", nameSuffix: "m7", intervals: [0, 3, 7, 10] },
+    { quality: "major7", qualityLabel: "Major 7", nameSuffix: "maj7", intervals: [0, 4, 7, 11] },
+    { quality: "sus2", qualityLabel: "Suspended 2", nameSuffix: "sus2", intervals: [0, 2, 7] },
+    { quality: "sus4", qualityLabel: "Suspended 4", nameSuffix: "sus4", intervals: [0, 5, 7] },
+    { quality: "add9", qualityLabel: "Add 9", nameSuffix: "add9", intervals: [0, 2, 4, 7] }
   ];
 
   return NOTE_NAMES.flatMap((root) =>
-    inversionShapes.flatMap((shape) => {
+    inversionShapes.flatMap((shape) =>
+      shape.intervals.slice(1).flatMap((bassOffset, inversionIndex) => {
       const rootIndex = NOTE_TO_INDEX.get(root) ?? 0;
-      const bass = noteAt(rootIndex + shape.bassOffset);
-      const chordName = `${root}${shape.quality === "minor" ? "m" : ""}/${bass}`;
+      const bass = noteAt(rootIndex + bassOffset);
+      const chordName = `${root}${shape.nameSuffix}/${bass}`;
       if (existingNames.has(chordName)) return [];
 
       const bassFret = (NOTE_TO_INDEX.get(bass) ?? 0) - 4;
       const normalizedBassFret = bassFret < 0 ? bassFret + 12 : bassFret;
-      if (normalizedBassFret > 9) return [];
-      const thirdOffset = shape.quality === "major" ? 4 : 3;
-      const chordTones = [rootIndex, rootIndex + thirdOffset, rootIndex + 7].map(noteAt).map(
+      if (normalizedBassFret > 12) return [];
+      const chordTones = shape.intervals.map((interval) => noteAt(rootIndex + interval)).map(
         (note) => NOTE_TO_INDEX.get(note) ?? 0
       );
       const preferredFret = Math.max(0, Math.min(7, normalizedBassFret - 2));
@@ -1538,12 +1522,12 @@ const makeGeneratedInversions = (): ChordLibraryItem[] => {
       ];
 
       return {
-        id: `${slugify(chordName)}-${slugify(shape.suffix)}-generated`,
+        id: `${slugify(chordName)}-${inversionIndex + 1}-inversion-generated`,
         root,
         quality: shape.quality,
         qualityLabel: shape.qualityLabel,
         inversion: "inverted" as const,
-        position: shape.suffix,
+        position: `${inversionIndex + 1}${inversionIndex === 0 ? "st" : inversionIndex === 1 ? "nd" : inversionIndex === 2 ? "rd" : "th"} inversion • ${bass} bass`,
         chord: makeChord({
           name: chordName,
           frets,
@@ -1566,9 +1550,10 @@ const makeGeneratedInversions = (): ChordLibraryItem[] => {
             description: "Return to a standard voicing when the slash bass is not needed."
           }
         ],
-        practiceFocus: "Practice this against its root-position chord and listen for bass-line direction."
+        practiceFocus: "Practice this against its root-position chord and listen for bass-line direction.",
       };
     })
+    )
   );
 };
 

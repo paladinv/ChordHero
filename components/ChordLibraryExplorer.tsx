@@ -22,6 +22,7 @@ const FAVORITES_STORAGE_KEY = "chord-hero-library-favorites";
 const CUSTOM_PACKS_STORAGE_KEY = "chord-hero-library-custom-packs";
 const PRACTICE_STATS_STORAGE_KEY = "chord-hero-library-practice-stats";
 const USER_NOTES_STORAGE_KEY = "chord-hero-library-user-notes";
+const STUDENT_PROFILES_STORAGE_KEY = "chord-hero-library-student-profiles";
 const SAMPLE_BASE_PATH = "/samples/guitar";
 const OPEN_STRING_FREQUENCIES = [82.41, 110, 146.83, 196, 246.94, 329.63];
 const STANDARD_STRING_NOTES = ["E", "A", "D", "G", "B", "E"];
@@ -101,6 +102,14 @@ type EarTarget = {
   entry: ChordLibraryItem;
   prompt: "chord" | "function";
   options: string[];
+};
+type StudentProfile = {
+  id: string;
+  name: string;
+  favorites: string[];
+  recents: string[];
+  practiceStats: PracticeStats;
+  userNotes: Record<string, string>;
 };
 type HeatmapNote = {
   key: string;
@@ -194,6 +203,21 @@ const getTheoryNotes = (entry: ChordLibraryItem) => {
   };
 };
 
+const getCommonMistakes = (entry: ChordLibraryItem) => {
+  const mistakes: string[] = [];
+  entry.chord.frets.forEach((fret, index) => {
+    if (fret < 0) mistakes.push(`String ${index + 1}: mute it cleanly; accidental contact can add a muddy bass note.`);
+  });
+  if (entry.difficultyTags.includes("barre")) {
+    mistakes.push("Barre: check each string one at a time and relax pressure between checks.");
+  }
+  if (entry.difficultyTags.includes("stretch")) {
+    mistakes.push("Stretch: move the wrist forward instead of squeezing harder with the thumb.");
+  }
+  if (!mistakes.length) mistakes.push("Buzzing: lift and re-place each finger close behind its fret wire.");
+  return mistakes.slice(0, 3);
+};
+
 export default function ChordLibraryExplorer() {
   const [libraryRoot, setLibraryRoot] = useState(DEFAULT_LIBRARY_ITEM?.root ?? "");
   const [libraryQuality, setLibraryQuality] = useState(DEFAULT_LIBRARY_ITEM?.quality ?? "");
@@ -227,6 +251,10 @@ export default function ChordLibraryExplorer() {
   const [earAnswer, setEarAnswer] = useState("");
   const [earResult, setEarResult] = useState("");
   const [thirdCompareChordId, setThirdCompareChordId] = useState("");
+  const [studentProfiles, setStudentProfiles] = useState<StudentProfile[]>([]);
+  const [activeStudentId, setActiveStudentId] = useState("default-student");
+  const [newStudentName, setNewStudentName] = useState("");
+  const [midiStatus, setMidiStatus] = useState("MIDI not connected");
 
   const deferredLibrarySearch = useDeferredValue(librarySearch.trim().toLowerCase());
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -551,6 +579,89 @@ export default function ChordLibraryExplorer() {
     ]);
   };
 
+  const snapshotStudent = (id: string, name: string): StudentProfile => ({
+    id,
+    name,
+    favorites: favoriteIds,
+    recents: recentIds,
+    practiceStats,
+    userNotes
+  });
+
+  const saveStudentProfile = () => {
+    const name = newStudentName.trim() || `Student ${studentProfiles.length + 1}`;
+    const id = `student-${Date.now()}`;
+    const profile = snapshotStudent(id, name);
+    setStudentProfiles((previous) => [profile, ...previous]);
+    setActiveStudentId(id);
+    setNewStudentName("");
+  };
+
+  const loadStudentProfile = (id: string) => {
+    const current = studentProfiles.find((profile) => profile.id === activeStudentId);
+    if (current) {
+      setStudentProfiles((previous) => previous.map((profile) => profile.id === activeStudentId ? snapshotStudent(activeStudentId, profile.name) : profile));
+    }
+    const next = studentProfiles.find((profile) => profile.id === id);
+    if (!next) return;
+    setActiveStudentId(id);
+    setFavoriteIds(next.favorites);
+    setRecentIds(next.recents);
+    setPracticeStats(next.practiceStats);
+    setUserNotes(next.userNotes);
+  };
+
+  const exportTeacherPacks = () => {
+    const blob = new Blob([JSON.stringify(customPacks, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "chord-hero-teacher-packs.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const importTeacherPacks = (file: File) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const imported = JSON.parse(String(reader.result)) as CustomPack[];
+        if (!Array.isArray(imported)) throw new Error("Invalid pack file");
+        const valid = imported.filter((pack) => pack && typeof pack.title === "string" && Array.isArray(pack.chordIds));
+        setCustomPacks((previous) => [...valid.map((pack) => ({ ...pack, id: `imported-${Date.now()}-${pack.id}`, custom: true as const })), ...previous]);
+      } catch {
+        setSampleStatus("Teacher pack import failed: choose a Chord Hero JSON export");
+      }
+    };
+    reader.readAsText(file);
+  };
+
+  const connectMidi = async () => {
+    const midiNavigator = navigator as Navigator & { requestMIDIAccess?: () => Promise<any> };
+    if (!midiNavigator.requestMIDIAccess) {
+      setMidiStatus("Web MIDI is not supported in this browser");
+      return;
+    }
+    try {
+      const access = await midiNavigator.requestMIDIAccess();
+      const handleMessage = (event: any) => {
+        const [status, note] = event.data ?? [];
+        if ((status & 0xf0) !== 0x90 || !note || event.data[2] === 0) return;
+        const midiNote = noteAt(note % 12);
+        setMidiStatus(`Last MIDI note: ${midiNote}`);
+        if (!earTarget) return;
+        const targetRoot = earTarget.entry.root;
+        const correct = midiNote === targetRoot;
+        setEarAnswer(correct ? (earTarget.prompt === "chord" ? earTarget.entry.chord.name : earTarget.entry.functionContexts[0]?.roles[0] ?? "I") : midiNote);
+        setEarResult(correct ? "Correct MIDI root" : `Try again; the root is ${targetRoot}`);
+      };
+      access.inputs.forEach((input: any) => { input.onmidimessage = handleMessage; });
+      setMidiStatus(`${access.inputs.size} MIDI input${access.inputs.size === 1 ? "" : "s"} connected`);
+    } catch {
+      setMidiStatus("MIDI permission was not granted");
+    }
+  };
+
   const addPracticeRep = (id: string) => {
     setPracticeStats((previous) => ({
       ...previous,
@@ -623,6 +734,7 @@ export default function ChordLibraryExplorer() {
       const storedCustomPacks = window.localStorage.getItem(CUSTOM_PACKS_STORAGE_KEY);
       const storedPracticeStats = window.localStorage.getItem(PRACTICE_STATS_STORAGE_KEY);
       const storedUserNotes = window.localStorage.getItem(USER_NOTES_STORAGE_KEY);
+      const storedProfiles = window.localStorage.getItem(STUDENT_PROFILES_STORAGE_KEY);
       if (storedFavorites) {
         setFavoriteIds(JSON.parse(storedFavorites));
       }
@@ -637,6 +749,9 @@ export default function ChordLibraryExplorer() {
       }
       if (storedUserNotes) {
         setUserNotes(JSON.parse(storedUserNotes));
+      }
+      if (storedProfiles) {
+        setStudentProfiles(JSON.parse(storedProfiles));
       }
     } catch {
       // Ignore storage failures and keep the UI usable.
@@ -682,6 +797,14 @@ export default function ChordLibraryExplorer() {
       // Ignore storage failures and keep the UI usable.
     }
   }, [userNotes]);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(STUDENT_PROFILES_STORAGE_KEY, JSON.stringify(studentProfiles));
+    } catch {
+      // Ignore storage failures and keep the UI usable.
+    }
+  }, [studentProfiles]);
 
   useEffect(() => {
     if (!selectedLibraryEntry) return;
@@ -978,6 +1101,9 @@ export default function ChordLibraryExplorer() {
                     ))}
                   </div>
                   <div className="chip-row">
+                    <button className="btn" type="button" onClick={connectMidi}>
+                      Connect MIDI
+                    </button>
                     <button
                       className="btn ghost"
                       type="button"
@@ -987,6 +1113,7 @@ export default function ChordLibraryExplorer() {
                     </button>
                     {earResult ? <strong>{earResult}</strong> : null}
                   </div>
+                  <p className="muted">{midiStatus}. Play the chord root on a MIDI keyboard or fretboard.</p>
                 </div>
               ) : null}
             </div>
@@ -1004,6 +1131,26 @@ export default function ChordLibraryExplorer() {
               ) : (
                 <p className="muted">No weak voicings are due yet.</p>
               )}
+            </div>
+
+            <div className="library-tool-panel">
+              <span className="label">Student progress profile</span>
+              <select value={activeStudentId} onChange={(event) => loadStudentProfile(event.target.value)}>
+                <option value="default-student">Current device profile</option>
+                {studentProfiles.map((profile) => (
+                  <option key={profile.id} value={profile.id}>{profile.name}</option>
+                ))}
+              </select>
+              <div className="chip-row">
+                <input
+                  value={newStudentName}
+                  onChange={(event) => setNewStudentName(event.target.value)}
+                  placeholder="New student name"
+                  aria-label="New student name"
+                />
+                <button className="btn" type="button" onClick={saveStudentProfile}>Save profile</button>
+              </div>
+              <p className="muted">Profiles keep favorites, recents, practice timing, reviews, and notes separate on this device.</p>
             </div>
           </div>
 
@@ -1135,7 +1282,7 @@ export default function ChordLibraryExplorer() {
               <div>
                 <span className="library-label">
                   {filteredLibraryEntries.length} matching voicing
-                  {filteredLibraryEntries.length === 1 ? "" : "s"}
+                  {filteredLibraryEntries.length === 1 ? "" : "s"} • each variant has its own chart
                 </span>
                 <div className="variant-list">
                   {filteredLibraryEntries.map((entry) => (
@@ -1145,7 +1292,7 @@ export default function ChordLibraryExplorer() {
                       className={`chip ${entry.id === selectedLibraryEntry.id ? "active" : ""}`}
                       onClick={() => setSelectedLibraryId(entry.id)}
                     >
-                      {entry.position}
+                      {entry.chord.name} • {entry.position}
                     </button>
                   ))}
                 </div>
@@ -1340,6 +1487,14 @@ export default function ChordLibraryExplorer() {
                     <ul>
                       {selectedLibraryEntry.avoidStrings.map((note) => (
                         <li key={note}>{note}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="library-detail-card">
+                    <span className="label">Common mistakes</span>
+                    <ul>
+                      {getCommonMistakes(selectedLibraryEntry).map((mistake) => (
+                        <li key={mistake}>{mistake}</li>
                       ))}
                     </ul>
                   </div>
@@ -1542,6 +1697,21 @@ export default function ChordLibraryExplorer() {
                 <button className="btn primary" type="button" onClick={() => window.print()}>
                   Print or save PDF
                 </button>
+              </div>
+              <div className="chip-row">
+                <button className="btn" type="button" onClick={exportTeacherPacks}>Export teacher packs</button>
+                <label className="btn ghost" htmlFor="teacher-pack-import">Import teacher packs</label>
+                <input
+                  id="teacher-pack-import"
+                  type="file"
+                  accept="application/json,.json"
+                  className="visually-hidden"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) importTeacherPacks(file);
+                    event.currentTarget.value = "";
+                  }}
+                />
               </div>
               <div className="library-filters">
                 <div>

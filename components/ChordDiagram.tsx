@@ -11,6 +11,15 @@ export type Chord = {
   fingers?: Array<1 | 2 | 3 | 4 | null>;
 };
 
+export const normalizeChord = (chord: Chord): Chord => ({
+  ...chord,
+  frets: Array.from({ length: STRING_COUNT }, (_, index) => {
+    const fret = chord.frets[index];
+    return typeof fret === "number" && Number.isFinite(fret) ? Math.max(-1, fret) : -1;
+  }),
+  fingers: Array.from({ length: STRING_COUNT }, (_, index) => chord.fingers?.[index] ?? null)
+});
+
 type ChordDiagramProps = {
   chord: Chord;
 };
@@ -29,6 +38,7 @@ function getBaseFret(chord: Chord) {
 }
 
 export default function ChordDiagram({ chord }: ChordDiagramProps) {
+  const chart = normalizeChord(chord);
   const width = 200;
   const height = 230;
   const paddingX = 22;
@@ -37,7 +47,7 @@ export default function ChordDiagram({ chord }: ChordDiagramProps) {
   const gridHeight = height - paddingY * 2;
   const stringGap = gridWidth / (STRING_COUNT - 1);
   const fretGap = gridHeight / (FRET_COUNT - 1);
-  const baseFret = getBaseFret(chord);
+  const baseFret = getBaseFret(chart);
 
   return (
     <svg
@@ -46,7 +56,7 @@ export default function ChordDiagram({ chord }: ChordDiagramProps) {
       viewBox={`0 0 ${width} ${height}`}
       className="diagram"
       role="img"
-      aria-label={`Chord diagram for ${chord.name}`}
+      aria-label={`Chord diagram for ${chart.name}`}
     >
       <rect x="0" y="0" width={width} height={height} rx="18" className="diagram-bg" />
 
@@ -84,18 +94,18 @@ export default function ChordDiagram({ chord }: ChordDiagramProps) {
         </text>
       )}
 
-      {chord.barre && (
+      {chart.barre && (
         <rect
-          x={paddingX + chord.barre.from * stringGap - 8}
-          y={paddingY + (chord.barre.fret - baseFret + 1) * fretGap - fretGap / 2 - 8}
-          width={(chord.barre.to - chord.barre.from) * stringGap + 16}
+          x={paddingX + chart.barre.from * stringGap - 8}
+          y={paddingY + (chart.barre.fret - baseFret + 1) * fretGap - fretGap / 2 - 8}
+          width={(chart.barre.to - chart.barre.from) * stringGap + 16}
           height={16}
           rx={8}
           className="diagram-barre"
         />
       )}
 
-      {chord.frets.map((fret, stringIndex) => {
+      {chart.frets.map((fret, stringIndex) => {
         const x = paddingX + stringIndex * stringGap;
         if (fret === 0) {
           return (
@@ -114,7 +124,7 @@ export default function ChordDiagram({ chord }: ChordDiagramProps) {
 
         const position = fret - baseFret + 1;
         const y = paddingY + position * fretGap - fretGap / 2;
-        const finger = chord.fingers?.[stringIndex] ?? null;
+        const finger = chart.fingers?.[stringIndex] ?? null;
 
         return (
           <g key={`dot-${stringIndex}`}>
