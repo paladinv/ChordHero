@@ -1,0 +1,3 @@
+-keepattributes *Annotation*
+-keep class com.codingmonkey.chordhero.domain.** { *; }
+-keepclassmembers class **$$serializer { *; }

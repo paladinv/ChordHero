@@ -6,7 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "content:export": "node scripts/export-shared-content.mjs",
+    "content:validate": "node scripts/validate-shared-content.mjs"
   },
   "dependencies": {
     "next": "^14.2.0",

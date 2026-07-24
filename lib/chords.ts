@@ -1,4 +1,5 @@
 import { Chord } from "../components/ChordDiagram";
+import sharedChordContent from "../shared/content/v1/chords.json";
 
 export type Level = {
   name: string;
@@ -1574,7 +1575,7 @@ const findChordByName = (name: string) => {
   return match.chord;
 };
 
-export const CHORD_LIBRARY = ALL_CHORD_LIBRARY_ITEMS;
+export const CHORD_LIBRARY = sharedChordContent.chordLibrary as unknown as ChordLibraryItem[];
 
 export const CHORD_ITEM_LOOKUP = new Map(CHORD_LIBRARY.map((item) => [item.id, item]));
 
@@ -1598,70 +1599,14 @@ export const HARMONIC_FUNCTION_OPTIONS: HarmonicRole[] = ["I", "ii", "iii", "IV"
 
 export const CHORD_LOOKUP = new Map(dedupeByName(CHORD_LIBRARY).map((chord) => [chord.name, chord]));
 
-export const PROGRESSION_PACKS: ProgressionPack[] = [
-  {
-    id: "key-of-g-starter",
-    title: "Key of G starter",
-    description: "Core campfire chords with a comfortable mix of major, vi, and dominant motion.",
-    keyCenter: "G",
-    focus: "Beginner-friendly I-IV-V-vi movement.",
-    chordIds: ["g-major-open", "c-major-open", "d-major-open", "e-minor-open", "g-over-b"],
-    progression: ["G", "C", "D", "Em", "C", "G", "D"],
-    rightHandPattern: "Down, down-up, up-down-up"
-  },
-  {
-    id: "key-of-c-warmups",
-    title: "Key of C warmups",
-    description: "Open-position harmony for practicing tonic, subdominant, and relative-minor colors.",
-    keyCenter: "C",
-    focus: "Smooth I-IV-V-vi transitions in open position.",
-    chordIds: ["c-major-open", "f-major7-open", "g7-open", "a-minor-open", "d-minor-open"].map(
-      (id) => (id === "g7-open" ? "g-dominant7-open" : id)
-    ),
-    progression: ["C", "Am", "Fmaj7", "G7", "C"],
-    rightHandPattern: "Thumb bass, down-up brush"
-  },
-  {
-    id: "walking-bass-inversions",
-    title: "Walking bass inversions",
-    description: "Bass-led chord movement using slash chords and inversion-friendly shapes.",
-    keyCenter: "G",
-    focus: "Hear how inversions smooth out progressions.",
-    chordIds: ["g-major-open", "g-over-b", "c-over-g", "d-over-fsharp", "am-over-c", "f-over-a"],
-    progression: ["G", "G/B", "C/G", "D/F#", "Am/C", "G"],
-    rightHandPattern: "Bass note, light strum, bass note, strum"
-  },
-  {
-    id: "barre-bootcamp",
-    title: "Barre bootcamp",
-    description: "Closed-position shapes that build endurance without leaving common guitar keys.",
-    keyCenter: "A",
-    focus: "Strength and consistency across E-shape and A-shape barre families.",
-    chordIds: ["f-major-barre", "b-minor-barre", "bb-major-barre", "fsharp-major-barre", "g-major-barre"],
-    progression: ["F", "Bb", "Gm", "C", "F"],
-    rightHandPattern: "Short downstrokes with muted releases"
-  }
-];
+export const PROGRESSION_PACKS = sharedChordContent.progressionPacks as ProgressionPack[];
 
-export const LEVELS: Level[] = [
-  {
-    name: "Open Chords",
-    description: "Comfortable open shapes to build speed.",
-    chords: ["C", "G", "D", "Em", "Am", "E", "A"].map(findChordByName)
-  },
-  {
-    name: "Open + Spice",
-    description: "Add sus and dominant flavors for quicker switches.",
-    chords: ["Cadd9", "Dsus4", "G", "Em7", "Am7", "E7", "D"].map(findChordByName)
-  },
-  {
-    name: "Barre Chords",
-    description: "Full grip shapes for strength and clarity.",
-    chords: ["F", "Bm", "Bb", "Gm", "C#m", "F#"].map(findChordByName)
-  },
-  {
-    name: "Inversions",
-    description: "Slash chords to sharpen bass movement.",
-    chords: ["C/G", "G/B", "D/F#", "Am/C", "Em/B", "F/A"].map(findChordByName)
-  }
-];
+export const LEVELS: Level[] = sharedChordContent.levels.map((level) => ({
+  name: level.name,
+  description: level.description,
+  chords: level.chordIds.map((id) => {
+    const entry = CHORD_ITEM_LOOKUP.get(id);
+    if (!entry) throw new Error(`Chord '${id}' was not found in shared content.`);
+    return entry.chord;
+  })
+}));

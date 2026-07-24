@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ChordDiagram, { Chord } from "../../components/ChordDiagram";
 import { LEVELS } from "../../lib/chords";
+import { playRecordedClick } from "../../lib/recordedAudio";
 
 const MAX_CHORDS = 10;
 const INTERVAL_MS = 3000;
@@ -77,6 +78,8 @@ export default function TrainerPage() {
   const playClick = useCallback(async (frequency = 900) => {
     if (!metronomeOn) return;
     const ctx = await ensureAudioContext();
+    const played = await playRecordedClick(ctx, { accent: frequency > 1000, volume: 0.25 });
+    if (played) return;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "square";

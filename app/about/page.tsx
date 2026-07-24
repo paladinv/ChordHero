@@ -48,6 +48,14 @@ export default function AboutPage() {
             remix it, as long as derivative work remains open under GPL-3.0 terms.
           </p>
         </div>
+        <div className="about-card">
+          <h3>Recorded audio</h3>
+          <p>
+            Guitar previews use D. Smolken&apos;s CC0 Emilyguitar recordings. Practice clicks use
+            Joseph Sardin&apos;s CC0 studio-recorded hi-hat from BigSoundBank. Both are bundled for
+            reliable offline playback.
+          </p>
+        </div>
       </section>
     </main>
   );

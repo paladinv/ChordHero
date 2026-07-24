@@ -16,6 +16,8 @@ import {
   type HarmonicRole,
   type ProgressionPack
 } from "../lib/chords";
+import { loadRecordedAudio } from "../lib/recordedAudio";
+import sharedSettings from "../shared/content/v1/settings.json";
 
 const RECENTS_STORAGE_KEY = "chord-hero-library-recents";
 const FAVORITES_STORAGE_KEY = "chord-hero-library-favorites";
@@ -24,12 +26,13 @@ const PRACTICE_STATS_STORAGE_KEY = "chord-hero-library-practice-stats";
 const USER_NOTES_STORAGE_KEY = "chord-hero-library-user-notes";
 const STUDENT_PROFILES_STORAGE_KEY = "chord-hero-library-student-profiles";
 const SAMPLE_BASE_PATH = "/samples/guitar";
+const RECORDED_GUITAR_ROOTS = [37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 69, 72, 75, 78, 81, 84, 86];
 const OPEN_STRING_FREQUENCIES = [82.41, 110, 146.83, 196, 246.94, 329.63];
 const STANDARD_STRING_NOTES = ["E", "A", "D", "G", "B", "E"];
 const DEFAULT_LIBRARY_ITEM = CHORD_LIBRARY[0] ?? null;
 const NOTES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 const NOTE_INDEX = new Map(NOTES.map((note, index) => [note, index]));
-const RIGHT_HAND_PATTERNS = [
+const LEGACY_RIGHT_HAND_PATTERNS = [
   "Down, down-up, up-down-up",
   "Thumb bass, down-up brush",
   "Bass note, light strum, bass note, strum",
@@ -37,8 +40,8 @@ const RIGHT_HAND_PATTERNS = [
   "Arpeggio 6-4-3-2-1",
   "Alternating bass with pinch"
 ];
-const SAMPLE_VOICES = ["steel", "nylon", "muted", "picked"] as const;
-const TUNINGS = [
+const LEGACY_SAMPLE_VOICES = ["clean", "warm", "muted", "picked"] as const;
+const LEGACY_TUNINGS = [
   {
     id: "standard",
     label: "Standard",
@@ -64,6 +67,13 @@ const TUNINGS = [
     semitoneOffsets: [-1, -1, -1, -1, -1, -1]
   }
 ] as const;
+
+const RIGHT_HAND_PATTERNS = sharedSettings.rightHandPatterns;
+const SAMPLE_VOICES = sharedSettings.sampleVoices as Array<"clean" | "warm" | "muted" | "picked">;
+const TUNINGS = sharedSettings.tunings;
+void LEGACY_RIGHT_HAND_PATTERNS;
+void LEGACY_SAMPLE_VOICES;
+void LEGACY_TUNINGS;
 const SONG_EXAMPLES = [
   {
     family: "open-position",
@@ -242,12 +252,12 @@ export default function ChordLibraryExplorer() {
   const [activeTimerId, setActiveTimerId] = useState<string | null>(null);
   const [userNotes, setUserNotes] = useState<Record<string, string>>({});
   const [capoFret, setCapoFret] = useState(0);
-  const [sampleVoice, setSampleVoice] = useState<SampleVoice>("steel");
+  const [sampleVoice, setSampleVoice] = useState<SampleVoice>("clean");
   const [tuningId, setTuningId] = useState<TuningId>("standard");
   const [teacherKey, setTeacherKey] = useState("G");
   const [teacherSkill, setTeacherSkill] = useState<"all" | DifficultyTag>("beginner");
   const [teacherPackId, setTeacherPackId] = useState<"all" | string>("all");
-  const [sampleStatus, setSampleStatus] = useState("Generated fallback ready");
+  const [sampleStatus, setSampleStatus] = useState("Recorded guitar ready");
   const [earTarget, setEarTarget] = useState<EarTarget | null>(null);
   const [earAnswer, setEarAnswer] = useState("");
   const [earResult, setEarResult] = useState("");
@@ -259,7 +269,6 @@ export default function ChordLibraryExplorer() {
 
   const deferredLibrarySearch = useDeferredValue(librarySearch.trim().toLowerCase());
   const audioContextRef = useRef<AudioContext | null>(null);
-  const sampleCacheRef = useRef<Map<string, AudioBuffer>>(new Map());
   const allProgressionPacks = useMemo(
     () => [...PROGRESSION_PACKS, ...customPacks],
     [customPacks]
@@ -476,50 +485,60 @@ export default function ChordLibraryExplorer() {
     return audioContextRef.current;
   };
 
-  const getSampleBuffer = async (voice: SampleVoice, mode: "strum" | "arpeggio") => {
-    const ctx = await ensureAudioContext();
-    const sampleMode = voice === "picked" ? "arpeggio" : voice === "muted" ? "muted-strum" : mode;
-    const cacheKey = `${voice}-${sampleMode}`;
-    const cached = sampleCacheRef.current.get(cacheKey);
-    if (cached) return cached;
-
-    try {
-      const response = await fetch(`${SAMPLE_BASE_PATH}/${cacheKey}.wav`);
-      if (!response.ok) return null;
-      const buffer = await response.arrayBuffer();
-      const decoded = await ctx.decodeAudioData(buffer);
-      sampleCacheRef.current.set(cacheKey, decoded);
-      setSampleStatus(`Recorded ${voice} ${sampleMode} sample loaded`);
-      return decoded;
-    } catch {
-      setSampleStatus("Recorded samples not found; using generated fallback");
-      return null;
-    }
-  };
-
   const playChordPreview = async (chord: Chord, mode: "strum" | "arpeggio") => {
     const ctx = await ensureAudioContext();
-    const sampleBuffer = await getSampleBuffer(sampleVoice, mode);
-    if (sampleBuffer) {
-      const source = ctx.createBufferSource();
-      const sampleGain = ctx.createGain();
-      source.buffer = sampleBuffer;
-      source.playbackRate.value = Math.pow(2, capoFret / 12);
-      sampleGain.gain.value = sampleVoice === "muted" ? 0.42 : 0.65;
-      source.connect(sampleGain);
-      sampleGain.connect(ctx.destination);
-      source.start();
+    const frequencies = getVoicingFrequencies(chord, capoFret, selectedTuning.semitoneOffsets);
+    if (!frequencies.length) return;
+
+    const midiNotes = frequencies.map((frequency) => Math.round(69 + 12 * Math.log2(frequency / 440)));
+    const recordedRoots = midiNotes.map((midiNote) =>
+      RECORDED_GUITAR_ROOTS.reduce((closest, candidate) =>
+        Math.abs(candidate - midiNote) < Math.abs(closest - midiNote) ? candidate : closest
+      )
+    );
+    const samplePaths = sampleVoice === "muted"
+      ? midiNotes.map(() => `${SAMPLE_BASE_PATH}/muted.mp3`)
+      : recordedRoots.map((root) => `${SAMPLE_BASE_PATH}/clean/${root}.mp3`);
+    const sampleBuffers = await Promise.all(samplePaths.map((path) => loadRecordedAudio(ctx, path)));
+
+    if (sampleBuffers.every((buffer): buffer is AudioBuffer => Boolean(buffer))) {
+      const output = ctx.createBiquadFilter();
+      output.type = "lowpass";
+      output.frequency.value = sampleVoice === "warm" ? 1900 : sampleVoice === "muted" ? 2600 : 5200;
+      output.Q.value = sampleVoice === "warm" ? 0.65 : 0.35;
+      output.connect(ctx.destination);
+
+      const now = ctx.currentTime;
+      const step = mode === "strum" ? 0.034 : sampleVoice === "picked" ? 0.19 : 0.145;
+      const sustain = sampleVoice === "muted" ? 0.28 : mode === "strum" ? 1.35 : 1.8;
+
+      sampleBuffers.forEach((buffer, index) => {
+        const source = ctx.createBufferSource();
+        const noteGain = ctx.createGain();
+        const startAt = now + index * step;
+        source.buffer = buffer;
+        source.playbackRate.value = sampleVoice === "muted"
+          ? 0.9 + index * 0.025
+          : Math.pow(2, (midiNotes[index] - recordedRoots[index]) / 12);
+        noteGain.gain.setValueAtTime(0.0001, startAt);
+        noteGain.gain.exponentialRampToValueAtTime(sampleVoice === "muted" ? 0.2 : 0.17, startAt + 0.008);
+        noteGain.gain.exponentialRampToValueAtTime(0.0001, startAt + sustain);
+        source.connect(noteGain);
+        noteGain.connect(output);
+        source.start(startAt);
+        source.stop(startAt + sustain + 0.05);
+      });
+      setSampleStatus(`Recorded ${sampleVoice} guitar loaded`);
       return;
     }
 
-    const frequencies = getVoicingFrequencies(chord, capoFret, selectedTuning.semitoneOffsets);
-    if (!frequencies.length) return;
+    setSampleStatus("Recorded guitar unavailable; using generated fallback");
 
     const masterGain = ctx.createGain();
     const filter = ctx.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.value = sampleVoice === "nylon" ? 1250 : sampleVoice === "muted" ? 900 : 2600;
-    filter.Q.value = sampleVoice === "nylon" ? 0.7 : 1.15;
+    filter.frequency.value = sampleVoice === "warm" ? 1250 : sampleVoice === "muted" ? 900 : 2600;
+    filter.Q.value = sampleVoice === "warm" ? 0.7 : 1.15;
     filter.connect(ctx.destination);
     masterGain.connect(filter);
     masterGain.gain.value = 0.0001;
@@ -538,7 +557,7 @@ export default function ChordLibraryExplorer() {
       const osc = ctx.createOscillator();
       const noteGain = ctx.createGain();
       const startAt = now + index * step;
-      osc.type = sampleVoice === "nylon" ? "sine" : mode === "strum" ? "triangle" : "sawtooth";
+      osc.type = sampleVoice === "warm" ? "sine" : mode === "strum" ? "triangle" : "sawtooth";
       osc.frequency.value = frequency;
       noteGain.gain.value = 0.0001;
       osc.connect(noteGain);

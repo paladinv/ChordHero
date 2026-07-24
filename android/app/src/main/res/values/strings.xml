@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">Chord Hero</string>
+    <string name="trainer">Trainer</string>
+    <string name="right_hand">Right-Hand Studio</string>
+    <string name="song_coach">Song Coach</string>
+    <string name="library">Chord Library</string>
+    <string name="chart">Chord Chart</string>
+    <string name="tools">Profiles &amp; Tools</string>
+    <string name="about">About</string>
+</resources>

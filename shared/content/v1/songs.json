@@ -1,0 +1,3906 @@
+{
+  "schemaVersion": 2,
+  "songs": [
+    {
+      "id": "amazing-grace",
+      "title": "Amazing Grace",
+      "artist": "Traditional",
+      "source": "Public domain hymn",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 80,
+      "key": "G",
+      "timeSignature": "3/4",
+      "tags": [
+        "hymn",
+        "folk",
+        "beginner"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Amazing grace, how sweet the sound"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G",
+                "Em",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "amazing-grace-strum",
+          "name": "Gentle strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 80,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D -",
+          "feel": "Let each chord ring."
+        },
+        {
+          "id": "amazing-grace-finger",
+          "name": "Alternating thumbpicking",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 68,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Thumb bass, 3-2-1 arpeggio",
+          "feel": "Keep the thumb steady."
+        },
+        {
+          "id": "amazing-grace-pick",
+          "name": "Waltz plectrum",
+          "technique": "plectrum",
+          "key": "C",
+          "timeSignature": "3/4",
+          "bpm": 76,
+          "tuningId": "standard",
+          "capo": 5,
+          "pattern": "D - U D - U",
+          "feel": "Use light alternate picking."
+        }
+      ]
+    },
+    {
+      "id": "oh-susanna",
+      "title": "Oh! Susanna",
+      "artist": "Stephen Foster",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 92,
+      "key": "C",
+      "timeSignature": "2/4",
+      "tags": [
+        "folk",
+        "beginner",
+        "upbeat"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Oh, I come from Alabama with a banjo on my knee"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "C",
+                "F",
+                "C",
+                "G",
+                "C"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "oh-susanna-strum",
+          "name": "Campfire strum",
+          "technique": "strumming",
+          "key": "C",
+          "timeSignature": "2/4",
+          "bpm": 92,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D U U",
+          "feel": "Bright and bouncy."
+        },
+        {
+          "id": "oh-susanna-finger",
+          "name": "Folk fingerstyle",
+          "technique": "fingerpicking",
+          "key": "C",
+          "timeSignature": "2/4",
+          "bpm": 78,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass, 3-2-1, bass, 3-2-1",
+          "feel": "Accent the melody notes."
+        },
+        {
+          "id": "oh-susanna-pick",
+          "name": "Driving plectrum",
+          "technique": "plectrum",
+          "key": "D",
+          "timeSignature": "2/4",
+          "bpm": 96,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U",
+          "feel": "Keep the eighth notes even."
+        }
+      ]
+    },
+    {
+      "id": "this-little-light",
+      "title": "This Little Light of Mine",
+      "artist": "Traditional",
+      "source": "Public domain spiritual",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 96,
+      "key": "G",
+      "timeSignature": "4/4",
+      "tags": [
+        "spiritual",
+        "gospel",
+        "beginner"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "This little light of mine, I'm gonna let it shine"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "this-little-light-strum",
+          "name": "Gospel strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 96,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U D U",
+          "feel": "Light upstrokes."
+        },
+        {
+          "id": "this-little-light-finger",
+          "name": "Pinch pattern",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 82,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Thumb bass with alternating pinch",
+          "feel": "Let the melody sing."
+        },
+        {
+          "id": "this-little-light-pick",
+          "name": "Plectrum groove",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "4/4",
+          "bpm": 100,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D D U D U",
+          "feel": "Accent beats two and four."
+        }
+      ]
+    },
+    {
+      "id": "scarborough-fair",
+      "title": "Scarborough Fair",
+      "artist": "Traditional English",
+      "source": "Public domain ballad",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 84,
+      "key": "Am",
+      "timeSignature": "3/4",
+      "tags": [
+        "ballad",
+        "minor",
+        "folk"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Are you going to Scarborough Fair? Parsley, sage, rosemary and thyme"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "Am",
+                "C",
+                "Am",
+                "G",
+                "Am",
+                "C",
+                "Am",
+                "Em"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "scarborough-fair-strum",
+          "name": "Ballad strum",
+          "technique": "strumming",
+          "key": "Am",
+          "timeSignature": "3/4",
+          "bpm": 84,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D U",
+          "feel": "Soft, spacious strums."
+        },
+        {
+          "id": "scarborough-fair-finger",
+          "name": "Tranquil arpeggio",
+          "technique": "fingerpicking",
+          "key": "Am",
+          "timeSignature": "3/4",
+          "bpm": 72,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-4-3-2-3-4",
+          "feel": "Keep the pattern circular."
+        },
+        {
+          "id": "scarborough-fair-pick",
+          "name": "Picked waltz",
+          "technique": "plectrum",
+          "key": "Em",
+          "timeSignature": "3/4",
+          "bpm": 78,
+          "tuningId": "standard",
+          "capo": 5,
+          "pattern": "D U D U D U",
+          "feel": "Use a restrained attack."
+        }
+      ]
+    },
+    {
+      "id": "greensleeves",
+      "title": "Greensleeves",
+      "artist": "Traditional English",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 88,
+      "key": "Am",
+      "timeSignature": "6/8",
+      "tags": [
+        "folk",
+        "minor",
+        "waltz"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Alas, my love, you do me wrong, to cast me off discourteously"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "Am",
+                "G",
+                "F",
+                "E",
+                "Am",
+                "C",
+                "G",
+                "E",
+                "Am"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "greensleeves-strum",
+          "name": "Flowing 6/8",
+          "technique": "strumming",
+          "key": "Am",
+          "timeSignature": "6/8",
+          "bpm": 88,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U",
+          "feel": "Bass notes lead each group."
+        },
+        {
+          "id": "greensleeves-finger",
+          "name": "Melodic fingerstyle",
+          "technique": "fingerpicking",
+          "key": "Am",
+          "timeSignature": "6/8",
+          "bpm": 72,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Thumb, 3-2-1-2-3",
+          "feel": "Bring out the top string."
+        },
+        {
+          "id": "greensleeves-pick",
+          "name": "Plectrum jig",
+          "technique": "plectrum",
+          "key": "Em",
+          "timeSignature": "6/8",
+          "bpm": 82,
+          "tuningId": "standard",
+          "capo": 5,
+          "pattern": "D U D U D U",
+          "feel": "Keep the triplets relaxed."
+        }
+      ]
+    },
+    {
+      "id": "saints-go-marching",
+      "title": "When the Saints Go Marching In",
+      "artist": "Traditional",
+      "source": "Public domain traditional song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 100,
+      "key": "C",
+      "timeSignature": "4/4",
+      "tags": [
+        "jazz",
+        "march",
+        "beginner"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Oh when the saints go marching in, oh when the saints go marching in"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "C",
+                "F",
+                "C",
+                "G",
+                "C"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "saints-go-marching-strum",
+          "name": "March strum",
+          "technique": "strumming",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 100,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D D D",
+          "feel": "Accent beats one and three."
+        },
+        {
+          "id": "saints-go-marching-finger",
+          "name": "Walking bass",
+          "technique": "fingerpicking",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 84,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Alternating bass with pinch",
+          "feel": "Make the bass line steady."
+        },
+        {
+          "id": "saints-go-marching-pick",
+          "name": "Swing plectrum",
+          "technique": "plectrum",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 108,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D - D U - U",
+          "feel": "Add a gentle swing."
+        }
+      ]
+    },
+    {
+      "id": "house-rising-sun",
+      "title": "House of the Rising Sun",
+      "artist": "Traditional",
+      "source": "Public domain traditional folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 78,
+      "key": "Am",
+      "timeSignature": "6/8",
+      "tags": [
+        "folk",
+        "minor",
+        "arpeggio"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "There is a house in New Orleans, they call the Rising Sun"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "Am",
+                "C",
+                "D",
+                "F",
+                "Am",
+                "C",
+                "E"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "house-rising-sun-strum",
+          "name": "Slow arpeggiated strum",
+          "technique": "strumming",
+          "key": "Am",
+          "timeSignature": "6/8",
+          "bpm": 78,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D U",
+          "feel": "Strum softly."
+        },
+        {
+          "id": "house-rising-sun-finger",
+          "name": "Classic arpeggio",
+          "technique": "fingerpicking",
+          "key": "Am",
+          "timeSignature": "6/8",
+          "bpm": 68,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-3-2-1-2-3",
+          "feel": "Even volume on every string."
+        },
+        {
+          "id": "house-rising-sun-pick",
+          "name": "Plectrum 6/8",
+          "technique": "plectrum",
+          "key": "Em",
+          "timeSignature": "6/8",
+          "bpm": 72,
+          "tuningId": "standard",
+          "capo": 5,
+          "pattern": "D U D U D U",
+          "feel": "Use a warm, even pick stroke."
+        }
+      ]
+    },
+    {
+      "id": "skip-to-my-lou",
+      "title": "Skip to My Lou",
+      "artist": "Traditional American",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 104,
+      "key": "G",
+      "timeSignature": "4/4",
+      "tags": [
+        "folk",
+        "beginner",
+        "dance"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Lost my partner, what'll I do? Skip to my Lou, my darling"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "skip-to-my-lou-strum",
+          "name": "Bouncy strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 104,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D U U D U",
+          "feel": "Keep it playful."
+        },
+        {
+          "id": "skip-to-my-lou-finger",
+          "name": "Clawhammer-inspired",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 88,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Thumb bass, brush, thumb, brush",
+          "feel": "Alternate bass strings."
+        },
+        {
+          "id": "skip-to-my-lou-pick",
+          "name": "Fast plectrum",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "4/4",
+          "bpm": 112,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Relax the wrist."
+        }
+      ]
+    },
+    {
+      "id": "red-river-valley",
+      "title": "The Red River Valley",
+      "artist": "Traditional",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 90,
+      "key": "G",
+      "timeSignature": "3/4",
+      "tags": [
+        "folk",
+        "ballad",
+        "beginner"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "From this valley they say you are going, we will miss your bright eyes and sweet smile"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "red-river-valley-strum",
+          "name": "Ballad strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 90,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D -",
+          "feel": "Let chords ring."
+        },
+        {
+          "id": "red-river-valley-finger",
+          "name": "Waltz fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 72,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass, 3-2-1, 3-2",
+          "feel": "Keep the melody on top."
+        },
+        {
+          "id": "red-river-valley-pick",
+          "name": "Plectrum waltz",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "3/4",
+          "bpm": 84,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Light alternate picking."
+        }
+      ]
+    },
+    {
+      "id": "shenandoah",
+      "title": "Shenandoah",
+      "artist": "Traditional American",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 72,
+      "key": "G",
+      "timeSignature": "3/4",
+      "tags": [
+        "folk",
+        "ballad",
+        "slow"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Oh Shenandoah, I long to hear you, away, you rolling river"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "D",
+                "Em",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "shenandoah-strum",
+          "name": "Wide strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 72,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D U",
+          "feel": "Leave space between changes."
+        },
+        {
+          "id": "shenandoah-finger",
+          "name": "Open-string fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 60,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-4-3-2-3-4",
+          "feel": "Use a gentle touch."
+        },
+        {
+          "id": "shenandoah-pick",
+          "name": "Plectrum ballad",
+          "technique": "plectrum",
+          "key": "C",
+          "timeSignature": "3/4",
+          "bpm": 68,
+          "tuningId": "standard",
+          "capo": 5,
+          "pattern": "D - U D - U",
+          "feel": "Keep the pick close to the strings."
+        }
+      ]
+    },
+    {
+      "id": "bear-went-over-mountain",
+      "title": "The Bear Went Over the Mountain",
+      "artist": "Traditional",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 102,
+      "key": "C",
+      "timeSignature": "4/4",
+      "tags": [
+        "children",
+        "folk",
+        "beginner"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "The bear went over the mountain, the bear went over the mountain"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "C",
+                "G",
+                "C",
+                "F",
+                "C",
+                "G",
+                "C"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "bear-went-over-mountain-strum",
+          "name": "Playful strum",
+          "technique": "strumming",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 102,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D U U D U",
+          "feel": "Keep the pulse light."
+        },
+        {
+          "id": "bear-went-over-mountain-finger",
+          "name": "Simple alternating bass",
+          "technique": "fingerpicking",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 84,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass, 3-2-1, bass, 3-2-1",
+          "feel": "Use open strings."
+        },
+        {
+          "id": "bear-went-over-mountain-pick",
+          "name": "Plectrum bounce",
+          "technique": "plectrum",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 108,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U",
+          "feel": "Use small wrist motion."
+        }
+      ]
+    },
+    {
+      "id": "auld-lang-syne",
+      "title": "Auld Lang Syne",
+      "artist": "Traditional Scottish",
+      "source": "Public domain traditional song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 80,
+      "key": "G",
+      "timeSignature": "3/4",
+      "tags": [
+        "folk",
+        "new-year",
+        "ballad"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Should old acquaintance be forgot, and never brought to mind"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "auld-lang-syne-strum",
+          "name": "Stately strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 80,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D -",
+          "feel": "Play with a steady sway."
+        },
+        {
+          "id": "auld-lang-syne-finger",
+          "name": "Waltz fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 68,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass, 3-2-1, 3-2",
+          "feel": "Bring out the high melody."
+        },
+        {
+          "id": "auld-lang-syne-pick",
+          "name": "Picked waltz",
+          "technique": "plectrum",
+          "key": "C",
+          "timeSignature": "3/4",
+          "bpm": 76,
+          "tuningId": "standard",
+          "capo": 5,
+          "pattern": "D U D U D U",
+          "feel": "Keep the accents broad."
+        }
+      ]
+    },
+    {
+      "id": "twinkle-twinkle",
+      "title": "Twinkle, Twinkle, Little Star",
+      "artist": "Traditional",
+      "source": "Public domain melody",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 88,
+      "key": "C",
+      "timeSignature": "4/4",
+      "tags": [
+        "children",
+        "beginner",
+        "melody"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Twinkle, twinkle, little star, how I wonder what you are"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "C",
+                "F",
+                "C",
+                "G",
+                "C"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "twinkle-twinkle-strum",
+          "name": "Beginner strum",
+          "technique": "strumming",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 88,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D - D -",
+          "feel": "Leave room for the melody."
+        },
+        {
+          "id": "twinkle-twinkle-finger",
+          "name": "Melody fingerstyle",
+          "technique": "fingerpicking",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 72,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Thumb bass, pinch melody",
+          "feel": "Make the top note clear."
+        },
+        {
+          "id": "twinkle-twinkle-pick",
+          "name": "Plectrum melody",
+          "technique": "plectrum",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 92,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U",
+          "feel": "Keep the melody on the treble strings."
+        }
+      ]
+    },
+    {
+      "id": "mary-had-a-little-lamb",
+      "title": "Mary Had a Little Lamb",
+      "artist": "Traditional",
+      "source": "Public domain nursery song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 92,
+      "key": "C",
+      "timeSignature": "4/4",
+      "tags": [
+        "children",
+        "beginner",
+        "nursery"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Mary had a little lamb, its fleece was white as snow"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "C",
+                "G",
+                "C",
+                "F",
+                "C",
+                "G",
+                "C"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "mary-had-a-little-lamb-strum",
+          "name": "Nursery strum",
+          "technique": "strumming",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 92,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D - D -",
+          "feel": "Keep every change comfortable."
+        },
+        {
+          "id": "mary-had-a-little-lamb-finger",
+          "name": "Gentle fingerstyle",
+          "technique": "fingerpicking",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 76,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass, pinch, 3-2-1",
+          "feel": "Play quietly."
+        },
+        {
+          "id": "mary-had-a-little-lamb-pick",
+          "name": "Plectrum practice",
+          "technique": "plectrum",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 100,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U",
+          "feel": "Keep downstrokes relaxed."
+        }
+      ]
+    },
+    {
+      "id": "row-row-row-your-boat",
+      "title": "Row, Row, Row Your Boat",
+      "artist": "Traditional",
+      "source": "Public domain nursery song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 88,
+      "key": "C",
+      "timeSignature": "6/8",
+      "tags": [
+        "children",
+        "round",
+        "beginner"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Row, row, row your boat, gently down the stream"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "C",
+                "G",
+                "C",
+                "F",
+                "C",
+                "G",
+                "C"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "row-row-row-your-boat-strum",
+          "name": "Flowing strum",
+          "technique": "strumming",
+          "key": "C",
+          "timeSignature": "6/8",
+          "bpm": 88,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U",
+          "feel": "Rock gently through the bar."
+        },
+        {
+          "id": "row-row-row-your-boat-finger",
+          "name": "Rolling fingerstyle",
+          "technique": "fingerpicking",
+          "key": "C",
+          "timeSignature": "6/8",
+          "bpm": 72,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-3-2-1-2-3",
+          "feel": "Even triplets."
+        },
+        {
+          "id": "row-row-row-your-boat-pick",
+          "name": "Plectrum 6/8",
+          "technique": "plectrum",
+          "key": "D",
+          "timeSignature": "6/8",
+          "bpm": 96,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Keep the motion continuous."
+        }
+      ]
+    },
+    {
+      "id": "happy-birthday",
+      "title": "Happy Birthday to You",
+      "artist": "Patty Hill / Mildred Hill",
+      "source": "Public domain song",
+      "license": "Public domain in the United States",
+      "difficulty": "easy",
+      "bpm": 96,
+      "key": "C",
+      "timeSignature": "3/4",
+      "tags": [
+        "celebration",
+        "beginner",
+        "waltz"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Happy birthday to you, happy birthday to you"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "C",
+                "G",
+                "C",
+                "F",
+                "C",
+                "G",
+                "C"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "happy-birthday-strum",
+          "name": "Birthday waltz",
+          "technique": "strumming",
+          "key": "C",
+          "timeSignature": "3/4",
+          "bpm": 96,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U",
+          "feel": "Keep the melody relaxed."
+        },
+        {
+          "id": "happy-birthday-finger",
+          "name": "Waltz fingerstyle",
+          "technique": "fingerpicking",
+          "key": "C",
+          "timeSignature": "3/4",
+          "bpm": 76,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass, 3-2-1, 3-2",
+          "feel": "Let the high notes ring."
+        },
+        {
+          "id": "happy-birthday-pick",
+          "name": "Plectrum waltz",
+          "technique": "plectrum",
+          "key": "D",
+          "timeSignature": "3/4",
+          "bpm": 104,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Use a light celebratory accent."
+        }
+      ]
+    },
+    {
+      "id": "jingle-bells",
+      "title": "Jingle Bells",
+      "artist": "James Lord Pierpont",
+      "source": "Public domain carol",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 108,
+      "key": "C",
+      "timeSignature": "4/4",
+      "tags": [
+        "holiday",
+        "beginner",
+        "upbeat"
+      ],
+      "sections": [
+        {
+          "id": "chorus",
+          "title": "Chorus",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Jingle bells, jingle bells, jingle all the way"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "C",
+                "F",
+                "C",
+                "G",
+                "C"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "jingle-bells-strum",
+          "name": "Holiday strum",
+          "technique": "strumming",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 108,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D U U D U",
+          "feel": "Keep it bright."
+        },
+        {
+          "id": "jingle-bells-finger",
+          "name": "Bells fingerstyle",
+          "technique": "fingerpicking",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 88,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Alternating bass and pinch",
+          "feel": "Make the melody sparkle."
+        },
+        {
+          "id": "jingle-bells-pick",
+          "name": "Driving pick",
+          "technique": "plectrum",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 116,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Keep the wrist loose."
+        }
+      ]
+    },
+    {
+      "id": "silent-night",
+      "title": "Silent Night",
+      "artist": "Franz Xaver Gruber",
+      "source": "Public domain carol",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 72,
+      "key": "G",
+      "timeSignature": "3/4",
+      "tags": [
+        "holiday",
+        "hymn",
+        "ballad"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Silent night, holy night, all is calm, all is bright"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "D",
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "silent-night-strum",
+          "name": "Quiet waltz",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 72,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D -",
+          "feel": "Very gentle attack."
+        },
+        {
+          "id": "silent-night-finger",
+          "name": "Lullaby fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 60,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-4-3-2-3-4",
+          "feel": "Keep the pulse soft."
+        },
+        {
+          "id": "silent-night-pick",
+          "name": "Light plectrum",
+          "technique": "plectrum",
+          "key": "C",
+          "timeSignature": "3/4",
+          "bpm": 68,
+          "tuningId": "standard",
+          "capo": 5,
+          "pattern": "D - U D - U",
+          "feel": "Use a feather-light pick."
+        }
+      ]
+    },
+    {
+      "id": "o-come-all-ye-faithful",
+      "title": "O Come, All Ye Faithful",
+      "artist": "Traditional hymn",
+      "source": "Public domain carol",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 84,
+      "key": "G",
+      "timeSignature": "4/4",
+      "tags": [
+        "holiday",
+        "hymn",
+        "anthem"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "O come, all ye faithful, joyful and triumphant"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "D",
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "o-come-all-ye-faithful-strum",
+          "name": "Hymn strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 84,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U D U",
+          "feel": "Broad and steady."
+        },
+        {
+          "id": "o-come-all-ye-faithful-finger",
+          "name": "Hymn fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 68,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass with alternating pinch",
+          "feel": "Bring out the vocal line."
+        },
+        {
+          "id": "o-come-all-ye-faithful-pick",
+          "name": "Plectrum hymn",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "4/4",
+          "bpm": 92,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D D U D U",
+          "feel": "Build gradually."
+        }
+      ]
+    },
+    {
+      "id": "joy-to-the-world",
+      "title": "Joy to the World",
+      "artist": "Isaac Watts / George Frideric Handel",
+      "source": "Public domain hymn",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 96,
+      "key": "D",
+      "timeSignature": "4/4",
+      "tags": [
+        "holiday",
+        "hymn",
+        "anthem"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Joy to the world, the Lord is come; let earth receive her King"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "D",
+                "A",
+                "D",
+                "G",
+                "D",
+                "A",
+                "D"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "joy-to-the-world-strum",
+          "name": "Open strum",
+          "technique": "strumming",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 96,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D U U D U",
+          "feel": "Clear, ringing chords."
+        },
+        {
+          "id": "joy-to-the-world-finger",
+          "name": "Baroque fingerstyle",
+          "technique": "fingerpicking",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 76,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass, 3-2-1, 2-3",
+          "feel": "Shape the melody."
+        },
+        {
+          "id": "joy-to-the-world-pick",
+          "name": "Plectrum anthem",
+          "technique": "plectrum",
+          "key": "E",
+          "timeSignature": "4/4",
+          "bpm": 104,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Keep the attack confident."
+        }
+      ]
+    },
+    {
+      "id": "battle-hymn-republic",
+      "title": "The Battle Hymn of the Republic",
+      "artist": "Julia Ward Howe",
+      "source": "Public domain hymn",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 100,
+      "key": "G",
+      "timeSignature": "4/4",
+      "tags": [
+        "hymn",
+        "march",
+        "anthem"
+      ],
+      "sections": [
+        {
+          "id": "chorus",
+          "title": "Chorus",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Glory, glory, hallelujah! His truth is marching on"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "battle-hymn-republic-strum",
+          "name": "Marching strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 100,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D D D",
+          "feel": "Accent the march."
+        },
+        {
+          "id": "battle-hymn-republic-finger",
+          "name": "Rolling hymn",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 80,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Alternating bass with pinch",
+          "feel": "Keep the bass grounded."
+        },
+        {
+          "id": "battle-hymn-republic-pick",
+          "name": "Plectrum march",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "4/4",
+          "bpm": 108,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U",
+          "feel": "Use firm downbeats."
+        }
+      ]
+    },
+    {
+      "id": "yankee-doodle",
+      "title": "Yankee Doodle",
+      "artist": "Traditional American",
+      "source": "Public domain patriotic song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 112,
+      "key": "C",
+      "timeSignature": "4/4",
+      "tags": [
+        "folk",
+        "patriotic",
+        "beginner"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Yankee Doodle went to town, a-riding on a pony"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "C",
+                "G",
+                "C",
+                "F",
+                "C",
+                "G",
+                "C"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "yankee-doodle-strum",
+          "name": "March strum",
+          "technique": "strumming",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 112,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D U D D U",
+          "feel": "Play it crisply."
+        },
+        {
+          "id": "yankee-doodle-finger",
+          "name": "Banjo-style fingerpick",
+          "technique": "fingerpicking",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 88,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Thumb, brush, thumb, brush",
+          "feel": "Keep alternating bass."
+        },
+        {
+          "id": "yankee-doodle-pick",
+          "name": "Plectrum march",
+          "technique": "plectrum",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 120,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Small, quick strokes."
+        }
+      ]
+    },
+    {
+      "id": "the-water-is-wide",
+      "title": "The Water Is Wide",
+      "artist": "Traditional",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 70,
+      "key": "C",
+      "timeSignature": "3/4",
+      "tags": [
+        "folk",
+        "ballad",
+        "fingerstyle"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "The water is wide, I cannot cross over, and neither have I wings to fly"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "C",
+                "F",
+                "C",
+                "Am",
+                "F",
+                "G",
+                "C"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-water-is-wide-strum",
+          "name": "Open ballad",
+          "technique": "strumming",
+          "key": "C",
+          "timeSignature": "3/4",
+          "bpm": 70,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D U",
+          "feel": "Keep the dynamics gentle."
+        },
+        {
+          "id": "the-water-is-wide-finger",
+          "name": "Celtic fingerstyle",
+          "technique": "fingerpicking",
+          "key": "C",
+          "timeSignature": "3/4",
+          "bpm": 58,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-4-3-2-3-4",
+          "feel": "Let open strings ring."
+        },
+        {
+          "id": "the-water-is-wide-pick",
+          "name": "Picked waltz",
+          "technique": "plectrum",
+          "key": "D",
+          "timeSignature": "3/4",
+          "bpm": 66,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Keep the pick soft."
+        }
+      ]
+    },
+    {
+      "id": "wayfaring-stranger",
+      "title": "Wayfaring Stranger",
+      "artist": "Traditional American",
+      "source": "Public domain spiritual",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 76,
+      "key": "Am",
+      "timeSignature": "4/4",
+      "tags": [
+        "spiritual",
+        "minor",
+        "folk"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "I am a poor wayfaring stranger, while traveling through this world of woe"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "Am",
+                "C",
+                "Am",
+                "E",
+                "Am"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "wayfaring-stranger-strum",
+          "name": "Minor strum",
+          "technique": "strumming",
+          "key": "Am",
+          "timeSignature": "4/4",
+          "bpm": 76,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U D U",
+          "feel": "Dark and spacious."
+        },
+        {
+          "id": "wayfaring-stranger-finger",
+          "name": "Alternating minor",
+          "technique": "fingerpicking",
+          "key": "Am",
+          "timeSignature": "4/4",
+          "bpm": 62,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass, 3-2-1, bass, 3-2-1",
+          "feel": "Keep the minor pulse steady."
+        },
+        {
+          "id": "wayfaring-stranger-pick",
+          "name": "Plectrum minor",
+          "technique": "plectrum",
+          "key": "Em",
+          "timeSignature": "4/4",
+          "bpm": 68,
+          "tuningId": "standard",
+          "capo": 5,
+          "pattern": "D D U D U",
+          "feel": "Use a warm, controlled attack."
+        }
+      ]
+    },
+    {
+      "id": "down-in-the-valley",
+      "title": "Down in the Valley",
+      "artist": "Traditional American",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 84,
+      "key": "G",
+      "timeSignature": "3/4",
+      "tags": [
+        "folk",
+        "ballad",
+        "beginner"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Down in the valley, the valley so low, hang your head over, hear the wind blow"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "down-in-the-valley-strum",
+          "name": "Valley waltz",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 84,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D -",
+          "feel": "Let the final beat breathe."
+        },
+        {
+          "id": "down-in-the-valley-finger",
+          "name": "Gentle picking",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 68,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass, 3-2-1, 3-2",
+          "feel": "Keep the treble notes connected."
+        },
+        {
+          "id": "down-in-the-valley-pick",
+          "name": "Plectrum waltz",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "3/4",
+          "bpm": 92,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Use a rounded stroke."
+        }
+      ]
+    },
+    {
+      "id": "home-on-the-range",
+      "title": "Home on the Range",
+      "artist": "Brewster Higley / Daniel Kelley",
+      "source": "Public domain American song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 88,
+      "key": "G",
+      "timeSignature": "4/4",
+      "tags": [
+        "folk",
+        "western",
+        "beginner"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Oh, give me a home where the buffalo roam, where the deer and the antelope play"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "home-on-the-range-strum",
+          "name": "Western strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 88,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U D U",
+          "feel": "Leave space around the bass."
+        },
+        {
+          "id": "home-on-the-range-finger",
+          "name": "Open range fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 72,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Alternating bass with pinch",
+          "feel": "Keep it wide and open."
+        },
+        {
+          "id": "home-on-the-range-pick",
+          "name": "Western plectrum",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "4/4",
+          "bpm": 96,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D D U U D U",
+          "feel": "Add a gentle train feel."
+        }
+      ]
+    },
+    {
+      "id": "oh-shenandoah",
+      "title": "Oh Shenandoah",
+      "artist": "Traditional",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 72,
+      "key": "D",
+      "timeSignature": "3/4",
+      "tags": [
+        "folk",
+        "ballad",
+        "river"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Oh Shenandoah, I can't get across, away, you rolling river"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "D",
+                "A",
+                "Bm",
+                "G",
+                "D",
+                "A",
+                "D"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "oh-shenandoah-strum",
+          "name": "River strum",
+          "technique": "strumming",
+          "key": "D",
+          "timeSignature": "3/4",
+          "bpm": 72,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D U",
+          "feel": "Smooth and unhurried."
+        },
+        {
+          "id": "oh-shenandoah-finger",
+          "name": "River fingerstyle",
+          "technique": "fingerpicking",
+          "key": "D",
+          "timeSignature": "3/4",
+          "bpm": 58,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-4-3-2-3-4",
+          "feel": "Make the bass a quiet current."
+        },
+        {
+          "id": "oh-shenandoah-pick",
+          "name": "Picked river ballad",
+          "technique": "plectrum",
+          "key": "E",
+          "timeSignature": "3/4",
+          "bpm": 66,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Use an even, soft stroke."
+        }
+      ]
+    },
+    {
+      "id": "the-cuckoo",
+      "title": "The Cuckoo",
+      "artist": "Traditional English",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 92,
+      "key": "D",
+      "timeSignature": "4/4",
+      "tags": [
+        "folk",
+        "old-time",
+        "picking"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "The cuckoo is a pretty bird, she sings as she flies"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "D",
+                "G",
+                "D",
+                "A",
+                "D"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-cuckoo-strum",
+          "name": "Old-time strum",
+          "technique": "strumming",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 92,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U D U",
+          "feel": "Add a little bounce."
+        },
+        {
+          "id": "the-cuckoo-finger",
+          "name": "Old-time fingerpick",
+          "technique": "fingerpicking",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 74,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Thumb, brush, thumb, pinch",
+          "feel": "Keep the thumb alternating."
+        },
+        {
+          "id": "the-cuckoo-pick",
+          "name": "Plectrum folk",
+          "technique": "plectrum",
+          "key": "E",
+          "timeSignature": "4/4",
+          "bpm": 100,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U",
+          "feel": "Keep the eighth notes crisp."
+        }
+      ]
+    },
+    {
+      "id": "the-foggy-dew",
+      "title": "The Foggy Dew",
+      "artist": "Traditional Irish",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 82,
+      "key": "D",
+      "timeSignature": "6/8",
+      "tags": [
+        "irish",
+        "folk",
+        "ballad"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "As down the glen one Easter morn to a city fair rode I"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "D",
+                "G",
+                "D",
+                "A",
+                "D"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-foggy-dew-strum",
+          "name": "Irish strum",
+          "technique": "strumming",
+          "key": "D",
+          "timeSignature": "6/8",
+          "bpm": 82,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U",
+          "feel": "Keep the bar moving."
+        },
+        {
+          "id": "the-foggy-dew-finger",
+          "name": "Celtic roll",
+          "technique": "fingerpicking",
+          "key": "D",
+          "timeSignature": "6/8",
+          "bpm": 66,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-3-2-1-2-3",
+          "feel": "Make each triplet smooth."
+        },
+        {
+          "id": "the-foggy-dew-pick",
+          "name": "Plectrum jig",
+          "technique": "plectrum",
+          "key": "E",
+          "timeSignature": "6/8",
+          "bpm": 94,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Use light triplet accents."
+        }
+      ]
+    },
+    {
+      "id": "the-wild-rover",
+      "title": "The Wild Rover",
+      "artist": "Traditional Irish",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 108,
+      "key": "G",
+      "timeSignature": "4/4",
+      "tags": [
+        "irish",
+        "folk",
+        "pub"
+      ],
+      "sections": [
+        {
+          "id": "chorus",
+          "title": "Chorus",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "And it's no, nay, never, no, nay, never, no more"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-wild-rover-strum",
+          "name": "Pub strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 108,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D U U D U",
+          "feel": "Strong communal pulse."
+        },
+        {
+          "id": "the-wild-rover-finger",
+          "name": "Folk fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 84,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Alternating bass with brush",
+          "feel": "Keep the low strings present."
+        },
+        {
+          "id": "the-wild-rover-pick",
+          "name": "Plectrum singalong",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "4/4",
+          "bpm": 116,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Drive the chorus."
+        }
+      ]
+    },
+    {
+      "id": "the-parting-glass",
+      "title": "The Parting Glass",
+      "artist": "Traditional Scottish",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 72,
+      "key": "G",
+      "timeSignature": "3/4",
+      "tags": [
+        "scottish",
+        "folk",
+        "ballad"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Of all the money that e'er I had, I spent it in good company"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "Em",
+                "C",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-parting-glass-strum",
+          "name": "Parting waltz",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 72,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D U",
+          "feel": "Warm and reflective."
+        },
+        {
+          "id": "the-parting-glass-finger",
+          "name": "Celtic fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 58,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-4-3-2-3-4",
+          "feel": "Let the final note ring."
+        },
+        {
+          "id": "the-parting-glass-pick",
+          "name": "Plectrum waltz",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "3/4",
+          "bpm": 66,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Keep the pick understated."
+        }
+      ]
+    },
+    {
+      "id": "the-lark-in-the-morn",
+      "title": "The Lark in the Morn",
+      "artist": "Traditional Irish",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 104,
+      "key": "D",
+      "timeSignature": "6/8",
+      "tags": [
+        "irish",
+        "dance",
+        "folk"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "The lark in the morning she rises off her nest, and she goes off in the air"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "D",
+                "G",
+                "D",
+                "A",
+                "D"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-lark-in-the-morn-strum",
+          "name": "Jig strum",
+          "technique": "strumming",
+          "key": "D",
+          "timeSignature": "6/8",
+          "bpm": 104,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U",
+          "feel": "Keep the jig light."
+        },
+        {
+          "id": "the-lark-in-the-morn-finger",
+          "name": "Jig fingerstyle",
+          "technique": "fingerpicking",
+          "key": "D",
+          "timeSignature": "6/8",
+          "bpm": 82,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Thumb, 3-2-1-2-3",
+          "feel": "Let the melody float."
+        },
+        {
+          "id": "the-lark-in-the-morn-pick",
+          "name": "Plectrum jig",
+          "technique": "plectrum",
+          "key": "E",
+          "timeSignature": "6/8",
+          "bpm": 116,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Use a relaxed triplet motion."
+        }
+      ]
+    },
+    {
+      "id": "the-risin-of-the-moon",
+      "title": "The Rising of the Moon",
+      "artist": "John Keegan Casey",
+      "source": "Public domain Irish song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 96,
+      "key": "G",
+      "timeSignature": "4/4",
+      "tags": [
+        "irish",
+        "march",
+        "folk"
+      ],
+      "sections": [
+        {
+          "id": "chorus",
+          "title": "Chorus",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "By the rising of the moon, by the rising of the moon"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-risin-of-the-moon-strum",
+          "name": "March strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 96,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D D D",
+          "feel": "Strong, even downstrokes."
+        },
+        {
+          "id": "the-risin-of-the-moon-finger",
+          "name": "March fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 76,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Alternating bass and pinch",
+          "feel": "Keep the rhythm grounded."
+        },
+        {
+          "id": "the-risin-of-the-moon-pick",
+          "name": "Plectrum march",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "4/4",
+          "bpm": 104,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U",
+          "feel": "Accentuate the downbeat."
+        }
+      ]
+    },
+    {
+      "id": "the-sally-gardens",
+      "title": "The Sally Gardens",
+      "artist": "Traditional Irish",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 76,
+      "key": "D",
+      "timeSignature": "3/4",
+      "tags": [
+        "irish",
+        "ballad",
+        "folk"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Down by the Salley Gardens my love and I did meet"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "D",
+                "G",
+                "D",
+                "A",
+                "Bm",
+                "G",
+                "D"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-sally-gardens-strum",
+          "name": "Garden waltz",
+          "technique": "strumming",
+          "key": "D",
+          "timeSignature": "3/4",
+          "bpm": 76,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U",
+          "feel": "Keep the phrasing natural."
+        },
+        {
+          "id": "the-sally-gardens-finger",
+          "name": "Celtic fingerstyle",
+          "technique": "fingerpicking",
+          "key": "D",
+          "timeSignature": "3/4",
+          "bpm": 60,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass, 3-2-1, 2-3",
+          "feel": "Bring out the upper melody."
+        },
+        {
+          "id": "the-sally-gardens-pick",
+          "name": "Picked waltz",
+          "technique": "plectrum",
+          "key": "E",
+          "timeSignature": "3/4",
+          "bpm": 70,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Use soft alternate picking."
+        }
+      ]
+    },
+    {
+      "id": "the-minstrel-boy",
+      "title": "The Minstrel Boy",
+      "artist": "Thomas Moore",
+      "source": "Public domain Irish song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 92,
+      "key": "G",
+      "timeSignature": "4/4",
+      "tags": [
+        "irish",
+        "anthem",
+        "folk"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "The minstrel boy to the war has gone, in the ranks of death you'll find him"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "Em",
+                "C",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-minstrel-boy-strum",
+          "name": "Anthem strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 92,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U D U",
+          "feel": "Build toward the chorus."
+        },
+        {
+          "id": "the-minstrel-boy-finger",
+          "name": "Hymn fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 72,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Alternating bass with pinch",
+          "feel": "Keep the melody lyrical."
+        },
+        {
+          "id": "the-minstrel-boy-pick",
+          "name": "Plectrum anthem",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "4/4",
+          "bpm": 100,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D D U D U",
+          "feel": "Use broad downbeats."
+        }
+      ]
+    },
+    {
+      "id": "the-galway-girl-traditional",
+      "title": "The Galway Shawl",
+      "artist": "Traditional Irish",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 96,
+      "key": "G",
+      "timeSignature": "3/4",
+      "tags": [
+        "irish",
+        "folk",
+        "waltz"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "If you ever go across the sea to Ireland, then maybe at the closing of your day"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "Em",
+                "C",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-galway-girl-traditional-strum",
+          "name": "Irish waltz",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 96,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U",
+          "feel": "Keep a lilting pulse."
+        },
+        {
+          "id": "the-galway-girl-traditional-finger",
+          "name": "Waltz fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 76,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-4-3-2-3-4",
+          "feel": "Let the melody float."
+        },
+        {
+          "id": "the-galway-girl-traditional-pick",
+          "name": "Plectrum waltz",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "3/4",
+          "bpm": 104,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Use a light pick."
+        }
+      ]
+    },
+    {
+      "id": "the-cobbler",
+      "title": "The Cobbler",
+      "artist": "Traditional Irish",
+      "source": "Public domain folk tune",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 112,
+      "key": "D",
+      "timeSignature": "6/8",
+      "tags": [
+        "irish",
+        "dance",
+        "beginner"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Theme",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "A lively traditional dance tune for practicing repeated chord changes"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "D",
+                "G",
+                "D",
+                "A",
+                "D"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-cobbler-strum",
+          "name": "Jig strum",
+          "technique": "strumming",
+          "key": "D",
+          "timeSignature": "6/8",
+          "bpm": 112,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U",
+          "feel": "Keep the dance buoyant."
+        },
+        {
+          "id": "the-cobbler-finger",
+          "name": "Jig fingerstyle",
+          "technique": "fingerpicking",
+          "key": "D",
+          "timeSignature": "6/8",
+          "bpm": 88,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Thumb, 3-2-1-2-3",
+          "feel": "Keep the bass consistent."
+        },
+        {
+          "id": "the-cobbler-pick",
+          "name": "Fast plectrum",
+          "technique": "plectrum",
+          "key": "E",
+          "timeSignature": "6/8",
+          "bpm": 124,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Relax into the triplets."
+        }
+      ]
+    },
+    {
+      "id": "the-banks-of-the-lee",
+      "title": "The Banks of the Lee",
+      "artist": "Traditional Irish",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 76,
+      "key": "G",
+      "timeSignature": "3/4",
+      "tags": [
+        "irish",
+        "ballad",
+        "folk"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "I met my love by the banks of the Lee, where the purple heather grows"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "Em",
+                "C",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-banks-of-the-lee-strum",
+          "name": "River waltz",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 76,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D U",
+          "feel": "Keep it tender."
+        },
+        {
+          "id": "the-banks-of-the-lee-finger",
+          "name": "River fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 60,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-4-3-2-3-4",
+          "feel": "Use ringing open strings."
+        },
+        {
+          "id": "the-banks-of-the-lee-pick",
+          "name": "Plectrum waltz",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "3/4",
+          "bpm": 68,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Keep the pick quiet."
+        }
+      ]
+    },
+    {
+      "id": "the-skipper-and-his-boy",
+      "title": "The Skipper and His Boy",
+      "artist": "Traditional",
+      "source": "Public domain sea song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 104,
+      "key": "C",
+      "timeSignature": "4/4",
+      "tags": [
+        "sea shanty",
+        "folk",
+        "beginner"
+      ],
+      "sections": [
+        {
+          "id": "chorus",
+          "title": "Chorus",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "A short traditional sea-song exercise for steady quarter-note changes"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "C",
+                "F",
+                "C",
+                "G",
+                "C"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-skipper-and-his-boy-strum",
+          "name": "Shanty strum",
+          "technique": "strumming",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 104,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D D D",
+          "feel": "Strong and simple."
+        },
+        {
+          "id": "the-skipper-and-his-boy-finger",
+          "name": "Shanty fingerstyle",
+          "technique": "fingerpicking",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 84,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass, pinch, bass, pinch",
+          "feel": "Keep the beat in the thumb."
+        },
+        {
+          "id": "the-skipper-and-his-boy-pick",
+          "name": "Plectrum shanty",
+          "technique": "plectrum",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 112,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U",
+          "feel": "Use confident downbeats."
+        }
+      ]
+    },
+    {
+      "id": "the-cruel-war-is-raging",
+      "title": "The Cruel War Is Raging",
+      "artist": "Traditional American",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 72,
+      "key": "Am",
+      "timeSignature": "3/4",
+      "tags": [
+        "folk",
+        "ballad",
+        "minor"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "The cruel war is raging, Johnny has to fight"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "Am",
+                "C",
+                "G",
+                "Am",
+                "F",
+                "E",
+                "Am"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-cruel-war-is-raging-strum",
+          "name": "Minor ballad",
+          "technique": "strumming",
+          "key": "Am",
+          "timeSignature": "3/4",
+          "bpm": 72,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D U",
+          "feel": "Keep the dynamics restrained."
+        },
+        {
+          "id": "the-cruel-war-is-raging-finger",
+          "name": "Minor fingerstyle",
+          "technique": "fingerpicking",
+          "key": "Am",
+          "timeSignature": "3/4",
+          "bpm": 58,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-4-3-2-3-4",
+          "feel": "Emphasize the descending bass."
+        },
+        {
+          "id": "the-cruel-war-is-raging-pick",
+          "name": "Picked minor",
+          "technique": "plectrum",
+          "key": "Em",
+          "timeSignature": "3/4",
+          "bpm": 66,
+          "tuningId": "standard",
+          "capo": 5,
+          "pattern": "D U D U D U",
+          "feel": "Keep the pick delicate."
+        }
+      ]
+    },
+    {
+      "id": "the-house-carpenter",
+      "title": "The House Carpenter",
+      "artist": "Traditional English",
+      "source": "Public domain ballad",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 76,
+      "key": "Am",
+      "timeSignature": "6/8",
+      "tags": [
+        "ballad",
+        "minor",
+        "folk"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Well met, well met, my old true love, long time have I been seeking thee"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "Am",
+                "G",
+                "Am",
+                "F",
+                "Am",
+                "E",
+                "Am"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-house-carpenter-strum",
+          "name": "Ballad strum",
+          "technique": "strumming",
+          "key": "Am",
+          "timeSignature": "6/8",
+          "bpm": 76,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U",
+          "feel": "Keep the minor sway."
+        },
+        {
+          "id": "the-house-carpenter-finger",
+          "name": "Old ballad fingerstyle",
+          "technique": "fingerpicking",
+          "key": "Am",
+          "timeSignature": "6/8",
+          "bpm": 60,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-3-2-1-2-3",
+          "feel": "Use a quiet thumb."
+        },
+        {
+          "id": "the-house-carpenter-pick",
+          "name": "Plectrum ballad",
+          "technique": "plectrum",
+          "key": "Em",
+          "timeSignature": "6/8",
+          "bpm": 68,
+          "tuningId": "standard",
+          "capo": 5,
+          "pattern": "D U D U D U",
+          "feel": "Keep the triplets soft."
+        }
+      ]
+    },
+    {
+      "id": "the-unquiet-grave",
+      "title": "The Unquiet Grave",
+      "artist": "Traditional English",
+      "source": "Public domain ballad",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 68,
+      "key": "Em",
+      "timeSignature": "3/4",
+      "tags": [
+        "ballad",
+        "minor",
+        "folk"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "The wind doth blow today, my love, and a few small drops of rain"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "Em",
+                "G",
+                "D",
+                "Em",
+                "C",
+                "B7",
+                "Em"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-unquiet-grave-strum",
+          "name": "Quiet minor strum",
+          "technique": "strumming",
+          "key": "Em",
+          "timeSignature": "3/4",
+          "bpm": 68,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D U",
+          "feel": "Leave every chord open."
+        },
+        {
+          "id": "the-unquiet-grave-finger",
+          "name": "Haunting fingerstyle",
+          "technique": "fingerpicking",
+          "key": "Em",
+          "timeSignature": "3/4",
+          "bpm": 54,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-4-3-2-3-4",
+          "feel": "Let the high notes decay."
+        },
+        {
+          "id": "the-unquiet-grave-pick",
+          "name": "Plectrum lament",
+          "technique": "plectrum",
+          "key": "Am",
+          "timeSignature": "3/4",
+          "bpm": 60,
+          "tuningId": "standard",
+          "capo": 5,
+          "pattern": "D U D U D U",
+          "feel": "Use sparse accents."
+        }
+      ]
+    },
+    {
+      "id": "the-blacksmith",
+      "title": "The Blacksmith",
+      "artist": "Traditional English",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 96,
+      "key": "D",
+      "timeSignature": "4/4",
+      "tags": [
+        "folk",
+        "work song",
+        "ballad"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "A blacksmith courted me, nine months and better"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "D",
+                "G",
+                "D",
+                "A",
+                "Bm",
+                "G",
+                "D"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-blacksmith-strum",
+          "name": "Work-song strum",
+          "technique": "strumming",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 96,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U D U",
+          "feel": "Steady and grounded."
+        },
+        {
+          "id": "the-blacksmith-finger",
+          "name": "Hammered fingerstyle",
+          "technique": "fingerpicking",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 76,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Alternating bass with pinch",
+          "feel": "Give the bass a pulse."
+        },
+        {
+          "id": "the-blacksmith-pick",
+          "name": "Plectrum work song",
+          "technique": "plectrum",
+          "key": "E",
+          "timeSignature": "4/4",
+          "bpm": 104,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D D U D U",
+          "feel": "Add a firm backbeat."
+        }
+      ]
+    },
+    {
+      "id": "the-shepherds-boy",
+      "title": "The Shepherd's Boy",
+      "artist": "Traditional",
+      "source": "Public domain folk tune",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 88,
+      "key": "G",
+      "timeSignature": "3/4",
+      "tags": [
+        "folk",
+        "beginner",
+        "waltz"
+      ],
+      "sections": [
+        {
+          "id": "theme",
+          "title": "Theme",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "A simple traditional melody for practicing three-beat phrasing"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-shepherds-boy-strum",
+          "name": "Simple waltz",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 88,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D - D -",
+          "feel": "Keep the pulse steady."
+        },
+        {
+          "id": "the-shepherds-boy-finger",
+          "name": "Pastoral fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 70,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass, 3-2-1, 3-2",
+          "feel": "Use a soft thumb."
+        },
+        {
+          "id": "the-shepherds-boy-pick",
+          "name": "Picked waltz",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "3/4",
+          "bpm": 96,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Keep the pick close."
+        }
+      ]
+    },
+    {
+      "id": "the-camptown-races",
+      "title": "Camptown Races",
+      "artist": "Stephen Foster",
+      "source": "Public domain song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 112,
+      "key": "C",
+      "timeSignature": "2/4",
+      "tags": [
+        "folk",
+        "beginner",
+        "upbeat"
+      ],
+      "sections": [
+        {
+          "id": "chorus",
+          "title": "Chorus",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Doo-dah, doo-dah, Camptown ladies sing this song"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "C",
+                "F",
+                "C",
+                "G",
+                "C"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-camptown-races-strum",
+          "name": "Ragtime strum",
+          "technique": "strumming",
+          "key": "C",
+          "timeSignature": "2/4",
+          "bpm": 112,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D U U",
+          "feel": "Keep the syncopation light."
+        },
+        {
+          "id": "the-camptown-races-finger",
+          "name": "Banjo fingerstyle",
+          "technique": "fingerpicking",
+          "key": "C",
+          "timeSignature": "2/4",
+          "bpm": 90,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Thumb bass, brush, pinch",
+          "feel": "Alternate bass strings."
+        },
+        {
+          "id": "the-camptown-races-pick",
+          "name": "Plectrum two-step",
+          "technique": "plectrum",
+          "key": "D",
+          "timeSignature": "2/4",
+          "bpm": 124,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U",
+          "feel": "Keep it crisp."
+        }
+      ]
+    },
+    {
+      "id": "old-dan-tucker",
+      "title": "Old Dan Tucker",
+      "artist": "Daniel Decatur Emmett",
+      "source": "Public domain song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 108,
+      "key": "G",
+      "timeSignature": "4/4",
+      "tags": [
+        "folk",
+        "beginner",
+        "minstrel-era"
+      ],
+      "sections": [
+        {
+          "id": "chorus",
+          "title": "Chorus",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "Get out of the way, old Dan Tucker, you're too late to get your supper"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "old-dan-tucker-strum",
+          "name": "Chorus strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 108,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D U U D U",
+          "feel": "Keep it cheerful."
+        },
+        {
+          "id": "old-dan-tucker-finger",
+          "name": "Folk fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 86,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Alternating bass with brush",
+          "feel": "Keep the bass regular."
+        },
+        {
+          "id": "old-dan-tucker-pick",
+          "name": "Plectrum drive",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "4/4",
+          "bpm": 116,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Use a bright attack."
+        }
+      ]
+    },
+    {
+      "id": "the-yellow-rose-of-texas",
+      "title": "The Yellow Rose of Texas",
+      "artist": "Traditional American",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 100,
+      "key": "G",
+      "timeSignature": "3/4",
+      "tags": [
+        "folk",
+        "western",
+        "ballad"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "There's a yellow rose in Texas, I'm going back to see"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-yellow-rose-of-texas-strum",
+          "name": "Western waltz",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 100,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U",
+          "feel": "Keep it swinging."
+        },
+        {
+          "id": "the-yellow-rose-of-texas-finger",
+          "name": "Country fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "3/4",
+          "bpm": 80,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Alternating bass with pinch",
+          "feel": "Emphasize the bass walk."
+        },
+        {
+          "id": "the-yellow-rose-of-texas-pick",
+          "name": "Plectrum country",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "3/4",
+          "bpm": 108,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U D U",
+          "feel": "Keep the pick springy."
+        }
+      ]
+    },
+    {
+      "id": "the-erie-canal",
+      "title": "The Erie Canal",
+      "artist": "Traditional American",
+      "source": "Public domain canal song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 96,
+      "key": "C",
+      "timeSignature": "4/4",
+      "tags": [
+        "folk",
+        "work song",
+        "beginner"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "I've got a mule, her name is Sal, fifteen miles on the Erie Canal"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "C",
+                "F",
+                "C",
+                "G",
+                "C"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-erie-canal-strum",
+          "name": "Canal strum",
+          "technique": "strumming",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 96,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U D U",
+          "feel": "Keep the walking pulse."
+        },
+        {
+          "id": "the-erie-canal-finger",
+          "name": "Alternating bass",
+          "technique": "fingerpicking",
+          "key": "C",
+          "timeSignature": "4/4",
+          "bpm": 76,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Bass, 3-2-1, bass, 3-2-1",
+          "feel": "Make the bass travel."
+        },
+        {
+          "id": "the-erie-canal-pick",
+          "name": "Plectrum walk",
+          "technique": "plectrum",
+          "key": "D",
+          "timeSignature": "4/4",
+          "bpm": 104,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D D U D U",
+          "feel": "Add a light swing."
+        }
+      ]
+    },
+    {
+      "id": "the-golden-vanity",
+      "title": "The Golden Vanity",
+      "artist": "Traditional English",
+      "source": "Public domain ballad",
+      "license": "Public domain",
+      "difficulty": "medium",
+      "bpm": 78,
+      "key": "Am",
+      "timeSignature": "6/8",
+      "tags": [
+        "ballad",
+        "folk",
+        "minor"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "There was a little ship and she sailed upon the sea, and the name of the ship was the Golden Vanity"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "Am",
+                "G",
+                "Am",
+                "F",
+                "Am",
+                "E",
+                "Am"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-golden-vanity-strum",
+          "name": "Sea ballad",
+          "technique": "strumming",
+          "key": "Am",
+          "timeSignature": "6/8",
+          "bpm": 78,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D - D U - U",
+          "feel": "Let the bar roll like waves."
+        },
+        {
+          "id": "the-golden-vanity-finger",
+          "name": "Wave fingerstyle",
+          "technique": "fingerpicking",
+          "key": "Am",
+          "timeSignature": "6/8",
+          "bpm": 62,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "6-3-2-1-2-3",
+          "feel": "Keep the top notes clear."
+        },
+        {
+          "id": "the-golden-vanity-pick",
+          "name": "Plectrum sea song",
+          "technique": "plectrum",
+          "key": "Em",
+          "timeSignature": "6/8",
+          "bpm": 70,
+          "tuningId": "standard",
+          "capo": 5,
+          "pattern": "D U D U D U",
+          "feel": "Use soft triplet strokes."
+        }
+      ]
+    },
+    {
+      "id": "the-fox",
+      "title": "The Fox",
+      "artist": "Traditional English",
+      "source": "Public domain folk song",
+      "license": "Public domain",
+      "difficulty": "easy",
+      "bpm": 104,
+      "key": "G",
+      "timeSignature": "4/4",
+      "tags": [
+        "folk",
+        "children",
+        "beginner"
+      ],
+      "sections": [
+        {
+          "id": "verse",
+          "title": "Verse",
+          "blocks": [
+            {
+              "type": "lyrics",
+              "text": "The fox went out on a chilly night, he prayed for the moon to give him light"
+            },
+            {
+              "type": "chords",
+              "chords": [
+                "G",
+                "C",
+                "G",
+                "D",
+                "G"
+              ]
+            }
+          ]
+        }
+      ],
+      "variations": [
+        {
+          "id": "the-fox-strum",
+          "name": "Folk strum",
+          "technique": "strumming",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 104,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "D D U U D U",
+          "feel": "Keep it playful."
+        },
+        {
+          "id": "the-fox-finger",
+          "name": "Storyteller fingerstyle",
+          "technique": "fingerpicking",
+          "key": "G",
+          "timeSignature": "4/4",
+          "bpm": 82,
+          "tuningId": "standard",
+          "capo": 0,
+          "pattern": "Alternating bass with pinch",
+          "feel": "Make the melody conversational."
+        },
+        {
+          "id": "the-fox-pick",
+          "name": "Plectrum folk",
+          "technique": "plectrum",
+          "key": "A",
+          "timeSignature": "4/4",
+          "bpm": 112,
+          "tuningId": "standard",
+          "capo": 2,
+          "pattern": "D U D U",
+          "feel": "Use small movements."
+        }
+      ]
+    }
+  ],
+  "chordTips": {
+    "C": {
+      "fingering": "Index on B1, middle on D2, ring on A3. Let high E ring.",
+      "transition": "Pivot your ring finger when moving between C and Am/F.",
+      "commonMistake": "Mute the high E string; keep it open."
+    },
+    "G": {
+      "fingering": "Ring on low E3, middle on A2, pinky on high E3.",
+      "transition": "Keep ring/pinky planted when moving to D or Em.",
+      "commonMistake": "Letting the B string mute; curl your fingers."
+    },
+    "D": {
+      "fingering": "Index on G2, ring on B3, middle on high E2.",
+      "transition": "Make a triangle shape and lift together for quick changes.",
+      "commonMistake": "Low strings ringing; mute low E/A."
+    },
+    "Em": {
+      "fingering": "Middle on A2, ring on D2.",
+      "transition": "Slide from G by dropping the middle finger first.",
+      "commonMistake": "Pressing too hard; keep it relaxed."
+    },
+    "Am": {
+      "fingering": "Index on B1, middle on D2, ring on G2.",
+      "transition": "From C, keep the index on B1 and pivot.",
+      "commonMistake": "B string muted; keep knuckles arched."
+    },
+    "F": {
+      "fingering": "Barre at 1st fret, ring on A3, pinky on D3, middle on G2.",
+      "transition": "Practice mini-barre on B/E first, then add bass.",
+      "commonMistake": "Buzzing on high strings; roll index slightly."
+    },
+    "E": {
+      "fingering": "Index on G1, middle on A2, ring on D2.",
+      "transition": "Move as a block from Em (add index).",
+      "commonMistake": "Muted G string; keep index arched."
+    },
+    "A": {
+      "fingering": "Index on D2, middle on G2, ring on B2.",
+      "transition": "Keep fingers compact to avoid muting high E.",
+      "commonMistake": "High E muted; angle fingers toward the nut."
+    }
+  }
+}

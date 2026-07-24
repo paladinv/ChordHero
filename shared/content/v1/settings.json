@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "tunings": [
+    {
+      "id": "standard",
+      "label": "Standard",
+      "strings": [
+        "E",
+        "A",
+        "D",
+        "G",
+        "B",
+        "E"
+      ],
+      "semitoneOffsets": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "drop-d",
+      "label": "Drop D",
+      "strings": [
+        "D",
+        "A",
+        "D",
+        "G",
+        "B",
+        "E"
+      ],
+      "semitoneOffsets": [
+        -2,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    {
+      "id": "dadgad",
+      "label": "DADGAD",
+      "strings": [
+        "D",
+        "A",
+        "D",
+        "G",
+        "A",
+        "D"
+      ],
+      "semitoneOffsets": [
+        -2,
+        0,
+        0,
+        0,
+        -2,
+        -2
+      ]
+    },
+    {
+      "id": "half-step-down",
+      "label": "Half-step down",
+      "strings": [
+        "Eb",
+        "Ab",
+        "Db",
+        "Gb",
+        "Bb",
+        "Eb"
+      ],
+      "semitoneOffsets": [
+        -1,
+        -1,
+        -1,
+        -1,
+        -1,
+        -1
+      ]
+    }
+  ],
+  "sampleVoices": [
+    "steel",
+    "nylon",
+    "muted",
+    "picked"
+  ],
+  "rightHandPatterns": [
+    "Down, down-up, up-down-up",
+    "Thumb bass, down-up brush",
+    "Bass note, light strum, bass note, strum",
+    "Short downstrokes with muted releases",
+    "Arpeggio 6-4-3-2-1",
+    "Alternating bass with pinch"
+  ]
+}

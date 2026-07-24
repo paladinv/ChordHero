@@ -9,6 +9,7 @@ import {
   RightHandExercise,
   RightHandTechnique
 } from "../../lib/rightHandExercises";
+import { playRecordedClick } from "../../lib/recordedAudio";
 
 const TECHNIQUES = Object.keys(TECHNIQUE_DETAILS) as RightHandTechnique[];
 const DIFFICULTIES = Object.keys(DIFFICULTY_DETAILS) as RightHandDifficulty[];
@@ -83,6 +84,8 @@ export default function RightHandPage() {
     if (!audioContextRef.current) audioContextRef.current = new AudioContext();
     const context = audioContextRef.current;
     if (context.state === "suspended") await context.resume();
+    const played = await playRecordedClick(context, { accent, volume: accent ? 0.26 : 0.17 });
+    if (played) return;
     const oscillator = context.createOscillator();
     const gain = context.createGain();
     oscillator.type = "triangle";

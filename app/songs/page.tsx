@@ -3,18 +3,30 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import ChordDiagram from "../../components/ChordDiagram";
 import { CHORD_LOOKUP } from "../../lib/chords";
+import { playRecordedClick } from "../../lib/recordedAudio";
+import sharedSongContent from "../../shared/content/v1/songs.json";
 
 type Song = {
+  id?: string;
   title: string;
+  artist?: string;
   source: string;
-  difficulty: "easy" | "medium";
+  license?: string;
+  difficulty: string;
   bpm: number;
   chords: string[];
   strumPattern: string;
   strumFeel: string;
+  key?: string;
+  timeSignature?: string;
+  variations?: SongVariation[];
 };
 
-const SONGS: Song[] = [
+type SongVariation = { id: string; name: string; technique: string; key: string; timeSignature: string; bpm: number; tuningId: string; capo: number; pattern: string; feel: string };
+
+type SharedSong = Omit<Song, "chords" | "strumPattern" | "strumFeel"> & { id: string; sections: { blocks: { type: string; chords?: string[] }[] }[]; variations: SongVariation[] };
+
+const LEGACY_SONGS: Song[] = [
   {
     title: "Amazing Grace",
     source: "Public domain hymn",
@@ -125,7 +137,7 @@ const SONGS: Song[] = [
   }
 ];
 
-const CHORD_TIPS: Record<
+const LEGACY_CHORD_TIPS: Record<
   string,
   { fingering: string; transition: string; commonMistake: string }
 > = {
@@ -171,6 +183,22 @@ const CHORD_TIPS: Record<
   }
 };
 
+// The literals above remain temporarily as an authoring/reference source; both web and native
+// runtime behavior is driven by the versioned cross-platform content contract.
+const SONGS: Song[] = (sharedSongContent.songs as unknown as SharedSong[]).map((song) => ({
+  ...song,
+  chords: song.sections.flatMap((section) => section.blocks.flatMap((block) => block.type === "chords" ? block.chords ?? [] : [])),
+  strumPattern: song.variations[0]?.pattern ?? "D - D -",
+  strumFeel: song.variations[0]?.feel ?? "Practice the changes slowly."
+}));
+const CHORD_TIPS = sharedSongContent.chordTips as Record<
+  string,
+  { fingering: string; transition: string; commonMistake: string }
+>;
+
+void LEGACY_SONGS;
+void LEGACY_CHORD_TIPS;
+
 export default function SongsPage() {
   const [songIndex, setSongIndex] = useState(0);
   const [songStep, setSongStep] = useState(0);
@@ -180,14 +208,28 @@ export default function SongsPage() {
   const [songBeatsPerChord, setSongBeatsPerChord] = useState(4);
   const [songBeat, setSongBeat] = useState(0);
   const [songCountIn, setSongCountIn] = useState(4);
+  const [variationId, setVariationId] = useState(SONGS[0]?.variations?.[0]?.id ?? "");
 
   const songTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
   const activeSong = SONGS[songIndex];
+  const activeVariation = activeSong.variations?.find((variation) => variation.id === variationId) ?? activeSong.variations?.[0];
   const currentSongChordName = activeSong.chords[Math.min(songStep, activeSong.chords.length - 1)];
   const currentSongChord = CHORD_LOOKUP.get(currentSongChordName) ?? null;
   const songTempoMs = Math.round(60000 / songTempoBpm);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requestedSongId = params.get("songId");
+    const nextIndex = Math.max(0, SONGS.findIndex((song) => song.id === requestedSongId));
+    const requestedVariationId = params.get("variationId");
+    if (requestedSongId && SONGS[nextIndex]) {
+      setSongIndex(nextIndex);
+      setSongTempoBpm(SONGS[nextIndex].bpm);
+      setVariationId(requestedVariationId ?? SONGS[nextIndex].variations?.[0]?.id ?? "");
+    }
+  }, []);
 
   const ensureAudioContext = useCallback(async () => {
     if (!audioContextRef.current) {
@@ -202,6 +244,8 @@ export default function SongsPage() {
   const playClick = useCallback(async (frequency = 900) => {
     if (!metronomeOn) return;
     const ctx = await ensureAudioContext();
+    const played = await playRecordedClick(ctx, { accent: frequency >= 900, volume: 0.25 });
+    if (played) return;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "square";
@@ -262,7 +306,7 @@ export default function SongsPage() {
     if (songStatus === "running" || songStatus === "countin") {
       playClick(songBeat === 0 ? 900 : 700);
     }
-  }, [metronomeOn, playClick, songStatus, songBeat]);
+  }, [metronomeOn, playClick, songStatus, songBeat, songCountIn]);
 
   const handleSongStart = async () => {
     await ensureAudioContext();
@@ -307,6 +351,7 @@ export default function SongsPage() {
                 const nextIndex = Number(event.target.value);
                 setSongIndex(nextIndex);
                 setSongTempoBpm(SONGS[nextIndex]?.bpm ?? 90);
+                setVariationId(SONGS[nextIndex]?.variations?.[0]?.id ?? "");
                 setSongStep(0);
                 setSongBeat(0);
                 setSongCountIn(4);
@@ -320,6 +365,17 @@ export default function SongsPage() {
               ))}
             </select>
             <p className="song-source">{activeSong.source}</p>
+            <p className="song-source">{activeSong.artist ?? "Traditional"} · {activeSong.key ?? "C"} · {activeSong.timeSignature ?? "4/4"}</p>
+            <div className="beats-control">
+              <span className="label">Arrangement</span>
+              <div className="chip-row">
+                {(activeSong.variations ?? []).map((variation) => (
+                  <button key={variation.id} type="button" className={`chip ${activeVariation?.id === variation.id ? "active" : ""}`} onClick={() => { setVariationId(variation.id); setSongTempoBpm(variation.bpm); }}>
+                    {variation.name}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="tempo-control">
               <label className="label" htmlFor="song-tempo">
                 Tempo: {songTempoBpm} BPM
@@ -380,8 +436,8 @@ export default function SongsPage() {
             <div className="song-guidance">
               <div className="song-guidance-card">
                 <span className="label">Strumming pattern</span>
-                <p className="strum-pattern">{activeSong.strumPattern}</p>
-                <p className="muted">{activeSong.strumFeel}</p>
+                <p className="strum-pattern">{activeVariation?.pattern ?? activeSong.strumPattern}</p>
+                <p className="muted">{activeVariation?.feel ?? activeSong.strumFeel}</p>
               </div>
               <div className="song-guidance-card">
                 <span className="label">Count-in</span>

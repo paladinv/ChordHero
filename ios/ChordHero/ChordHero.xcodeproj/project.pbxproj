@@ -1,0 +1,721 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		08A6B2363C6E15027EC361D3 /* right-hand.json in Resources */ = {isa = PBXBuildFile; fileRef = 1B402700CC3A6E8B88F0B934 /* right-hand.json */; };
+		152C12CE0E2BDE0D05039730 /* ChordHeroApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36E352A2216A3BD4ED888165 /* ChordHeroApp.swift */; };
+		156CB03ED8A5F6B8C5593A0A /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B43959F2C177E9C4FFAA936D /* LibraryView.swift */; };
+		27FFA3C6CD3F16BF60C8BBDE /* ChordDiagramView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63C59F5C212223CF9D37463B /* ChordDiagramView.swift */; };
+		2886160B54E23BE54E209C40 /* PersistenceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = AF0737D04AB8DE543B51387E /* PersistenceModels.swift */; };
+		2912C2CC98FF4393BB5FFBB6 /* settings.json in Resources */ = {isa = PBXBuildFile; fileRef = FB997C70CC982817F785C8B9 /* settings.json */; };
+		34B5A69D63DF6FB372AA278D /* right-hand.json in Resources */ = {isa = PBXBuildFile; fileRef = 1B402700CC3A6E8B88F0B934 /* right-hand.json */; };
+		4299FA1BD646FE24BCF90935 /* PracticeRules.swift in Sources */ = {isa = PBXBuildFile; fileRef = 245926AAA52AA9945DAA3998 /* PracticeRules.swift */; };
+		469D48C45E0274A3D48CFB47 /* songs.json in Resources */ = {isa = PBXBuildFile; fileRef = 90CE32B3CF831333F4BE2CF9 /* songs.json */; };
+		50A1B2C78A5E1E061C76ADE5 /* ChordChartView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1F64ADA9997AD370728F2C0 /* ChordChartView.swift */; };
+		629DB14910F22316C3F581E7 /* ContentAndRulesTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = F4CBA17682EF6A07A9845818 /* ContentAndRulesTests.swift */; };
+		696E6C17965B2926F64889B0 /* SongLibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 234020159B5504D199BC6D1E /* SongLibraryView.swift */; };
+		758BD6D2E3091D666E6F2019 /* ContentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 735F2BD00896A1811A9E2016 /* ContentStore.swift */; };
+		7DC8E06634738880E96D86BF /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 607F7F328E1D3FA115095702 /* Localizable.xcstrings */; };
+		837EC0723AE4552F6F1710BB /* SongCoachView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C488481005BE59B060F3092C /* SongCoachView.swift */; };
+		84F60F1224A9DAD44CCBDC60 /* chords.json in Resources */ = {isa = PBXBuildFile; fileRef = 2EB2B56A5A1D6B106B03DCEB /* chords.json */; };
+		8759912BC08122CCF8E81DBE /* AudioService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B8B20E61099F6BE9961847AC /* AudioService.swift */; };
+		8EC9046563C8775A7C590940 /* ChordHeroUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2EA6B5BFE15533D6B64112ED /* ChordHeroUITests.swift */; };
+		9E3004A9DC43717F2ED1970D /* TrainerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA319192BC0E5AFF3BCEA18C /* TrainerView.swift */; };
+		A13F71601CF9C6F36B29F872 /* ContentModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = B11533840779B5529F312B47 /* ContentModels.swift */; };
+		A27017189E468452FC50E072 /* RightHandView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F54AB2ED342A6CFB814B5401 /* RightHandView.swift */; };
+		BA871AF402C03268BCA0FF56 /* ToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A35E4A07B242D1A1829420E6 /* ToolsView.swift */; };
+		BF51197FEBF582CDDFF0F39F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 7F13A47F2C25F9C07179015F /* Assets.xcassets */; };
+		BFB30CD21B7561D166FEF4B6 /* PracticeDashboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2E3EB80594215AAA58C9E6D3 /* PracticeDashboard.swift */; };
+		CD636A6BFA4074C48BDB374D /* AppIconSource.svg in Resources */ = {isa = PBXBuildFile; fileRef = EE557D7BCE7AAB3C9C3B04A4 /* AppIconSource.svg */; };
+		D370EE2CE53541C14E932272 /* songs.json in Resources */ = {isa = PBXBuildFile; fileRef = 90CE32B3CF831333F4BE2CF9 /* songs.json */; };
+		F550754A8B1AB177A19C2D7D /* MIDIService.swift in Sources */ = {isa = PBXBuildFile; fileRef = B5BEEFC52635A202CDD1F313 /* MIDIService.swift */; };
+		F63676088F20A537918841C5 /* settings.json in Resources */ = {isa = PBXBuildFile; fileRef = FB997C70CC982817F785C8B9 /* settings.json */; };
+		FA1424E34AF97ED0704E12CE /* PDFService.swift in Sources */ = {isa = PBXBuildFile; fileRef = D1E61B63C2991E5CF5C5BEBB /* PDFService.swift */; };
+		FD0351B0DF9E468F648E484F /* chords.json in Resources */ = {isa = PBXBuildFile; fileRef = 2EB2B56A5A1D6B106B03DCEB /* chords.json */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		612BFE5DD2AF4990949ACB4B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 27F0B8D68BA20E7A6E5A264B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E66AE8DD97CBAC986228932F;
+			remoteInfo = ChordHero;
+		};
+		7C03667DD33D08B4B6ECC17D /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 27F0B8D68BA20E7A6E5A264B /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = E66AE8DD97CBAC986228932F;
+			remoteInfo = ChordHero;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		1B402700CC3A6E8B88F0B934 /* right-hand.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "right-hand.json"; sourceTree = "<group>"; };
+		234020159B5504D199BC6D1E /* SongLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongLibraryView.swift; sourceTree = "<group>"; };
+		245926AAA52AA9945DAA3998 /* PracticeRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeRules.swift; sourceTree = "<group>"; };
+		2E3EB80594215AAA58C9E6D3 /* PracticeDashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeDashboard.swift; sourceTree = "<group>"; };
+		2EA6B5BFE15533D6B64112ED /* ChordHeroUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordHeroUITests.swift; sourceTree = "<group>"; };
+		2EB2B56A5A1D6B106B03DCEB /* chords.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = chords.json; sourceTree = "<group>"; };
+		36E352A2216A3BD4ED888165 /* ChordHeroApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordHeroApp.swift; sourceTree = "<group>"; };
+		4B7873069BAA0738DD5D04AD /* ChordHero.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = ChordHero.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		607F7F328E1D3FA115095702 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
+		63C59F5C212223CF9D37463B /* ChordDiagramView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordDiagramView.swift; sourceTree = "<group>"; };
+		735F2BD00896A1811A9E2016 /* ContentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentStore.swift; sourceTree = "<group>"; };
+		7F13A47F2C25F9C07179015F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		8E739403040227B61F9127ED /* ChordHeroUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ChordHeroUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		90CE32B3CF831333F4BE2CF9 /* songs.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = songs.json; sourceTree = "<group>"; };
+		9DEFB28D4F169B0BD261AB0C /* ChordHeroTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = ChordHeroTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1F64ADA9997AD370728F2C0 /* ChordChartView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordChartView.swift; sourceTree = "<group>"; };
+		A35E4A07B242D1A1829420E6 /* ToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToolsView.swift; sourceTree = "<group>"; };
+		AF0737D04AB8DE543B51387E /* PersistenceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PersistenceModels.swift; sourceTree = "<group>"; };
+		B11533840779B5529F312B47 /* ContentModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentModels.swift; sourceTree = "<group>"; };
+		B43959F2C177E9C4FFAA936D /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
+		B5BEEFC52635A202CDD1F313 /* MIDIService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MIDIService.swift; sourceTree = "<group>"; };
+		B8B20E61099F6BE9961847AC /* AudioService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioService.swift; sourceTree = "<group>"; };
+		BA319192BC0E5AFF3BCEA18C /* TrainerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrainerView.swift; sourceTree = "<group>"; };
+		C488481005BE59B060F3092C /* SongCoachView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongCoachView.swift; sourceTree = "<group>"; };
+		D1E61B63C2991E5CF5C5BEBB /* PDFService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PDFService.swift; sourceTree = "<group>"; };
+		EE557D7BCE7AAB3C9C3B04A4 /* AppIconSource.svg */ = {isa = PBXFileReference; path = AppIconSource.svg; sourceTree = "<group>"; };
+		F4CBA17682EF6A07A9845818 /* ContentAndRulesTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentAndRulesTests.swift; sourceTree = "<group>"; };
+		F54AB2ED342A6CFB814B5401 /* RightHandView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RightHandView.swift; sourceTree = "<group>"; };
+		FB997C70CC982817F785C8B9 /* settings.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = settings.json; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		06189D221495AE36DE81EF12 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				F4CBA17682EF6A07A9845818 /* ContentAndRulesTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+		08B199DDEE87EE1FB64F94A5 = {
+			isa = PBXGroup;
+			children = (
+				77330A82B21E477F6E60094C /* Chord Hero */,
+				7DA34B7AA7C98F04C8C1DDE1 /* Resources */,
+				DDE1303944754E1D64D5B980 /* Sources */,
+				06189D221495AE36DE81EF12 /* Tests */,
+				6019139EF4BCA6084D3DE12B /* UITests */,
+				7ACFF833EB9DF0D3C1736672 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		248A7142BC37287706C57F7C /* content */ = {
+			isa = PBXGroup;
+			children = (
+				A87EF46BB7DDE87C58082EA5 /* v1 */,
+			);
+			path = content;
+			sourceTree = "<group>";
+		};
+		5FE448F1437DCFE57A329203 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				B8B20E61099F6BE9961847AC /* AudioService.swift */,
+				B5BEEFC52635A202CDD1F313 /* MIDIService.swift */,
+				D1E61B63C2991E5CF5C5BEBB /* PDFService.swift */,
+			);
+			path = Services;
+			sourceTree = "<group>";
+		};
+		6019139EF4BCA6084D3DE12B /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				2EA6B5BFE15533D6B64112ED /* ChordHeroUITests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+		610432C1BDE3A6FBF4E43B73 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				735F2BD00896A1811A9E2016 /* ContentStore.swift */,
+				AF0737D04AB8DE543B51387E /* PersistenceModels.swift */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
+		77330A82B21E477F6E60094C /* Chord Hero */ = {
+			isa = PBXGroup;
+			children = (
+				EBB6CF4898FBFBAA92EC8949 /* shared */,
+			);
+			name = "Chord Hero";
+			path = ../..;
+			sourceTree = "<group>";
+		};
+		7ACFF833EB9DF0D3C1736672 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				4B7873069BAA0738DD5D04AD /* ChordHero.app */,
+				9DEFB28D4F169B0BD261AB0C /* ChordHeroTests.xctest */,
+				8E739403040227B61F9127ED /* ChordHeroUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		7DA34B7AA7C98F04C8C1DDE1 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				EE557D7BCE7AAB3C9C3B04A4 /* AppIconSource.svg */,
+				7F13A47F2C25F9C07179015F /* Assets.xcassets */,
+				607F7F328E1D3FA115095702 /* Localizable.xcstrings */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		80FF30D368BBC012D50A908B /* Domain */ = {
+			isa = PBXGroup;
+			children = (
+				B11533840779B5529F312B47 /* ContentModels.swift */,
+				245926AAA52AA9945DAA3998 /* PracticeRules.swift */,
+			);
+			path = Domain;
+			sourceTree = "<group>";
+		};
+		8DD3E53B3333AF0C26E6D793 /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				A1F64ADA9997AD370728F2C0 /* ChordChartView.swift */,
+				B43959F2C177E9C4FFAA936D /* LibraryView.swift */,
+				2E3EB80594215AAA58C9E6D3 /* PracticeDashboard.swift */,
+				F54AB2ED342A6CFB814B5401 /* RightHandView.swift */,
+				C488481005BE59B060F3092C /* SongCoachView.swift */,
+				234020159B5504D199BC6D1E /* SongLibraryView.swift */,
+				A35E4A07B242D1A1829420E6 /* ToolsView.swift */,
+				BA319192BC0E5AFF3BCEA18C /* TrainerView.swift */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		9804D84E0CF162CE7E4D13C2 /* DesignSystem */ = {
+			isa = PBXGroup;
+			children = (
+				63C59F5C212223CF9D37463B /* ChordDiagramView.swift */,
+			);
+			path = DesignSystem;
+			sourceTree = "<group>";
+		};
+		A87EF46BB7DDE87C58082EA5 /* v1 */ = {
+			isa = PBXGroup;
+			children = (
+				2EB2B56A5A1D6B106B03DCEB /* chords.json */,
+				1B402700CC3A6E8B88F0B934 /* right-hand.json */,
+				FB997C70CC982817F785C8B9 /* settings.json */,
+				90CE32B3CF831333F4BE2CF9 /* songs.json */,
+			);
+			path = v1;
+			sourceTree = "<group>";
+		};
+		DDE1303944754E1D64D5B980 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				FC83F2E3B4185693E48ED472 /* App */,
+				610432C1BDE3A6FBF4E43B73 /* Data */,
+				9804D84E0CF162CE7E4D13C2 /* DesignSystem */,
+				80FF30D368BBC012D50A908B /* Domain */,
+				8DD3E53B3333AF0C26E6D793 /* Features */,
+				5FE448F1437DCFE57A329203 /* Services */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		EBB6CF4898FBFBAA92EC8949 /* shared */ = {
+			isa = PBXGroup;
+			children = (
+				248A7142BC37287706C57F7C /* content */,
+			);
+			path = shared;
+			sourceTree = "<group>";
+		};
+		FC83F2E3B4185693E48ED472 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				36E352A2216A3BD4ED888165 /* ChordHeroApp.swift */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		2E7DAB313D9592756487F982 /* ChordHeroUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F4D4B01D2E74BD64D7E1AB7D /* Build configuration list for PBXNativeTarget "ChordHeroUITests" */;
+			buildPhases = (
+				42BB4D516E9000A54AF68E1F /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				4483527F59B6E7D6EA142D5A /* PBXTargetDependency */,
+			);
+			name = ChordHeroUITests;
+			packageProductDependencies = (
+			);
+			productName = ChordHeroUITests;
+			productReference = 8E739403040227B61F9127ED /* ChordHeroUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+		B4FCA72D0501660FE9D7966D /* ChordHeroTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3390AB690CB3673A0CD52F57 /* Build configuration list for PBXNativeTarget "ChordHeroTests" */;
+			buildPhases = (
+				7DA1C178D9FFB123DC7BBDBB /* Sources */,
+				C06488ECF60F0AD74666DDF6 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				3488D71DA28FAD0F720BA6F1 /* PBXTargetDependency */,
+			);
+			name = ChordHeroTests;
+			packageProductDependencies = (
+			);
+			productName = ChordHeroTests;
+			productReference = 9DEFB28D4F169B0BD261AB0C /* ChordHeroTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		E66AE8DD97CBAC986228932F /* ChordHero */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = DD4C17A5682843AF3D3E8021 /* Build configuration list for PBXNativeTarget "ChordHero" */;
+			buildPhases = (
+				EEDA8AA04277F41356674968 /* Sources */,
+				EB83F517B550C6CEABD236D2 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = ChordHero;
+			packageProductDependencies = (
+			);
+			productName = ChordHero;
+			productReference = 4B7873069BAA0738DD5D04AD /* ChordHero.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		27F0B8D68BA20E7A6E5A264B /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					2E7DAB313D9592756487F982 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+						TestTargetID = E66AE8DD97CBAC986228932F;
+					};
+					B4FCA72D0501660FE9D7966D = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+					E66AE8DD97CBAC986228932F = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 6BCA169B9E0E482CF91BB26A /* Build configuration list for PBXProject "ChordHero" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 08B199DDEE87EE1FB64F94A5;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 7ACFF833EB9DF0D3C1736672 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				E66AE8DD97CBAC986228932F /* ChordHero */,
+				B4FCA72D0501660FE9D7966D /* ChordHeroTests */,
+				2E7DAB313D9592756487F982 /* ChordHeroUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C06488ECF60F0AD74666DDF6 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FD0351B0DF9E468F648E484F /* chords.json in Resources */,
+				08A6B2363C6E15027EC361D3 /* right-hand.json in Resources */,
+				2912C2CC98FF4393BB5FFBB6 /* settings.json in Resources */,
+				D370EE2CE53541C14E932272 /* songs.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EB83F517B550C6CEABD236D2 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				CD636A6BFA4074C48BDB374D /* AppIconSource.svg in Resources */,
+				BF51197FEBF582CDDFF0F39F /* Assets.xcassets in Resources */,
+				7DC8E06634738880E96D86BF /* Localizable.xcstrings in Resources */,
+				84F60F1224A9DAD44CCBDC60 /* chords.json in Resources */,
+				34B5A69D63DF6FB372AA278D /* right-hand.json in Resources */,
+				F63676088F20A537918841C5 /* settings.json in Resources */,
+				469D48C45E0274A3D48CFB47 /* songs.json in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		42BB4D516E9000A54AF68E1F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8EC9046563C8775A7C590940 /* ChordHeroUITests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7DA1C178D9FFB123DC7BBDBB /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				629DB14910F22316C3F581E7 /* ContentAndRulesTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		EEDA8AA04277F41356674968 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				8759912BC08122CCF8E81DBE /* AudioService.swift in Sources */,
+				50A1B2C78A5E1E061C76ADE5 /* ChordChartView.swift in Sources */,
+				27FFA3C6CD3F16BF60C8BBDE /* ChordDiagramView.swift in Sources */,
+				152C12CE0E2BDE0D05039730 /* ChordHeroApp.swift in Sources */,
+				A13F71601CF9C6F36B29F872 /* ContentModels.swift in Sources */,
+				758BD6D2E3091D666E6F2019 /* ContentStore.swift in Sources */,
+				156CB03ED8A5F6B8C5593A0A /* LibraryView.swift in Sources */,
+				F550754A8B1AB177A19C2D7D /* MIDIService.swift in Sources */,
+				FA1424E34AF97ED0704E12CE /* PDFService.swift in Sources */,
+				2886160B54E23BE54E209C40 /* PersistenceModels.swift in Sources */,
+				BFB30CD21B7561D166FEF4B6 /* PracticeDashboard.swift in Sources */,
+				4299FA1BD646FE24BCF90935 /* PracticeRules.swift in Sources */,
+				A27017189E468452FC50E072 /* RightHandView.swift in Sources */,
+				837EC0723AE4552F6F1710BB /* SongCoachView.swift in Sources */,
+				696E6C17965B2926F64889B0 /* SongLibraryView.swift in Sources */,
+				BA871AF402C03268BCA0FF56 /* ToolsView.swift in Sources */,
+				9E3004A9DC43717F2ED1970D /* TrainerView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		3488D71DA28FAD0F720BA6F1 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E66AE8DD97CBAC986228932F /* ChordHero */;
+			targetProxy = 7C03667DD33D08B4B6ECC17D /* PBXContainerItemProxy */;
+		};
+		4483527F59B6E7D6EA142D5A /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = E66AE8DD97CBAC986228932F /* ChordHero */;
+			targetProxy = 612BFE5DD2AF4990949ACB4B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		17D82041F7019CDF1109FDF8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.codingmonkey.ChordHeroUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ChordHero;
+			};
+			name = Debug;
+		};
+		263CC49639423E58EF53BC91 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.codingmonkey.ChordHeroTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ChordHero.app/ChordHero";
+			};
+			name = Release;
+		};
+		36B309F223A4E7409BA13FB4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Chord Hero";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Chord Hero uses Bluetooth MIDI devices for optional ear-training answers.";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.codingmonkey.ChordHero;
+				PRODUCT_NAME = ChordHero;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		456658776A33CEE2316A31C9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.codingmonkey.ChordHeroTests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/ChordHero.app/ChordHero";
+			};
+			name = Debug;
+		};
+		D6ADDFAB0E0AFFCDA66C376E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_CFBundleDisplayName = "Chord Hero";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
+				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Chord Hero uses Bluetooth MIDI devices for optional ear-training answers.";
+				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.codingmonkey.ChordHero;
+				PRODUCT_NAME = ChordHero;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		E5F017D1432B8A207A78298C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = targeted;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		EDEFE104552475118FCD00A4 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.codingmonkey.ChordHeroUITests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = ChordHero;
+			};
+			name = Release;
+		};
+		FBDB014ED05E6CDB6704C960 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = targeted;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3390AB690CB3673A0CD52F57 /* Build configuration list for PBXNativeTarget "ChordHeroTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				456658776A33CEE2316A31C9 /* Debug */,
+				263CC49639423E58EF53BC91 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		6BCA169B9E0E482CF91BB26A /* Build configuration list for PBXProject "ChordHero" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E5F017D1432B8A207A78298C /* Debug */,
+				FBDB014ED05E6CDB6704C960 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		DD4C17A5682843AF3D3E8021 /* Build configuration list for PBXNativeTarget "ChordHero" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				36B309F223A4E7409BA13FB4 /* Debug */,
+				D6ADDFAB0E0AFFCDA66C376E /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F4D4B01D2E74BD64D7E1AB7D /* Build configuration list for PBXNativeTarget "ChordHeroUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				17D82041F7019CDF1109FDF8 /* Debug */,
+				EDEFE104552475118FCD00A4 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 27F0B8D68BA20E7A6E5A264B /* Project object */;
+}
