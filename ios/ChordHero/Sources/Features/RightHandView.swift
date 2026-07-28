@@ -1,4 +1,5 @@
 import SwiftUI
+import Foundation
 
 struct RightHandView: View {
     let content: AppContent
@@ -11,6 +12,12 @@ struct RightHandView: View {
     @State private var activeStep = 0
     @State private var sound = true
     @State private var playbackTask: Task<Void, Never>?
+    @State private var roundDuration = 60
+    @State private var remaining = 60
+    @State private var countIn = 0
+    @State private var loops = 0
+    @State private var feedback = false
+    @State private var autoRamp = true
 
     private var exercises: [RightHandExercise] { content.exercises.filter { $0.technique == technique && $0.difficulty == difficulty } }
     private var exercise: RightHandExercise? { exercises.first(where: { $0.id == selectedID }) ?? exercises.first }
@@ -29,15 +36,45 @@ struct RightHandView: View {
                     StudioCard {
                         HStack { VStack(alignment: .leading) { StudioEyebrow(text: content.difficulties[difficulty]?.label ?? difficulty); Text(exercise.title).font(.title.bold()); Text(exercise.focus).foregroundStyle(.secondary) }; Spacer(); Text("\(max(0, exercises.firstIndex(of: exercise) ?? 0) + 1) / \(exercises.count)").font(.subheadline.bold().monospacedDigit()).padding(.horizontal, 10).padding(.vertical, 6).background(.quaternary, in: Capsule()) }
                         VStack(spacing: 14) {
-                            Text(stepDescription(exercise.pattern[activeStep]).main).font(.system(size: 72, weight: .black)).foregroundStyle(stepDescription(exercise.pattern[activeStep]).accent ? .orange : .primary)
-                            Text(stepDescription(exercise.pattern[activeStep]).detail).foregroundStyle(.secondary)
+                            if countIn > 0 {
+                                Text("GET READY").font(.caption.bold()).foregroundStyle(.secondary)
+                                Text("\(countIn)").font(.system(size: 72, weight: .black)).foregroundStyle(.orange)
+                            } else {
+                                Text(stepDescription(exercise.pattern[activeStep]).main).font(.system(size: 72, weight: .black)).foregroundStyle(stepDescription(exercise.pattern[activeStep]).accent ? .orange : .primary)
+                                Text(stepDescription(exercise.pattern[activeStep]).detail).foregroundStyle(.secondary)
+                            }
                             ScrollView(.horizontal) {
                                 HStack { ForEach(Array(exercise.pattern.enumerated()), id: \.offset) { index, step in VStack { Text(countLabel(index, exercise: exercise)).font(.caption.monospaced()); Text(stepDescription(step).main).font(.title2.bold()) }.frame(width: 55, height: 60).background(index == activeStep ? Color.orange.opacity(0.25) : Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 10)) } }
                             }
                         }.frame(maxWidth: .infinity)
-                        HStack { Button(playing ? "Pause" : "Start demo") { playing ? pause() : play(exercise) }.buttonStyle(.borderedProminent); Toggle("Sound", isOn: $sound).toggleStyle(.button) }
+                        Picker("Round", selection: $roundDuration) {
+                            Text("30 sec").tag(30)
+                            Text("1 min").tag(60)
+                            Text("3 min").tag(180)
+                        }.pickerStyle(.segmented)
+                        HStack {
+                            Button(playing ? "Pause" : "Start round") { playing ? pause() : play(exercise) }.buttonStyle(.borderedProminent)
+                            Toggle("Sound", isOn: $sound).toggleStyle(.button)
+                            Spacer()
+                            Text("\(remaining / 60):\(String(format: "%02d", remaining % 60))").font(.headline.monospacedDigit())
+                        }
                         VStack { HStack { Text("Tempo"); Spacer(); Text("\(bpm) BPM").bold().monospacedDigit() }; Slider(value: Binding(get: { Double(bpm) }, set: { bpm = Int($0); if playing { play(exercise) } }), in: 40...180, step: 2); Button("Reset to \(exercise.bpm)") { bpm = exercise.bpm; if playing { play(exercise) } }.font(.caption) }
+                        Toggle("Raise tempo after a clean round", isOn: $autoRamp).font(.callout)
                         Label(exercise.coaching, systemImage: "info.circle").font(.callout).foregroundStyle(.secondary)
+                        if feedback {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("How did it feel?").font(.headline)
+                                HStack {
+                                    Button("Clean") { rate("clean") }.buttonStyle(.borderedProminent)
+                                    Button("A few mistakes") { rate("mistakes") }.buttonStyle(.bordered)
+                                    Button("Too fast") { rate("fast") }.buttonStyle(.bordered)
+                                }
+                            }.padding().background(Color.orange.opacity(0.1), in: RoundedRectangle(cornerRadius: 12))
+                        }
+                        DisclosureGroup("How to read the pattern") {
+                            Text("↓/↑ down or up · × mute · — rest · P/i/m/a thumb, index, middle, ring · strings 1–6 run high to low.")
+                                .font(.caption).foregroundStyle(.secondary)
+                        }
                         HStack { Button("Previous") { move(-1) }.disabled((exercises.firstIndex(of: exercise) ?? 0) == 0); Spacer(); Button("Next exercise") { move(1) }.disabled((exercises.firstIndex(of: exercise) ?? 0) >= exercises.count - 1) }
                     }
                     StudioCard {
@@ -55,21 +92,49 @@ struct RightHandView: View {
         .onDisappear { pause() }
     }
 
-    private func select(_ item: RightHandExercise) { pause(); selectedID = item.id; bpm = item.bpm; activeStep = 0 }
+    private func select(_ item: RightHandExercise) { pause(); selectedID = item.id; bpm = item.bpm; activeStep = 0; remaining = roundDuration; feedback = false; loops = 0 }
     private func resetFilter() { if let first = exercises.first { select(first) } }
     private func move(_ delta: Int) { guard let exercise, let index = exercises.firstIndex(of: exercise) else { return }; let next = index + delta; if exercises.indices.contains(next) { select(exercises[next]) } }
-    private func pause() { playing = false; playbackTask?.cancel(); audio.stop() }
+    private func pause() { playing = false; countIn = 0; playbackTask?.cancel(); audio.stop() }
     private func play(_ exercise: RightHandExercise) {
         playbackTask?.cancel(); playing = true
         playbackTask = Task { @MainActor in
+            feedback = false
+            remaining = roundDuration
+            countIn = 4
+            for beat in stride(from: 4, through: 1, by: -1) {
+                guard !Task.isCancelled && playing else { return }
+                countIn = beat
+                if sound { audio.playClick(accent: beat == 4) }
+                try? await Task.sleep(for: .seconds(60.0 / Double(bpm)))
+            }
+            countIn = 0
+            var elapsed = 0.0
             while !Task.isCancelled && playing {
                 let step = stepDescription(exercise.pattern[activeStep]); if sound && !step.rest { audio.playClick(accent: step.accent) }
                 let interval = 60.0 / Double(bpm) / Double(exercise.subdivisionsPerBeat)
                 try? await Task.sleep(for: .seconds(interval))
                 guard !Task.isCancelled else { return }
                 activeStep = (activeStep + 1) % exercise.pattern.count
+                if activeStep == 0 { loops += 1 }
+                elapsed += interval
+                remaining = max(0, roundDuration - Int(elapsed))
+                if elapsed >= Double(roundDuration) {
+                    playing = false
+                    feedback = true
+                    audio.stop()
+                }
             }
         }
+    }
+
+    private func rate(_ rating: String) {
+        if rating == "clean", autoRamp { bpm = min(180, bpm + 4) }
+        if rating == "fast" { bpm = max(40, bpm - 6) }
+        feedback = false
+        remaining = roundDuration
+        activeStep = 0
+        loops = 0
     }
 
     private func stepDescription(_ raw: String) -> (main: String, detail: String, accent: Bool, rest: Bool) {

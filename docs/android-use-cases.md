@@ -25,7 +25,7 @@ This document applies the shared UC-01–69 mobile contract to the native Androi
 
 ## Right-Hand Studio
 
-- **UC-20:** Filter all 30 exercises by technique and difficulty.
+- **UC-20:** Filter all 36 exercises by technique and difficulty.
 - **UC-21:** Show focus, coaching, subdivision, pattern, and default tempo.
 - **UC-22:** Start/pause a looping follow-along playhead.
 - **UC-23:** Mark direction, string/finger, count, accent, mute, or rest.
@@ -91,7 +91,7 @@ This document applies the shared UC-01–69 mobile contract to the native Androi
 
 | Area | Required Android assertions |
 | --- | --- |
-| Content | Chord/right-hand/settings schema v1 plus songs schema v2; IDs, six-string shapes, ranges, references, and exact 346/4/4/30/50/150/4 inventories. |
+| Content | Chord/right-hand/settings schema v1 plus songs schema v2; IDs, six-string shapes, ranges, references, and exact 346/4/4/36/50/150/4 inventories. |
 | Domain | Base fret, capo, tuning, pitch classes, comparison, filters, recents, recommendations, and review intervals. |
 | State | Trainer cadence/cap/pause; exercise subdivision/wrap/cancellation; song count-in/progression/final bounds. |
 | Storage | Profile seed/selection/isolation, CRUD, atomic import, ten-item pack cap, DataStore recovery, and schema v1. |

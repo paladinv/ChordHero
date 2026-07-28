@@ -79,6 +79,9 @@ final class SongLibraryCollection {
     var songIDs: [String]
     var createdAt: Date
     var updatedAt: Date
+    var isQueue: Bool
+    var resumeSongID: String?
+    var resumeVariationID: String?
 
     init(id: UUID = UUID(), profileID: UUID, name: String, description: String = "", songIDs: [String] = [], now: Date = .now) {
         self.id = id
@@ -88,6 +91,7 @@ final class SongLibraryCollection {
         self.songIDs = Array(songIDs.uniqued())
         self.createdAt = now
         self.updatedAt = now
+        self.isQueue = false
     }
 }
 
@@ -109,6 +113,72 @@ final class ImportedSongRecord {
         self.sourceURL = sourceURL
         self.notes = notes
         self.importedAt = now
+    }
+}
+
+@Model
+final class SongPracticeRecord {
+    @Attribute(.unique) var compoundID: String
+    var profileID: UUID
+    var songID: String
+    var variationID: String
+    var isFavorite: Bool
+    var practiceCount: Int
+    var lastPracticedAt: Date?
+    var sectionMasteryJSON: String
+    var streakDays: Int
+
+    init(profileID: UUID, songID: String, variationID: String = "") {
+        self.compoundID = "\(profileID.uuidString):\(songID)"
+        self.profileID = profileID
+        self.songID = songID
+        self.variationID = variationID
+        self.isFavorite = false
+        self.practiceCount = 0
+        self.sectionMasteryJSON = "{}"
+        self.streakDays = 0
+    }
+}
+
+@Model
+final class SongQueueHistory {
+    @Attribute(.unique) var id: UUID
+    var profileID: UUID
+    var queueID: UUID
+    var songIDs: [String]
+    var completedAt: Date
+    var lastSongID: String?
+
+    init(profileID: UUID, queueID: UUID, songIDs: [String], lastSongID: String? = nil, now: Date = .now) {
+        self.id = UUID(); self.profileID = profileID; self.queueID = queueID; self.songIDs = songIDs; self.completedAt = now; self.lastSongID = lastSongID
+    }
+}
+
+@Model
+final class WeeklyPracticeGoal {
+    @Attribute(.unique) var compoundID: String
+    var profileID: UUID
+    var weekStart: String
+    var targetSessions: Int
+    var completedSessions: Int
+
+    init(profileID: UUID, weekStart: String, targetSessions: Int = 3) {
+        self.compoundID = "\(profileID.uuidString):\(weekStart)"; self.profileID = profileID; self.weekStart = weekStart; self.targetSessions = targetSessions; self.completedSessions = 0
+    }
+}
+
+@Model
+final class SongRecordingRecord {
+    @Attribute(.unique) var id: UUID
+    var profileID: UUID
+    var songID: String
+    var sectionID: String?
+    var filePath: String
+    var durationSeconds: Double
+    var createdAt: Date
+
+    init(profileID: UUID, songID: String, sectionID: String? = nil, filePath: String, durationSeconds: Double, now: Date = .now) {
+        self.id = UUID(); self.profileID = profileID; self.songID = songID; self.sectionID = sectionID; self.filePath = filePath; self.durationSeconds = durationSeconds; self.createdAt = now
     }
 }
 

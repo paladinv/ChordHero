@@ -42,7 +42,7 @@ class ContentAndPersistenceTest {
         assertEquals(346, content.chords.chordLibrary.size)
         assertEquals(4, content.chords.levels.size)
         assertEquals(4, content.chords.progressionPacks.size)
-        assertEquals(30, content.rightHand.exercises.size)
+        assertEquals(36, content.rightHand.exercises.size)
         assertEquals(50, content.songs.songs.size)
         assertTrue(content.songs.songs.all { it.variations.size >= 3 })
         assertEquals(4, content.settings.tunings.size)

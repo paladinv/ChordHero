@@ -5,6 +5,7 @@ struct SongCoachView: View {
     let initialSongID: String?
     let initialVariationID: String?
     @EnvironmentObject private var audio: SynthAudioService
+    @EnvironmentObject private var recorder: SongRecorderService
     @State private var songIndex = 0
     @State private var state = SongPlaybackState()
     @State private var bpm = 80
@@ -12,6 +13,8 @@ struct SongCoachView: View {
     @State private var metronome = true
     @State private var task: Task<Void, Never>?
     @State private var variationID: String?
+    @State private var handsFree = false
+    @State private var largePrint = false
 
     init(content: AppContent, initialSongID: String? = nil, initialVariationID: String? = nil) {
         self.content = content
@@ -33,13 +36,14 @@ struct SongCoachView: View {
                     Text(song.source).font(.caption).foregroundStyle(.secondary)
                     Picker("Arrangement", selection: Binding(get: { variation?.id ?? "" }, set: { value in variationID = value; bpm = song.variations.first(where: { $0.id == value })?.bpm ?? song.bpm })) { ForEach(song.variations) { Text("($0.name) · ($0.technique)").tag($0.id) } }
                     HStack { VStack(alignment: .leading) { Text("Tempo: \(bpm) BPM").bold(); Slider(value: Binding(get: { Double(bpm) }, set: { bpm = Int($0); restartTimerIfNeeded() }), in: 60...140, step: 2) }; Picker("Beats", selection: $beatsPerChord) { Text("2 beats").tag(2); Text("4 beats").tag(4); Text("6 beats").tag(6) }.pickerStyle(.segmented) }
-                    HStack { Button("Start lesson") { start() }.buttonStyle(.borderedProminent); Button("Pause") { pause() }.disabled(state.status != .running && state.status != .countIn); Button("Resume") { resume() }.disabled(state.status != .paused); Button("Reset", role: .destructive) { reset() }; Toggle("Metronome", isOn: $metronome).toggleStyle(.button) }.buttonStyle(.bordered)
+                    HStack { Button("Start lesson") { start() }.buttonStyle(.borderedProminent); Button("Pause") { pause() }.disabled(state.status != .running && state.status != .countIn); Button("Resume") { resume() }.disabled(state.status != .paused); Button("Reset", role: .destructive) { reset() }; Toggle("Metronome", isOn: $metronome).toggleStyle(.button); Toggle("Hands-free", isOn: $handsFree).toggleStyle(.button); Toggle("Large print", isOn: $largePrint).toggleStyle(.button) }.buttonStyle(.bordered)
+                    HStack { Button(recorder.isRecording ? "Stop recording" : "Record performance") { if recorder.isRecording { recorder.stop() } else { Task { await recorder.start(songID: song.id) } } }; Button("Play recording") { recorder.playLatest() }.disabled(recorder.latestURL == nil); if let error = recorder.errorMessage { Text(error).foregroundStyle(.red) } }.buttonStyle(.bordered)
                     HStack { VStack(alignment: .leading) { Text("Right-hand pattern").font(.caption.bold()); Text(variation?.pattern ?? song.strumPattern).font(.title3.monospaced()); Text(variation?.feel ?? song.strumFeel).foregroundStyle(.secondary) }; Spacer() }
                 }
                 StudioCard {
                     StudioEyebrow(text: state.status == .running ? "Now playing" : "Current chord")
                     if state.status == .countIn { Text("Starting in \(state.countIn)…").font(.largeTitle.bold()).foregroundStyle(.orange) }
-                    Text(chordName).font(.system(size: 52, weight: .black))
+                    Text(chordName).font(.system(size: largePrint ? 86 : 52, weight: .black))
                     Text("Step \(state.chordIndex + 1) of \(song.chords.count) · Beat \(state.beat + 1) of \(beatsPerChord)").monospacedDigit().foregroundStyle(.secondary)
                     if let chord { ChordDiagramView(chord: chord) }
                     if let tip = content.chordTips[chordName] {

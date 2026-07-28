@@ -13,6 +13,7 @@ import com.codingmonkey.chordhero.services.AudioService
 import com.codingmonkey.chordhero.services.DocumentService
 import com.codingmonkey.chordhero.services.MidiService
 import com.codingmonkey.chordhero.services.SynthAudioService
+import com.codingmonkey.chordhero.services.SongRecorderService
 
 class ChordHeroApplication : Application() {
     val container: AppContainer by lazy { AppContainer(this) }
@@ -24,6 +25,7 @@ class AppContainer(application: Application) {
     val progress: ProgressRepository = RoomProgressRepository(database)
     val settings = SettingsRepository(application)
     val audio: AudioService = SynthAudioService(application)
+    val recorder = SongRecorderService(application)
     val midi: MidiService = AndroidMidiService(application)
     val documents: DocumentService = AndroidDocumentService(application)
 }

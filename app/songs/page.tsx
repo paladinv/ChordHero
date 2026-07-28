@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ChordDiagram from "../../components/ChordDiagram";
 import { CHORD_LOOKUP } from "../../lib/chords";
 import { playRecordedClick } from "../../lib/recordedAudio";
 import sharedSongContent from "../../shared/content/v1/songs.json";
+import { transposeChord } from "../../lib/songLibrary";
 
 type Song = {
   id?: string;
@@ -20,11 +21,14 @@ type Song = {
   key?: string;
   timeSignature?: string;
   variations?: SongVariation[];
+  sections?: { id: string; title: string; blocks: { type: string; chords?: string[] }[] }[];
 };
 
 type SongVariation = { id: string; name: string; technique: string; key: string; timeSignature: string; bpm: number; tuningId: string; capo: number; pattern: string; feel: string };
+type VoiceRecognition = { continuous: boolean; lang: string; onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; start: () => void; stop: () => void };
+type VoiceRecognitionConstructor = new () => VoiceRecognition;
 
-type SharedSong = Omit<Song, "chords" | "strumPattern" | "strumFeel"> & { id: string; sections: { blocks: { type: string; chords?: string[] }[] }[]; variations: SongVariation[] };
+type SharedSong = Omit<Song, "chords" | "strumPattern" | "strumFeel"> & { id: string; sections: { id: string; title: string; blocks: { type: string; chords?: string[] }[] }[]; variations: SongVariation[] };
 
 const LEGACY_SONGS: Song[] = [
   {
@@ -209,15 +213,32 @@ export default function SongsPage() {
   const [songBeat, setSongBeat] = useState(0);
   const [songCountIn, setSongCountIn] = useState(4);
   const [variationId, setVariationId] = useState(SONGS[0]?.variations?.[0]?.id ?? "");
+  const [transpose, setTranspose] = useState(0);
+  const [largePrint, setLargePrint] = useState(false);
+  const [handsFree, setHandsFree] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState("");
+  const [loopSectionId, setLoopSectionId] = useState<string | null>(null);
 
   const songTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
 
   const activeSong = SONGS[songIndex];
   const activeVariation = activeSong.variations?.find((variation) => variation.id === variationId) ?? activeSong.variations?.[0];
-  const currentSongChordName = activeSong.chords[Math.min(songStep, activeSong.chords.length - 1)];
+  const displayedChords = activeSong.chords.map((chord) => transposeChord(chord, transpose));
+  const sectionRanges = useMemo(() => {
+    let cursor = 0;
+    return (activeSong.sections ?? []).map((section) => { const length = section.blocks.flatMap((block) => block.type === "chords" ? block.chords ?? [] : []).length; const range = { ...section, start: cursor, end: Math.max(cursor, cursor + length - 1) }; cursor += length; return range; });
+  }, [activeSong]);
+  const loopRange = sectionRanges.find((section) => section.id === loopSectionId);
+  const loopStart = loopRange?.start;
+  const loopEnd = loopRange?.end;
+  const currentSongChordName = displayedChords[Math.min(Math.max(songStep, loopRange?.start ?? 0), loopRange?.end ?? displayedChords.length - 1)];
   const currentSongChord = CHORD_LOOKUP.get(currentSongChordName) ?? null;
   const songTempoMs = Math.round(60000 / songTempoBpm);
+
+  const resetSong = useCallback(() => {
+    setSongStep(loopStart ?? 0); setSongBeat(0); setSongCountIn(4); setSongStatus("idle");
+  }, [loopStart]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -228,8 +249,28 @@ export default function SongsPage() {
       setSongIndex(nextIndex);
       setSongTempoBpm(SONGS[nextIndex].bpm);
       setVariationId(requestedVariationId ?? SONGS[nextIndex].variations?.[0]?.id ?? "");
+      setTranspose(Number(params.get("transpose") ?? 0));
+      setLargePrint(params.get("largePrint") === "1");
+      setHandsFree(params.get("handsFree") === "1");
     }
   }, []);
+
+  useEffect(() => {
+    if (!handsFree) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.code === "Space") { event.preventDefault(); setSongStatus((status) => status === "running" || status === "countin" ? "paused" : "running"); }
+      if (event.key.toLowerCase() === "r") resetSong();
+    };
+    window.addEventListener("keydown", handleKey);
+    const Recognition = (window as Window & { webkitSpeechRecognition?: VoiceRecognitionConstructor }).webkitSpeechRecognition;
+    const recognition = Recognition ? new Recognition() : null;
+    if (recognition) {
+      recognition.continuous = true; recognition.lang = "en-US";
+      recognition.onresult = (event) => { const command = event.results[event.results.length - 1][0].transcript.toLowerCase(); if (command.includes("pause")) setSongStatus("paused"); else if (command.includes("resume") || command.includes("start")) setSongStatus("running"); else if (command.includes("reset")) resetSong(); setVoiceStatus(`Heard: ${command}`); };
+      try { recognition.start(); } catch { setVoiceStatus("Use Space to pause/resume; voice control is unavailable."); }
+    } else setVoiceStatus("Use Space to pause/resume; voice control is unavailable.");
+    return () => { window.removeEventListener("keydown", handleKey); try { recognition?.stop(); } catch { /* no-op */ } };
+  }, [handsFree, resetSong]);
 
   const ensureAudioContext = useCallback(async () => {
     if (!audioContextRef.current) {
@@ -283,7 +324,8 @@ export default function SongsPage() {
         if (nextBeat >= songBeatsPerChord) {
           setSongStep((previousStep) => {
             const nextStep = previousStep + 1;
-            if (nextStep >= activeSong.chords.length) {
+            if (nextStep > (loopEnd ?? displayedChords.length - 1)) {
+              if (loopStart !== undefined) return loopStart;
               setSongStatus("paused");
               return previousStep;
             }
@@ -299,7 +341,7 @@ export default function SongsPage() {
         clearInterval(songTimer.current);
       }
     };
-  }, [activeSong.chords.length, songBeatsPerChord, songStatus, songTempoMs]);
+  }, [displayedChords.length, loopEnd, loopStart, songBeatsPerChord, songStatus, songTempoMs]);
 
   useEffect(() => {
     if (!metronomeOn) return;
@@ -310,21 +352,14 @@ export default function SongsPage() {
 
   const handleSongStart = async () => {
     await ensureAudioContext();
-    setSongStep(0);
+    setSongStep(loopStart ?? 0);
     setSongBeat(0);
     setSongCountIn(4);
     setSongStatus("countin");
   };
 
-  const resetSong = () => {
-    setSongStep(0);
-    setSongBeat(0);
-    setSongCountIn(4);
-    setSongStatus("idle");
-  };
-
   return (
-    <main className="page focused-page songs-page">
+    <main className={`page focused-page songs-page ${largePrint ? "song-coach-large-print" : ""}`}>
       <section className="studio-heading songs-heading">
         <div>
           <span className="tag">Song Coach</span>
@@ -352,6 +387,7 @@ export default function SongsPage() {
                 setSongIndex(nextIndex);
                 setSongTempoBpm(SONGS[nextIndex]?.bpm ?? 90);
                 setVariationId(SONGS[nextIndex]?.variations?.[0]?.id ?? "");
+                setTranspose(0);
                 setSongStep(0);
                 setSongBeat(0);
                 setSongCountIn(4);
@@ -391,6 +427,12 @@ export default function SongsPage() {
               />
             </div>
             <div className="beats-control">
+              <span className="label">Transpose</span>
+              <div className="chip-row">
+                {[-2, -1, 0, 1, 2].map((semitones) => <button key={semitones} type="button" className={`chip ${transpose === semitones ? "active" : ""}`} onClick={() => { setTranspose(semitones); setSongStatus("idle"); }}>{semitones === 0 ? "Original" : `${semitones > 0 ? "+" : ""}${semitones}`}</button>)}
+              </div>
+            </div>
+            <div className="beats-control">
               <span className="label">Beats per chord</span>
               <div className="chip-row">
                 {[2, 4, 6].map((beats) => (
@@ -404,6 +446,10 @@ export default function SongsPage() {
                   </button>
                 ))}
               </div>
+            </div>
+            <div className="beats-control">
+              <span className="label">Section loop</span>
+              <div className="chip-row"><button type="button" className={`chip ${loopSectionId === null ? "active" : ""}`} onClick={() => setLoopSectionId(null)}>Full song</button>{sectionRanges.map((section) => <button key={section.id} type="button" className={`chip ${loopSectionId === section.id ? "active" : ""}`} onClick={() => { setLoopSectionId(section.id); setSongStep(section.start); setSongStatus("idle"); }}>{section.title}</button>)}</div>
             </div>
             <div className="song-controls">
               <button className="btn primary" onClick={handleSongStart}>
@@ -432,7 +478,9 @@ export default function SongsPage() {
               >
                 {metronomeOn ? "Metronome on" : "Metronome off"}
               </button>
+              <button className={`btn ${handsFree ? "primary" : ""}`} onClick={() => setHandsFree((value) => !value)} aria-pressed={handsFree}>{handsFree ? "Hands-free on" : "Hands-free mode"}</button>
             </div>
+            {handsFree && <p className="muted" role="status">{voiceStatus || "Space pauses/resumes. Say start, pause, resume, or reset."}</p>}
             <div className="song-guidance">
               <div className="song-guidance-card">
                 <span className="label">Strumming pattern</span>
@@ -449,7 +497,7 @@ export default function SongsPage() {
             <span className="label">Current chord</span>
             <h3>{currentSongChordName}</h3>
             <p>
-              Step {Math.min(songStep + 1, activeSong.chords.length)} of {activeSong.chords.length} -
+              Step {Math.min(songStep + 1, displayedChords.length)} of {displayedChords.length} -
               Beat {songBeat + 1} of {songBeatsPerChord}
             </p>
             {songStatus === "countin" && (
@@ -476,7 +524,7 @@ export default function SongsPage() {
               </div>
             )}
             <div className="song-chords">
-              {activeSong.chords.map((chord, index) => (
+              {displayedChords.map((chord, index) => (
                 <span
                   key={`${chord}-${index}`}
                   className={`song-chip ${index === songStep ? "active" : ""}`}

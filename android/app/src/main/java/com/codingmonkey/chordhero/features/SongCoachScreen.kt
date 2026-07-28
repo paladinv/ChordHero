@@ -1,5 +1,6 @@
 package com.codingmonkey.chordhero.features
 
+import android.Manifest
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -22,6 +23,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
@@ -32,10 +35,11 @@ import com.codingmonkey.chordhero.domain.ContentBundle
 import com.codingmonkey.chordhero.domain.PlaybackStatus
 import com.codingmonkey.chordhero.domain.SongPlaybackState
 import com.codingmonkey.chordhero.services.AudioService
+import com.codingmonkey.chordhero.services.SongRecorderService
 import kotlinx.coroutines.delay
 
 @Composable
-fun SongCoachScreen(content: ContentBundle, audio: AudioService, initialSongID: String? = null, initialVariationID: String? = null) {
+fun SongCoachScreen(content: ContentBundle, audio: AudioService, recorder: SongRecorderService, initialSongID: String? = null, initialVariationID: String? = null) {
     var songIndex by remember { mutableIntStateOf(0) }
     var variationID by remember { mutableStateOf(initialVariationID) }
     val song = content.songs.songs[songIndex]
@@ -43,6 +47,9 @@ fun SongCoachScreen(content: ContentBundle, audio: AudioService, initialSongID: 
     var tempo by remember(song.id, variation?.id) { mutableFloatStateOf((variation?.bpm ?: song.bpm).toFloat()) }
     var beatsPerChord by remember { mutableIntStateOf(4) }
     var metronome by remember { mutableStateOf(true) }
+    var handsFree by remember { mutableStateOf(false) }
+    var largePrint by remember { mutableStateOf(false) }
+    val requestMicrophone = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted -> if (granted) recorder.start(song.id) }
     var state by remember(song.id) { mutableStateOf(SongPlaybackState()) }
     val chord = content.chords.chordLibrary.firstOrNull { it.chord.name == song.chords[state.chordIndex] }
         ?: content.chords.chordLibrary.first()
@@ -84,7 +91,7 @@ fun SongCoachScreen(content: ContentBundle, audio: AudioService, initialSongID: 
         item {
             Card(Modifier.fillMaxWidth()) {
                 Column {
-                    Text(song.title, style = MaterialTheme.typography.headlineSmall)
+                    Text(song.title, style = if (largePrint) MaterialTheme.typography.headlineLarge else MaterialTheme.typography.headlineSmall)
                     Text("${song.artist} · ${song.source} · ${song.difficulty}")
                     Text("${song.key} · ${song.timeSignature}")
                     Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { song.variations.forEach { item -> FilterChip(variation?.id == item.id, { variationID = item.id; tempo = item.bpm.toFloat(); state = SongPlaybackState() }, { Text(item.name) }) } }
@@ -94,7 +101,7 @@ fun SongCoachScreen(content: ContentBundle, audio: AudioService, initialSongID: 
                     Text(
                         if (state.countingIn) "Count in: ${state.countInRemaining}" else
                             "Step ${state.chordIndex + 1}/${song.chords.size} · Beat ${state.beat + 1}/$beatsPerChord",
-                        style = MaterialTheme.typography.titleLarge,
+                        style = if (largePrint) MaterialTheme.typography.displaySmall else MaterialTheme.typography.titleLarge,
                     )
                     tip?.let {
                         Text("Fingering: ${it.fingering}")
@@ -110,6 +117,10 @@ fun SongCoachScreen(content: ContentBundle, audio: AudioService, initialSongID: 
             Row {
                 Checkbox(metronome, { metronome = it })
                 Text("Metronome", modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
+                Checkbox(handsFree, { handsFree = it })
+                Text("Hands-free", modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
+                Checkbox(largePrint, { largePrint = it })
+                Text("Large print", modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
             }
         }
         item {
@@ -124,6 +135,7 @@ fun SongCoachScreen(content: ContentBundle, audio: AudioService, initialSongID: 
                 OutlinedButton(onClick = { state = SongPlaybackState(); audio.stop() }) { Text("Reset") }
             }
         }
+        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = { if (recorder.isRecording) recorder.stop() else requestMicrophone.launch(Manifest.permission.RECORD_AUDIO) }) { Text(if (recorder.isRecording) "Stop recording" else "Record performance") }; OutlinedButton(enabled = recorder.latestFile != null, onClick = { recorder.playLatest() }) { Text("Play recording") } } }
         item { Text("Songs", style = MaterialTheme.typography.titleMedium) }
         items(content.songs.songs.withIndex().toList()) { (index, item) ->
             OutlinedButton(

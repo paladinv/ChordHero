@@ -24,12 +24,20 @@ const FAVORITES_STORAGE_KEY = "chord-hero-library-favorites";
 const CUSTOM_PACKS_STORAGE_KEY = "chord-hero-library-custom-packs";
 const PRACTICE_STATS_STORAGE_KEY = "chord-hero-library-practice-stats";
 const USER_NOTES_STORAGE_KEY = "chord-hero-library-user-notes";
+const STRING_MISTAKES_STORAGE_KEY = "chord-hero-library-string-mistakes";
 const STUDENT_PROFILES_STORAGE_KEY = "chord-hero-library-student-profiles";
 const SAMPLE_BASE_PATH = "/samples/guitar";
 const RECORDED_GUITAR_ROOTS = [37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 69, 72, 75, 78, 81, 84, 86];
 const OPEN_STRING_FREQUENCIES = [82.41, 110, 146.83, 196, 246.94, 329.63];
 const STANDARD_STRING_NOTES = ["E", "A", "D", "G", "B", "E"];
 const DEFAULT_LIBRARY_ITEM = CHORD_LIBRARY[0] ?? null;
+const CHORD_SEARCH_INDEX = CHORD_LIBRARY.map((entry) => ({
+  entry,
+  text: [entry.chord.name, entry.root, entry.qualityLabel, entry.position, entry.summary]
+    .join(" ")
+    .toLowerCase()
+}));
+const MAX_VISIBLE_VOICINGS = 80;
 const NOTES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 const NOTE_INDEX = new Map(NOTES.map((note, index) => [note, index]));
 const LEGACY_RIGHT_HAND_PATTERNS = [
@@ -230,6 +238,18 @@ const getCommonMistakes = (entry: ChordLibraryItem) => {
   return mistakes.slice(0, 3);
 };
 
+const getVoiceLeadingNotes = (from: ChordLibraryItem, to: ChordLibraryItem) => {
+  const changes = from.chord.frets
+    .map((fret, index) => {
+      const nextFret = to.chord.frets[index];
+      if (fret === nextFret) return null;
+      if (fret < 0 || nextFret < 0) return `String ${index + 1}: mute/open change`;
+      return `String ${index + 1}: ${fret === 0 ? "open" : fret} to ${nextFret === 0 ? "open" : nextFret}`;
+    })
+    .filter((note): note is string => Boolean(note));
+  return changes.length ? changes.slice(0, 4) : ["Keep the same shape and focus on a clean transition."];
+};
+
 export default function ChordLibraryExplorer() {
   const [workspace, setWorkspace] = useState<LibraryWorkspace>("browse");
   const [libraryRoot, setLibraryRoot] = useState(DEFAULT_LIBRARY_ITEM?.root ?? "");
@@ -266,6 +286,11 @@ export default function ChordLibraryExplorer() {
   const [activeStudentId, setActiveStudentId] = useState("default-student");
   const [newStudentName, setNewStudentName] = useState("");
   const [midiStatus, setMidiStatus] = useState("MIDI not connected");
+  const [fretFilter, setFretFilter] = useState<"all" | "4" | "8" | "12">("all");
+  const [stringFilter, setStringFilter] = useState<"all" | "open" | "partial" | "full">("all");
+  const [voicingLimit, setVoicingLimit] = useState(MAX_VISIBLE_VOICINGS);
+  const [customFrets, setCustomFrets] = useState<number[]>([-1, -1, -1, -1, -1, -1]);
+  const [stringMistakes, setStringMistakes] = useState<Record<string, number[]>>({});
 
   const deferredLibrarySearch = useDeferredValue(librarySearch.trim().toLowerCase());
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -338,6 +363,10 @@ export default function ChordLibraryExplorer() {
         if (entry.quality !== libraryQuality) return false;
         if (libraryInversion !== "all" && entry.id !== libraryInversion) return false;
         if (libraryTag !== "all" && !entry.difficultyTags.includes(libraryTag)) return false;
+        if (fretFilter !== "all" && entry.chord.frets.some((fret) => fret > Number(fretFilter))) return false;
+        if (stringFilter === "open" && !entry.chord.frets.some((fret) => fret === 0)) return false;
+        if (stringFilter === "partial" && !entry.difficultyTags.includes("partial")) return false;
+        if (stringFilter === "full" && entry.chord.frets.filter((fret) => fret >= 0).length < 5) return false;
 
         if (libraryFunctionRole !== "any" || libraryFunctionKey !== "any") {
           const matchingContexts = entry.functionContexts.filter((context) =>
@@ -369,21 +398,23 @@ export default function ChordLibraryExplorer() {
       }),
     [
       deferredLibrarySearch,
+      fretFilter,
       libraryFunctionKey,
       libraryFunctionRole,
       libraryInversion,
       libraryPool,
       libraryQuality,
       libraryRoot,
-      libraryTag
+      libraryTag,
+      stringFilter
     ]
   );
 
   const searchMatches = useMemo(() => {
     if (!deferredLibrarySearch) return [];
-    return CHORD_LIBRARY.filter((entry) =>
-      entry.chord.name.toLowerCase().includes(deferredLibrarySearch)
-    ).slice(0, 8);
+    return CHORD_SEARCH_INDEX.filter((item) => item.text.includes(deferredLibrarySearch))
+      .map((item) => item.entry)
+      .slice(0, 8);
   }, [deferredLibrarySearch]);
 
   const selectedLibraryEntry =
@@ -395,6 +426,15 @@ export default function ChordLibraryExplorer() {
   const thirdCompareEntry =
     (thirdCompareChordId ? CHORD_ITEM_LOOKUP.get(thirdCompareChordId) : null) ?? null;
   const selectedTheory = selectedLibraryEntry ? getTheoryNotes(selectedLibraryEntry) : null;
+  const visibleVoicingEntries = useMemo(
+    () => filteredLibraryEntries.slice(0, voicingLimit),
+    [filteredLibraryEntries, voicingLimit]
+  );
+  const customChord: Chord = {
+    name: "Custom voicing",
+    frets: customFrets,
+    fingers: customFrets.map((fret) => (fret > 0 ? 1 : null)) as Array<1 | 2 | 3 | 4 | null>
+  };
   const selectedPracticeStats = selectedLibraryEntry
     ? practiceStats[selectedLibraryEntry.id] ?? { seconds: 0, reps: 0 }
     : { seconds: 0, reps: 0 };
@@ -727,6 +767,13 @@ export default function ChordLibraryExplorer() {
     setUserNotes((previous) => ({ ...previous, [id]: note }));
   };
 
+  const logStringMistake = (id: string, stringIndex: number) => {
+    setStringMistakes((previous) => ({
+      ...previous,
+      [id]: [...(previous[id] ?? []), stringIndex]
+    }));
+  };
+
   const startEarTraining = (prompt: "chord" | "function") => {
     const pool = filteredLibraryEntries.length ? filteredLibraryEntries : CHORD_LIBRARY;
     const entry = pool[Math.floor(Math.random() * pool.length)];
@@ -765,6 +812,7 @@ export default function ChordLibraryExplorer() {
       const storedCustomPacks = window.localStorage.getItem(CUSTOM_PACKS_STORAGE_KEY);
       const storedPracticeStats = window.localStorage.getItem(PRACTICE_STATS_STORAGE_KEY);
       const storedUserNotes = window.localStorage.getItem(USER_NOTES_STORAGE_KEY);
+      const storedStringMistakes = window.localStorage.getItem(STRING_MISTAKES_STORAGE_KEY);
       const storedProfiles = window.localStorage.getItem(STUDENT_PROFILES_STORAGE_KEY);
       if (storedFavorites) {
         setFavoriteIds(JSON.parse(storedFavorites));
@@ -780,6 +828,9 @@ export default function ChordLibraryExplorer() {
       }
       if (storedUserNotes) {
         setUserNotes(JSON.parse(storedUserNotes));
+      }
+      if (storedStringMistakes) {
+        setStringMistakes(JSON.parse(storedStringMistakes));
       }
       if (storedProfiles) {
         setStudentProfiles(JSON.parse(storedProfiles));
@@ -838,6 +889,14 @@ export default function ChordLibraryExplorer() {
   }, [studentProfiles]);
 
   useEffect(() => {
+    try {
+      window.localStorage.setItem(STRING_MISTAKES_STORAGE_KEY, JSON.stringify(stringMistakes));
+    } catch {
+      // Ignore storage failures and keep the UI usable.
+    }
+  }, [stringMistakes]);
+
+  useEffect(() => {
     if (!selectedLibraryEntry) return;
     setRecentIds((previous) => [
       selectedLibraryEntry.id,
@@ -871,6 +930,10 @@ export default function ChordLibraryExplorer() {
       setSelectedLibraryId(filteredLibraryEntries[0]?.id ?? "");
     }
   }, [filteredLibraryEntries, selectedLibraryId]);
+
+  useEffect(() => {
+    setVoicingLimit(MAX_VISIBLE_VOICINGS);
+  }, [deferredLibrarySearch, fretFilter, libraryFunctionKey, libraryFunctionRole, libraryInversion, libraryQuality, libraryRoot, libraryTag, stringFilter]);
 
   useEffect(() => {
     if (!comparisonCandidates.some((entry) => entry.id === compareChordId)) {
@@ -986,6 +1049,20 @@ export default function ChordLibraryExplorer() {
                 <option value="any">Any role</option>
                 {HARMONIC_FUNCTION_OPTIONS.map((role) => <option key={role} value={role}>{role}</option>)}
               </select>
+              <label htmlFor="library-fret-range">Fret range</label>
+              <select id="library-fret-range" value={fretFilter} onChange={(event) => setFretFilter(event.target.value as typeof fretFilter)}>
+                <option value="all">Any fret</option>
+                <option value="4">Open to fret 4</option>
+                <option value="8">Open to fret 8</option>
+                <option value="12">Open to fret 12</option>
+              </select>
+              <label htmlFor="library-string-set">String set</label>
+              <select id="library-string-set" value={stringFilter} onChange={(event) => setStringFilter(event.target.value as typeof stringFilter)}>
+                <option value="all">Any string set</option>
+                <option value="open">Includes open strings</option>
+                <option value="partial">Partial chords</option>
+                <option value="full">Five or more ringing strings</option>
+              </select>
             </div>
           </details>
         </div>
@@ -1029,7 +1106,7 @@ export default function ChordLibraryExplorer() {
                 <span className="label">Voicings</span>
                 <strong>{filteredLibraryEntries.length}</strong>
               </div>
-              {filteredLibraryEntries.map((entry) => (
+              {visibleVoicingEntries.map((entry) => (
                 <button
                   key={entry.id}
                   type="button"
@@ -1043,6 +1120,11 @@ export default function ChordLibraryExplorer() {
                   <small>{getDifficultyScore(entry)}/8</small>
                 </button>
               ))}
+              {visibleVoicingEntries.length < filteredLibraryEntries.length ? (
+                <button className="btn ghost library-load-more" type="button" onClick={() => setVoicingLimit((limit) => limit + MAX_VISIBLE_VOICINGS)}>
+                  Show {Math.min(MAX_VISIBLE_VOICINGS, filteredLibraryEntries.length - visibleVoicingEntries.length)} more voicings
+                </button>
+              ) : null}
             </aside>
 
             <div className={`library-stage workspace-${workspace}`}>
@@ -1147,6 +1229,21 @@ export default function ChordLibraryExplorer() {
                       </div>
                       <p className="muted">Next review: {selectedPracticeStats.nextReviewAt ? new Date(selectedPracticeStats.nextReviewAt).toLocaleString() : "Not scheduled"}</p>
                     </div>
+                    <div className="practice-mistake-log">
+                      <span className="label">Log a problem string</span>
+                      <div className="chip-row">
+                        {STANDARD_STRING_NOTES.map((note, index) => (
+                          <button key={`${note}-${index}`} className="chip" type="button" onClick={() => logStringMistake(selectedLibraryEntry.id, index)}>
+                            {index + 1}: {note}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="muted">
+                        {stringMistakes[selectedLibraryEntry.id]?.length
+                          ? `Most logged: string ${[0, 1, 2, 3, 4, 5].sort((a, b) => (stringMistakes[selectedLibraryEntry.id]?.filter((item) => item === b).length ?? 0) - (stringMistakes[selectedLibraryEntry.id]?.filter((item) => item === a).length ?? 0))[0] + 1}`
+                          : "No string-specific mistakes logged yet."}
+                      </p>
+                    </div>
                     {recommendation ? <p>Suggested next: <button className="inline-link" type="button" onClick={() => jumpToChord(recommendation.id)}>{recommendation.chord.name} · {recommendation.position}</button></p> : null}
                   </section>
                   <aside className="library-task-secondary">
@@ -1198,6 +1295,13 @@ export default function ChordLibraryExplorer() {
                       </article>
                     ))}
                   </div>
+                  {compareEntry ? (
+                    <div className="library-disclosure-content voice-leading-notes">
+                      <span className="label">Voice-leading guide</span>
+                      <p>Smallest visible changes from {selectedLibraryEntry.chord.name} to {compareEntry.chord.name}:</p>
+                      <ul>{getVoiceLeadingNotes(selectedLibraryEntry, compareEntry).map((note) => <li key={note}>{note}</li>)}</ul>
+                    </div>
+                  ) : null}
                   <details className="library-disclosure">
                     <summary>Show shared-note fretboard</summary>
                     <div className="heatmap-grid" aria-label="Fretboard shared-note heatmap">
@@ -1216,6 +1320,18 @@ export default function ChordLibraryExplorer() {
                       <div><label htmlFor="library-capo">Capo {capoFret}</label><input id="library-capo" type="range" min="0" max="7" value={capoFret} onChange={(event) => setCapoFret(Number(event.target.value))}/><p>{selectedLibraryEntry.chord.name} sounds as {selectedCapoName}.</p></div>
                       <div><label htmlFor="library-tuning">Tuning</label><select id="library-tuning" value={tuningId} onChange={(event) => setTuningId(event.target.value as TuningId)}>{TUNINGS.map((tuning) => <option key={tuning.id} value={tuning.id}>{tuning.label}</option>)}</select><p>{getChordNoteNames(selectedLibraryEntry.chord, selectedTuning).join(" ")}</p></div>
                       <div><span>Sample voice</span><div className="chip-row">{SAMPLE_VOICES.map((voice) => <button key={voice} type="button" className={`chip ${sampleVoice === voice ? "active" : ""}`} onClick={() => setSampleVoice(voice)}>{voice}</button>)}</div><p>{sampleStatus}</p></div>
+                    </div>
+                    <div className="custom-fretboard-editor">
+                      <div className="library-section-heading"><div><span className="label">Voicing builder</span><h4>Make a custom shape</h4></div><button className="btn ghost" type="button" onClick={() => setCustomFrets([-1, -1, -1, -1, -1, -1])}>Clear</button></div>
+                      <p className="muted">Click a string to cycle mute, open, and frets 1–5. The chart updates immediately.</p>
+                      <div className="custom-fretboard-grid" aria-label="Custom fretboard editor">
+                        {customFrets.map((fret, index) => (
+                          <button key={index} type="button" className="custom-fret-cell" aria-label={`String ${index + 1}, fret ${fret < 0 ? "muted" : fret}`} onClick={() => setCustomFrets((previous) => previous.map((current, currentIndex) => currentIndex === index ? (current >= 5 ? -1 : current + 1) : current))}>
+                            <strong>{STANDARD_STRING_NOTES[index]}</strong><span>{fret < 0 ? "X" : fret === 0 ? "O" : fret}</span>
+                          </button>
+                        ))}
+                      </div>
+                      <div className="custom-fretboard-preview"><ChordDiagram chord={customChord} /><button className="btn" type="button" onClick={() => playChordPreview(customChord, "strum")}>Play custom shape</button></div>
                     </div>
                   </section>
                   <section>

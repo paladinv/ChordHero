@@ -10,7 +10,7 @@ final class ContentAndRulesTests: XCTestCase {
         XCTAssertEqual(content.chords.count, 346)
         XCTAssertEqual(content.levels.count, 4)
         XCTAssertEqual(content.progressionPacks.count, 4)
-        XCTAssertEqual(content.exercises.count, 30)
+        XCTAssertEqual(content.exercises.count, 36)
         XCTAssertEqual(content.songs.count, 50)
         XCTAssertTrue(content.songs.allSatisfy { $0.variations.count >= 3 })
         XCTAssertEqual(content.tunings.count, 4)

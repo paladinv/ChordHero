@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		08A6B2363C6E15027EC361D3 /* right-hand.json in Resources */ = {isa = PBXBuildFile; fileRef = 1B402700CC3A6E8B88F0B934 /* right-hand.json */; };
+		0C84638F96F11C22858B675D /* SongRecorderService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2848C5E53D37833606C4A135 /* SongRecorderService.swift */; };
 		152C12CE0E2BDE0D05039730 /* ChordHeroApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 36E352A2216A3BD4ED888165 /* ChordHeroApp.swift */; };
 		156CB03ED8A5F6B8C5593A0A /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = B43959F2C177E9C4FFAA936D /* LibraryView.swift */; };
 		27FFA3C6CD3F16BF60C8BBDE /* ChordDiagramView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63C59F5C212223CF9D37463B /* ChordDiagramView.swift */; };
@@ -60,6 +61,7 @@
 		1B402700CC3A6E8B88F0B934 /* right-hand.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = "right-hand.json"; sourceTree = "<group>"; };
 		234020159B5504D199BC6D1E /* SongLibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongLibraryView.swift; sourceTree = "<group>"; };
 		245926AAA52AA9945DAA3998 /* PracticeRules.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeRules.swift; sourceTree = "<group>"; };
+		2848C5E53D37833606C4A135 /* SongRecorderService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SongRecorderService.swift; sourceTree = "<group>"; };
 		2E3EB80594215AAA58C9E6D3 /* PracticeDashboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PracticeDashboard.swift; sourceTree = "<group>"; };
 		2EA6B5BFE15533D6B64112ED /* ChordHeroUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ChordHeroUITests.swift; sourceTree = "<group>"; };
 		2EB2B56A5A1D6B106B03DCEB /* chords.json */ = {isa = PBXFileReference; lastKnownFileType = text.json; path = chords.json; sourceTree = "<group>"; };
@@ -123,6 +125,7 @@
 				B8B20E61099F6BE9961847AC /* AudioService.swift */,
 				B5BEEFC52635A202CDD1F313 /* MIDIService.swift */,
 				D1E61B63C2991E5CF5C5BEBB /* PDFService.swift */,
+				2848C5E53D37833606C4A135 /* SongRecorderService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -412,6 +415,7 @@
 				A27017189E468452FC50E072 /* RightHandView.swift in Sources */,
 				837EC0723AE4552F6F1710BB /* SongCoachView.swift in Sources */,
 				696E6C17965B2926F64889B0 /* SongLibraryView.swift in Sources */,
+				0C84638F96F11C22858B675D /* SongRecorderService.swift in Sources */,
 				BA871AF402C03268BCA0FF56 /* ToolsView.swift in Sources */,
 				9E3004A9DC43717F2ED1970D /* TrainerView.swift in Sources */,
 			);
@@ -477,6 +481,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Chord Hero";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Chord Hero uses Bluetooth MIDI devices for optional ear-training answers.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Chord Hero uses the microphone to record personal song practice performances.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -517,6 +522,7 @@
 				INFOPLIST_KEY_CFBundleDisplayName = "Chord Hero";
 				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.music";
 				INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription = "Chord Hero uses Bluetooth MIDI devices for optional ear-training answers.";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Chord Hero uses the microphone to record personal song practice performances.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				LD_RUNPATH_SEARCH_PATHS = (

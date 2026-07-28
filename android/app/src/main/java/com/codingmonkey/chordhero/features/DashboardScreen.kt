@@ -45,7 +45,7 @@ fun DashboardScreen(onNavigate: (Destination) -> Unit) {
 
 private fun description(destination: Destination): String = when (destination) {
     Destination.Trainer -> "Timed chord-change rounds"
-    Destination.RightHand -> "30 technique exercises"
+    Destination.RightHand -> "36 guided technique exercises"
     Destination.Songs -> "50 guided traditional songs"
     Destination.Library -> "346 chord voicings and study tools"
     Destination.Chart -> "Browse levels and roots"

@@ -15,7 +15,7 @@ const dashboardCards = [
     title: "Right-Hand Studio",
     symbol: "02",
     description: "Follow animated strumming, plectrum, and fingerpicking drills at your own speed.",
-    meta: ["30 exercises", "40–180 BPM", "3 skill levels"]
+    meta: ["36 exercises", "Guided rounds", "3 skill levels"]
   },
   {
     href: "/songs",

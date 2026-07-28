@@ -15,13 +15,25 @@ for (const document of [chords, rightHand, settings]) {
 if (songs.schemaVersion !== 2) fail("The songs document must use schemaVersion 2");
 
 const chordIDs = new Set();
+const chordFamilies = new Map();
 for (const entry of chords.chordLibrary) {
   if (!entry.id || chordIDs.has(entry.id)) fail(`Duplicate or missing chord id: ${entry.id}`);
   chordIDs.add(entry.id);
   if (entry.chord.frets.length !== 6 || entry.chord.fingers.length !== 6) fail(`${entry.id} must define six strings`);
+  if (!entry.chord.name || !entry.position || !entry.quality) fail(`${entry.id} is missing chord naming metadata`);
   if (entry.chord.frets.some((fret) => !Number.isInteger(fret) || fret < -1)) fail(`${entry.id} has an invalid fret`);
   if (entry.chord.fingers.some((finger) => finger !== null && ![1, 2, 3, 4].includes(finger))) fail(`${entry.id} has an invalid finger`);
   if (entry.chord.barre && (entry.chord.barre.from < 0 || entry.chord.barre.to > 5 || entry.chord.barre.from > entry.chord.barre.to)) fail(`${entry.id} has an invalid barre`);
+  if (entry.inversion === "inverted" && !entry.chord.name.includes("/")) fail(`${entry.id} must identify its slash bass`);
+  const familyKey = `${entry.root}:${entry.quality}`;
+  const family = chordFamilies.get(familyKey) ?? { standard: 0, inverted: 0 };
+  family[entry.inversion] += 1;
+  chordFamilies.set(familyKey, family);
+}
+for (const [familyKey, family] of chordFamilies) {
+  if (family.standard === 0 || family.inverted === 0) {
+    console.warn(`Coverage note: ${familyKey} has ${family.standard} standard and ${family.inverted} inverted voicings`);
+  }
 }
 if (chordIDs.size !== 346) fail(`Expected the web app's 346 chord voicings, found ${chordIDs.size}`);
 for (const level of chords.levels) for (const id of level.chordIds) if (!chordIDs.has(id)) fail(`Unknown level chord ${id}`);
@@ -30,7 +42,12 @@ if (chords.levels.length !== 4) fail("Expected four trainer levels");
 if (chords.progressionPacks.length !== 4) fail("Expected four built-in progression packs");
 
 const exerciseIDs = new Set(rightHand.exercises.map((exercise) => exercise.id));
-if (exerciseIDs.size !== 30) fail(`Expected 30 unique right-hand exercises, found ${exerciseIDs.size}`);
+if (exerciseIDs.size !== 36) fail(`Expected 36 unique right-hand exercises, found ${exerciseIDs.size}`);
+for (const exercise of rightHand.exercises) {
+  if (!["strumming", "plectrum", "fingerpicking"].includes(exercise.technique)) fail(`Unsupported right-hand technique ${exercise.technique}`);
+  if (!["beginner", "intermediate", "expert"].includes(exercise.difficulty)) fail(`Unsupported right-hand difficulty ${exercise.difficulty}`);
+  if (!exercise.pattern?.length || exercise.bpm < 40 || exercise.bpm > 180) fail(`Invalid right-hand exercise ${exercise.id}`);
+}
 const songIDs = new Set();
 const techniques = new Set(["strumming", "fingerpicking", "plectrum"]);
 for (const song of songs.songs) {
@@ -48,4 +65,4 @@ for (const song of songs.songs) {
 if (songs.songs.length !== 50) fail(`Expected 50 songs, found ${songs.songs.length}`);
 if (settings.tunings.length !== 4) fail("Expected four tunings");
 
-console.log("Shared content is valid: 346 chords, 4 levels, 4 packs, 30 exercises, 50 songs, 4 tunings.");
+console.log("Shared content is valid: 346 chords, 4 levels, 4 packs, 36 exercises, 50 songs, 4 tunings.");

@@ -256,6 +256,28 @@
       ]
     },
     {
+      "id": "strum-polyrhythm",
+      "technique": "strumming",
+      "difficulty": "expert",
+      "title": "Three-over-four accents",
+      "focus": "Polyrhythmic accent control",
+      "coaching": "Keep the sixteenth-note hand motion even while accents cycle every three strokes across the bar line.",
+      "bpm": 90,
+      "subdivision": "Sixteenth notes",
+      "pattern": ["D!", "U", "D", "U!", "D", "U", "D!", "U", "D", "U!", "D", "U", "D!", "U", "D", "U!"]
+    },
+    {
+      "id": "strum-rasgueado",
+      "technique": "strumming",
+      "difficulty": "expert",
+      "title": "Rasgueado fan",
+      "focus": "Finger fan and thumb return",
+      "coaching": "Open the ring, middle, and index fingers in sequence, then use a relaxed thumb upstroke to reset.",
+      "bpm": 84,
+      "subdivision": "Sixteenth notes",
+      "pattern": ["D!", "D", "D", "U", "D!", "D", "D", "U", "D!", "D", "D", "U", "D!", "D", "D", "U"]
+    },
+    {
       "id": "pick-single-string",
       "technique": "plectrum",
       "difficulty": "beginner",
@@ -474,6 +496,28 @@
       ]
     },
     {
+      "id": "pick-economy",
+      "technique": "plectrum",
+      "difficulty": "expert",
+      "title": "Economy-picking sweep",
+      "focus": "Directional string changes",
+      "coaching": "Continue the pick through adjacent strings in one direction, then reset with a small alternate stroke.",
+      "bpm": 104,
+      "subdivision": "Sixteenth notes",
+      "pattern": ["5D!", "4D", "3D", "2D", "2U", "3U", "4U", "5U", "4D!", "3D", "2D", "1D", "1U", "2U", "3U", "4U"]
+    },
+    {
+      "id": "pick-tremolo",
+      "technique": "plectrum",
+      "difficulty": "expert",
+      "title": "Tremolo endurance",
+      "focus": "Relaxed high-speed alternate picking",
+      "coaching": "Use the smallest possible pick stroke and release thumb pressure whenever tension begins to rise.",
+      "bpm": 118,
+      "subdivision": "Sixteenth notes",
+      "pattern": ["1D!", "1U", "1D", "1U", "1D!", "1U", "1D", "1U", "2D!", "2U", "2D", "2U", "2D!", "2U", "2D", "2U"]
+    },
+    {
       "id": "finger-thumb",
       "technique": "fingerpicking",
       "difficulty": "beginner",
@@ -688,6 +732,28 @@
         "m2",
         "a1"
       ]
+    },
+    {
+      "id": "finger-tremolo",
+      "technique": "fingerpicking",
+      "difficulty": "expert",
+      "title": "Classical tremolo",
+      "focus": "P–a–m–i melody flow",
+      "coaching": "Keep the thumb bass separate and let a, m, and i return to the first string with identical volume.",
+      "bpm": 96,
+      "subdivision": "Sixteenth notes",
+      "pattern": ["P6!", "a1", "m1", "i1", "P5!", "a1", "m1", "i1", "P4!", "a1", "m1", "i1", "P5!", "a1", "m1", "i1"]
+    },
+    {
+      "id": "finger-hybrid",
+      "technique": "fingerpicking",
+      "difficulty": "expert",
+      "title": "Hybrid-picking cascade",
+      "focus": "Pick, middle, and ring coordination",
+      "coaching": "Hold the pick lightly for the bass notes while middle and ring pluck the upper strings toward the palm.",
+      "bpm": 102,
+      "subdivision": "Sixteenth notes",
+      "pattern": ["P6!", "m2", "a1", "m2", "P5!", "m2", "a1", "m2", "P4!", "m2", "a1", "m2", "P5!", "m2", "a1", "m2"]
     }
   ]
 }

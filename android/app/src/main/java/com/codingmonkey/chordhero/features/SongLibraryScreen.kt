@@ -28,6 +28,8 @@ import com.codingmonkey.chordhero.app.AppContainer
 import com.codingmonkey.chordhero.data.ImportedSongEntity
 import com.codingmonkey.chordhero.data.SongLibraryEntity
 import com.codingmonkey.chordhero.data.StudentProfileEntity
+import com.codingmonkey.chordhero.data.SongPracticeEntity
+import com.codingmonkey.chordhero.data.WeeklyPracticeGoalEntity
 import com.codingmonkey.chordhero.domain.ContentBundle
 import com.codingmonkey.chordhero.domain.SongDefinition
 import com.codingmonkey.chordhero.domain.SongVariation
@@ -39,8 +41,11 @@ fun SongLibraryScreen(content: ContentBundle, profile: StudentProfileEntity, con
     val context = LocalContext.current
     val collections by container.progress.songLibraries(profile.id).collectAsState(emptyList())
     val importedSongs by container.progress.importedSongs(profile.id).collectAsState(emptyList())
+    val practiceRecords by container.progress.songPractice(profile.id).collectAsState(emptyList())
+    val weeklyGoal by container.progress.weeklyGoal(profile.id).collectAsState(null)
     var query by remember { mutableStateOf("") }
     var technique by remember { mutableStateOf("All") }
+    var favoritesOnly by remember { mutableStateOf(false) }
     var selectedID by remember { mutableStateOf(content.songs.songs.firstOrNull()?.id) }
     var variationID by remember { mutableStateOf(content.songs.songs.firstOrNull()?.variations?.firstOrNull()?.id) }
     var sourceUrl by remember { mutableStateOf("") }
@@ -50,10 +55,11 @@ fun SongLibraryScreen(content: ContentBundle, profile: StudentProfileEntity, con
     var renameID by remember { mutableStateOf<String?>(null) }
     var renameName by remember { mutableStateOf("") }
 
-    val songs = remember(content, query, technique) {
+    val songs = remember(content, query, technique, favoritesOnly, practiceRecords) {
         val term = query.trim().lowercase()
         content.songs.songs.filter { song ->
             (technique == "All" || song.variations.any { it.technique == technique }) &&
+                (!favoritesOnly || practiceRecords.any { it.songId == song.id && it.favorite }) &&
                 (term.isEmpty() || listOf(song.title, song.artist, song.source, song.key, song.timeSignature, song.tags.joinToString()).joinToString(" ").lowercase().contains(term))
         }
     }
@@ -63,9 +69,10 @@ fun SongLibraryScreen(content: ContentBundle, profile: StudentProfileEntity, con
     FeatureList("Song Library", "Search fifty traditional songs, save local collections, and choose a practice arrangement") {
         item {
             OutlinedTextField(query, { query = it }, label = { Text("Search title, artist, or tag") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("All", "strumming", "fingerpicking", "plectrum").forEach { value -> FilterChip(technique == value, { technique = value }, { Text(if (value == "All") "All" else value.replaceFirstChar { it.uppercase() }) }) } }
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { listOf("All", "strumming", "fingerpicking", "plectrum").forEach { value -> FilterChip(technique == value, { technique = value }, { Text(if (value == "All") "All" else value.replaceFirstChar { it.uppercase() }) }) }; FilterChip(favoritesOnly, { favoritesOnly = !favoritesOnly }, { Text("Favorites") }) }
         }
-        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = { scope.launch { container.progress.saveSongLibrary(SongLibraryEntity(profileId = profile.id, name = "My Songs ${collections.size + 1}")) } }) { Text("New library") }; Text("${songs.size} results", modifier = Modifier.alignByBaseline()) } }
+        item { Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(onClick = { scope.launch { container.progress.saveSongLibrary(SongLibraryEntity(profileId = profile.id, name = "My Songs ${collections.size + 1}")) } }) { Text("New library") }; OutlinedButton(onClick = { scope.launch { container.progress.saveSongLibrary(SongLibraryEntity(profileId = profile.id, name = "Practice queue ${collections.size + 1}", isQueue = true)) } }) { Text("New queue") }; Text("${songs.size} results", modifier = Modifier.alignByBaseline()) } }
+        item { Card(Modifier.fillMaxWidth()) { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { Text("Weekly practice goal", style = MaterialTheme.typography.titleMedium); Text("${weeklyGoal?.completedSessions ?: 0} / ${weeklyGoal?.targetSessions ?: 3} sessions"); Button(onClick = { scope.launch { val current = weeklyGoal ?: WeeklyPracticeGoalEntity(profile.id, java.time.LocalDate.now().with(java.time.DayOfWeek.MONDAY).toString()); container.progress.saveWeeklyGoal(current.copy(completedSessions = minOf(current.targetSessions, current.completedSessions + 1))) } }) { Text("Log practice session") } } } }
         if (collections.isNotEmpty()) item { Card(Modifier.fillMaxWidth()) { Column(verticalArrangement = Arrangement.spacedBy(6.dp)) { Text("Your collections", style = MaterialTheme.typography.titleMedium); collections.forEach { collection -> Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) { if (renameID == collection.id) { OutlinedTextField(renameName, { renameName = it }, label = { Text("Name") }, modifier = Modifier.weight(1f), singleLine = true); Button(onClick = { scope.launch { container.progress.saveSongLibrary(collection.copy(name = renameName.ifBlank { collection.name }, updatedAt = System.currentTimeMillis())); renameID = null } }) { Text("Save") } } else { Text("${collection.name} · ${collection.songIds.size} songs", modifier = Modifier.weight(1f)); OutlinedButton(onClick = { renameID = collection.id; renameName = collection.name }) { Text("Rename") }; OutlinedButton(onClick = { scope.launch { container.progress.deleteSongLibrary(collection.id) } }) { Text("Delete") } } } } } } }
         if (songs.isEmpty()) item { Text("No songs match these filters. Clear a filter or try another search.") }
         else items(songs, key = { it.id }) { song -> OutlinedButton(onClick = { selectedID = song.id; variationID = song.variations.firstOrNull()?.id }, modifier = Modifier.fillMaxWidth()) { Text("${song.title} · ${song.artist} · ${song.timeSignature}") } }
@@ -75,7 +82,8 @@ fun SongLibraryScreen(content: ContentBundle, profile: StudentProfileEntity, con
                     song.variations.forEach { item -> FilterChip(variation?.id == item.id, { variationID = item.id }, { Text("${item.name} · ${item.technique}") }) }
                     Text(variation?.pattern ?: song.strumPattern, style = MaterialTheme.typography.titleMedium); Text(variation?.feel ?: song.strumFeel)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Button(onClick = { variation?.let { onOpenSong(song.id, it.id) } }) { Text("Open Song Coach") }
+                        Button(onClick = { variation?.let { val existing = practiceRecords.firstOrNull { record -> record.songId == song.id }; scope.launch { container.progress.saveSongPractice((existing ?: SongPracticeEntity(profile.id, song.id)).copy(variationId = it.id, practiceCount = (existing?.practiceCount ?: 0) + 1, lastPracticedAt = System.currentTimeMillis())); onOpenSong(song.id, it.id) } } }) { Text("Open Song Coach") }
+                        OutlinedButton(onClick = { val existing = practiceRecords.firstOrNull { record -> record.songId == song.id }; scope.launch { container.progress.saveSongPractice((existing ?: SongPracticeEntity(profile.id, song.id)).copy(favorite = !(existing?.favorite ?: false))) } }) { Text(if (practiceRecords.firstOrNull { it.songId == song.id }?.favorite == true) "★ Favorite" else "☆ Favorite") }
                         OutlinedButton(onClick = {
                             scope.launch {
                                 val target = collections.firstOrNull() ?: SongLibraryEntity(profileId = profile.id, name = "My Songs").also { created -> container.progress.saveSongLibrary(created) }
@@ -89,7 +97,7 @@ fun SongLibraryScreen(content: ContentBundle, profile: StudentProfileEntity, con
                 } }
             }
         }
-        item { Text("Ultimate Guitar source link", style = MaterialTheme.typography.titleLarge); Text("Browse the original site, then save metadata and a link locally. Full offline tab/lyric import requires an authorized provider.", color = MaterialTheme.colorScheme.onSurfaceVariant); OutlinedTextField(sourceUrl, { sourceUrl = it }, label = { Text("Source URL") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(sourceTitle, { sourceTitle = it }, label = { Text("Song title") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(sourceArtist, { sourceArtist = it }, label = { Text("Artist") }, modifier = Modifier.fillMaxWidth()); Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(enabled = sourceUrl.isNotBlank(), onClick = { scope.launch { container.progress.saveImportedSong(ImportedSongEntity(profileId = profile.id, title = sourceTitle.ifBlank { "Imported song" }, artist = sourceArtist.ifBlank { "Unknown artist" }, sourceUrl = sourceUrl)); message = "Source link saved." } }) { Text("Save source link") }; OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.ultimate-guitar.com/search.php?search_type=title&value=${Uri.encode(query)}"))) }) { Text("Browse UG") } } }
+        item { Text("Ultimate Guitar source link", style = MaterialTheme.typography.titleLarge); Text("Browse the original site, then save metadata and a link locally. Full offline tab/lyric import requires an authorized provider.", color = MaterialTheme.colorScheme.onSurfaceVariant); OutlinedTextField(sourceUrl, { sourceUrl = it }, label = { Text("Source URL") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(sourceTitle, { sourceTitle = it }, label = { Text("Song title") }, modifier = Modifier.fillMaxWidth()); OutlinedTextField(sourceArtist, { sourceArtist = it }, label = { Text("Artist") }, modifier = Modifier.fillMaxWidth()); Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) { Button(enabled = sourceUrl.isNotBlank(), onClick = { scope.launch { val title = sourceTitle.ifBlank { "Imported song" }; val artist = sourceArtist.ifBlank { "Unknown artist" }; val duplicate = importedSongs.any { it.sourceUrl.trimEnd('/') == sourceUrl.trimEnd('/') || (it.title.equals(title, true) && it.artist.equals(artist, true)) }; if (duplicate) message = "That source or song is already saved." else { container.progress.saveImportedSong(ImportedSongEntity(profileId = profile.id, title = title, artist = artist, sourceUrl = sourceUrl)); message = "Source link saved." } } }) { Text("Save source link") }; OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://www.ultimate-guitar.com/search.php?search_type=title&value=${Uri.encode(query)}"))) }) { Text("Browse UG") } } }
         if (importedSongs.isNotEmpty()) item { Text("Saved source links", style = MaterialTheme.typography.titleMedium); importedSongs.forEach { song -> OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(song.sourceUrl))) }, modifier = Modifier.fillMaxWidth()) { Text("${song.title} · ${song.artist}") } } }
     }
 }

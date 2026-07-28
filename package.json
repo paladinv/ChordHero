@@ -6,15 +6,18 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
+    "sync-server": "node server/syncServer.mjs",
     "lint": "next lint",
     "content:export": "node scripts/export-shared-content.mjs",
-    "content:validate": "node scripts/validate-shared-content.mjs"
+    "content:validate": "node scripts/validate-shared-content.mjs",
+    "song-library:compatibility": "node scripts/validate-song-library-compatibility.mjs"
   },
   "dependencies": {
     "next": "^14.2.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "source-map-js": "^1.2.0"
+    "source-map-js": "^1.2.0",
+    "ws": "^8.21.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",

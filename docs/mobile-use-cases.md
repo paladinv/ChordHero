@@ -25,7 +25,7 @@ This catalogue is the product contract for the native iOS 17+ app and the later 
 
 ## Right-Hand Studio
 
-- **UC-20:** Filter all 30 exercises by technique and difficulty.
+- **UC-20:** Filter all 36 exercises by technique and difficulty.
 - **UC-21:** View focus, coaching, subdivision, pattern, and default tempo.
 - **UC-22:** Start/pause a continuously looping follow-along pattern.
 - **UC-23:** Display direction, string/finger, count, accent, mute, and rest state.
@@ -91,7 +91,7 @@ This catalogue is the product contract for the native iOS 17+ app and the later 
 
 | Test area | Required assertions |
 | --- | --- |
-| Shared content | Chords/right-hand/settings schema v1 and songs schema v2; stable IDs; valid six-string arrays, frets, fingers, barres, song sections, and variations; 346 chords, 4 levels, 4 packs, 30 exercises, 50 songs, 150 variations, and 4 tunings. |
+| Shared content | Chords/right-hand/settings schema v1 and songs schema v2; stable IDs; valid six-string arrays, frets, fingers, barres, song sections, and variations; 346 chords, 4 levels, 4 packs, 36 exercises, 50 songs, 150 variations, and 4 tunings. |
 | Chord rules | Stable lookups; base fret/barre rendering; capo transposition; tuning/pitch-class mapping; shared-note heatmap. |
 | Trainer | Immediate first chord; three-second deadlines; ten-item cap; no adjacent duplicate; pause/resume/reset; manual and capped automatic progression. |
 | Right hand | Subdivision interval math; step interpretation; loop wrap; tempo changes; cancellation on selection/filter change. |

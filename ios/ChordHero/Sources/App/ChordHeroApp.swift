@@ -5,6 +5,7 @@ import SwiftUI
 struct ChordHeroApp: App {
     @StateObject private var contentStore = ContentStore()
     @StateObject private var audio = SynthAudioService()
+    @StateObject private var recorder = SongRecorderService()
     @StateObject private var midi = MIDIService()
     private let container: ModelContainer
 
@@ -14,10 +15,10 @@ struct ChordHeroApp: App {
                 .appendingPathComponent("ChordHero", isDirectory: true)
             try FileManager.default.createDirectory(at: support, withIntermediateDirectories: true)
             let configuration = ModelConfiguration(url: support.appendingPathComponent("ChordHero.store"))
-            container = try ModelContainer(for: StudentProfile.self, ChordProgress.self, CustomPracticePack.self, SongLibraryCollection.self, ImportedSongRecord.self, configurations: configuration)
+            container = try ModelContainer(for: StudentProfile.self, ChordProgress.self, CustomPracticePack.self, SongLibraryCollection.self, ImportedSongRecord.self, SongPracticeRecord.self, SongQueueHistory.self, WeeklyPracticeGoal.self, SongRecordingRecord.self, configurations: configuration)
         } catch {
             let fallback = ModelConfiguration(isStoredInMemoryOnly: true)
-            container = try! ModelContainer(for: StudentProfile.self, ChordProgress.self, CustomPracticePack.self, SongLibraryCollection.self, ImportedSongRecord.self, configurations: fallback)
+            container = try! ModelContainer(for: StudentProfile.self, ChordProgress.self, CustomPracticePack.self, SongLibraryCollection.self, ImportedSongRecord.self, SongPracticeRecord.self, SongQueueHistory.self, WeeklyPracticeGoal.self, SongRecordingRecord.self, configurations: fallback)
         }
     }
 
@@ -26,6 +27,7 @@ struct ChordHeroApp: App {
             RootView()
                 .environmentObject(contentStore)
                 .environmentObject(audio)
+                .environmentObject(recorder)
                 .environmentObject(midi)
         }
         .modelContainer(container)

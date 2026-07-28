@@ -65,6 +65,9 @@ data class SongLibraryEntity(
     val songIds: List<String> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis(),
+    val isQueue: Boolean = false,
+    val resumeSongId: String? = null,
+    val resumeVariationId: String? = null,
 )
 
 @Entity(tableName = "imported_song_records")
@@ -76,6 +79,47 @@ data class ImportedSongEntity(
     val sourceUrl: String,
     val notes: String = "",
     val importedAt: Long = System.currentTimeMillis(),
+)
+
+@Entity(tableName = "song_practice_records", primaryKeys = ["profileId", "songId"])
+data class SongPracticeEntity(
+    val profileId: String,
+    val songId: String,
+    val variationId: String = "",
+    val favorite: Boolean = false,
+    val practiceCount: Int = 0,
+    val lastPracticedAt: Long? = null,
+    val sectionMasteryJson: String = "{}",
+    val streakDays: Int = 0,
+)
+
+@Entity(tableName = "song_queue_history")
+data class SongQueueHistoryEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val profileId: String,
+    val queueId: String,
+    val songIds: List<String>,
+    val completedAt: Long = System.currentTimeMillis(),
+    val lastSongId: String? = null,
+)
+
+@Entity(tableName = "weekly_practice_goals", primaryKeys = ["profileId", "weekStart"])
+data class WeeklyPracticeGoalEntity(
+    val profileId: String,
+    val weekStart: String,
+    val targetSessions: Int = 3,
+    val completedSessions: Int = 0,
+)
+
+@Entity(tableName = "song_recordings")
+data class SongRecordingEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val profileId: String,
+    val songId: String,
+    val sectionId: String? = null,
+    val filePath: String,
+    val durationMs: Long,
+    val createdAt: Long = System.currentTimeMillis(),
 )
 
 class StringListConverter {
@@ -121,9 +165,34 @@ interface ImportedSongDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insert(song: ImportedSongEntity)
 }
 
+@Dao
+interface SongPracticeDao {
+    @Query("SELECT * FROM song_practice_records WHERE profileId = :profileId") fun observe(profileId: String): Flow<List<SongPracticeEntity>>
+    @Upsert suspend fun upsert(record: SongPracticeEntity)
+}
+
+@Dao
+interface SongQueueHistoryDao {
+    @Query("SELECT * FROM song_queue_history WHERE profileId = :profileId ORDER BY completedAt DESC") fun observe(profileId: String): Flow<List<SongQueueHistoryEntity>>
+    @Insert suspend fun insert(history: SongQueueHistoryEntity)
+}
+
+@Dao
+interface WeeklyGoalDao {
+    @Query("SELECT * FROM weekly_practice_goals WHERE profileId = :profileId ORDER BY weekStart DESC LIMIT 1") fun observe(profileId: String): Flow<WeeklyPracticeGoalEntity?>
+    @Upsert suspend fun upsert(goal: WeeklyPracticeGoalEntity)
+}
+
+@Dao
+interface SongRecordingDao {
+    @Query("SELECT * FROM song_recordings WHERE profileId = :profileId ORDER BY createdAt DESC") fun observe(profileId: String): Flow<List<SongRecordingEntity>>
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insert(recording: SongRecordingEntity)
+    @Query("DELETE FROM song_recordings WHERE id = :id") suspend fun delete(id: String)
+}
+
 @Database(
-    entities = [StudentProfileEntity::class, ChordProgressEntity::class, CustomPracticePackEntity::class, SongLibraryEntity::class, ImportedSongEntity::class],
-    version = 2,
+    entities = [StudentProfileEntity::class, ChordProgressEntity::class, CustomPracticePackEntity::class, SongLibraryEntity::class, ImportedSongEntity::class, SongPracticeEntity::class, SongQueueHistoryEntity::class, WeeklyPracticeGoalEntity::class, SongRecordingEntity::class],
+    version = 4,
     exportSchema = true,
 )
 @TypeConverters(StringListConverter::class)
@@ -133,6 +202,10 @@ abstract class ChordHeroDatabase : RoomDatabase() {
     abstract fun packs(): PackDao
     abstract fun songLibraries(): SongLibraryDao
     abstract fun importedSongs(): ImportedSongDao
+    abstract fun songPractice(): SongPracticeDao
+    abstract fun songQueueHistory(): SongQueueHistoryDao
+    abstract fun weeklyGoals(): WeeklyGoalDao
+    abstract fun songRecordings(): SongRecordingDao
 
     companion object {
         fun create(context: Context): ChordHeroDatabase =
@@ -141,6 +214,21 @@ abstract class ChordHeroDatabase : RoomDatabase() {
                     override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
                         db.execSQL("CREATE TABLE IF NOT EXISTS song_library_collections (id TEXT NOT NULL PRIMARY KEY, profileId TEXT NOT NULL, name TEXT NOT NULL, description TEXT NOT NULL, songIds TEXT NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)")
                         db.execSQL("CREATE TABLE IF NOT EXISTS imported_song_records (id TEXT NOT NULL PRIMARY KEY, profileId TEXT NOT NULL, title TEXT NOT NULL, artist TEXT NOT NULL, sourceUrl TEXT NOT NULL, notes TEXT NOT NULL, importedAt INTEGER NOT NULL)")
+                    }
+                }, object : androidx.room.migration.Migration(2, 3) {
+                    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                        db.execSQL("CREATE TABLE IF NOT EXISTS song_practice_records (profileId TEXT NOT NULL, songId TEXT NOT NULL, variationId TEXT NOT NULL, favorite INTEGER NOT NULL, practiceCount INTEGER NOT NULL, lastPracticedAt INTEGER, PRIMARY KEY(profileId, songId))")
+                    }
+                }, object : androidx.room.migration.Migration(3, 4) {
+                    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                        db.execSQL("ALTER TABLE song_library_collections ADD COLUMN isQueue INTEGER NOT NULL DEFAULT 0")
+                        db.execSQL("ALTER TABLE song_library_collections ADD COLUMN resumeSongId TEXT")
+                        db.execSQL("ALTER TABLE song_library_collections ADD COLUMN resumeVariationId TEXT")
+                        db.execSQL("ALTER TABLE song_practice_records ADD COLUMN sectionMasteryJson TEXT NOT NULL DEFAULT '{}'")
+                        db.execSQL("ALTER TABLE song_practice_records ADD COLUMN streakDays INTEGER NOT NULL DEFAULT 0")
+                        db.execSQL("CREATE TABLE IF NOT EXISTS song_queue_history (id TEXT NOT NULL PRIMARY KEY, profileId TEXT NOT NULL, queueId TEXT NOT NULL, songIds TEXT NOT NULL, completedAt INTEGER NOT NULL, lastSongId TEXT)")
+                        db.execSQL("CREATE TABLE IF NOT EXISTS weekly_practice_goals (profileId TEXT NOT NULL, weekStart TEXT NOT NULL, targetSessions INTEGER NOT NULL, completedSessions INTEGER NOT NULL, PRIMARY KEY(profileId, weekStart))")
+                        db.execSQL("CREATE TABLE IF NOT EXISTS song_recordings (id TEXT NOT NULL PRIMARY KEY, profileId TEXT NOT NULL, songId TEXT NOT NULL, sectionId TEXT, filePath TEXT NOT NULL, durationMs INTEGER NOT NULL, createdAt INTEGER NOT NULL)")
                     }
                 }).build()
     }
@@ -163,6 +251,15 @@ interface ProgressRepository {
     suspend fun saveSongLibrary(collection: SongLibraryEntity)
     suspend fun deleteSongLibrary(id: String)
     suspend fun saveImportedSong(song: ImportedSongEntity)
+    fun songPractice(profileId: String): Flow<List<SongPracticeEntity>>
+    suspend fun saveSongPractice(record: SongPracticeEntity)
+    fun songQueueHistory(profileId: String): Flow<List<SongQueueHistoryEntity>>
+    suspend fun addSongQueueHistory(history: SongQueueHistoryEntity)
+    fun weeklyGoal(profileId: String): Flow<WeeklyPracticeGoalEntity?>
+    suspend fun saveWeeklyGoal(goal: WeeklyPracticeGoalEntity)
+    fun songRecordings(profileId: String): Flow<List<SongRecordingEntity>>
+    suspend fun saveSongRecording(recording: SongRecordingEntity)
+    suspend fun deleteSongRecording(id: String)
 }
 
 class RoomProgressRepository(private val db: ChordHeroDatabase) : ProgressRepository {
@@ -215,4 +312,13 @@ class RoomProgressRepository(private val db: ChordHeroDatabase) : ProgressReposi
     override suspend fun saveSongLibrary(collection: SongLibraryEntity) = db.songLibraries().upsert(collection.copy(songIds = collection.songIds.distinct()))
     override suspend fun deleteSongLibrary(id: String) = db.songLibraries().delete(id)
     override suspend fun saveImportedSong(song: ImportedSongEntity) = db.importedSongs().insert(song)
+    override fun songPractice(profileId: String): Flow<List<SongPracticeEntity>> = db.songPractice().observe(profileId)
+    override suspend fun saveSongPractice(record: SongPracticeEntity) = db.songPractice().upsert(record)
+    override fun songQueueHistory(profileId: String) = db.songQueueHistory().observe(profileId)
+    override suspend fun addSongQueueHistory(history: SongQueueHistoryEntity) = db.songQueueHistory().insert(history)
+    override fun weeklyGoal(profileId: String) = db.weeklyGoals().observe(profileId)
+    override suspend fun saveWeeklyGoal(goal: WeeklyPracticeGoalEntity) = db.weeklyGoals().upsert(goal)
+    override fun songRecordings(profileId: String) = db.songRecordings().observe(profileId)
+    override suspend fun saveSongRecording(recording: SongRecordingEntity) = db.songRecordings().insert(recording)
+    override suspend fun deleteSongRecording(id: String) = db.songRecordings().delete(id)
 }

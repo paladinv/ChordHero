@@ -56,8 +56,10 @@ export default function ChordDiagram({ chord }: ChordDiagramProps) {
       viewBox={`0 0 ${width} ${height}`}
       className="diagram"
       role="img"
-      aria-label={`Chord diagram for ${chart.name}`}
+      aria-label={`Chord diagram for ${chart.name}. X means muted, O means open, and numbers show fingerings.`}
     >
+      <title>{`Chord diagram for ${chart.name}`}</title>
+      <desc>Six-string guitar chart. X means muted, O means open, and numbers show recommended fingers.</desc>
       <rect x="0" y="0" width={width} height={height} rx="18" className="diagram-bg" />
 
       {Array.from({ length: STRING_COUNT }).map((_, index) => {
