@@ -1,4 +1,4 @@
-import type { SongLibraryState } from "./songLibrary";
+import { migrateSongLibraryState, type SongLibraryState } from "./songLibrary";
 
 function bytesToBase64(bytes: Uint8Array): string { let binary = ""; for (let index = 0; index < bytes.length; index += 0x8000) binary += String.fromCharCode(...bytes.subarray(index, index + 0x8000)); return btoa(binary); }
 function base64ToBytes(value: string): Uint8Array { return Uint8Array.from(atob(value), (character) => character.charCodeAt(0)); }
@@ -15,7 +15,7 @@ export async function decryptLibraryBackup(payload: string, password: string): P
   const encrypted = JSON.parse(payload); const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
   const key = await crypto.subtle.deriveKey({ name: "PBKDF2", salt: base64ToBytes(encrypted.salt) as unknown as BufferSource, iterations: 120000, hash: "SHA-256" }, material, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
   const plaintext = await crypto.subtle.decrypt({ name: "AES-GCM", iv: base64ToBytes(encrypted.iv) as unknown as BufferSource }, key, base64ToBytes(encrypted.ciphertext) as unknown as BufferSource);
-  const state = JSON.parse(new TextDecoder().decode(plaintext)); if (state?.version !== 1 || !Array.isArray(state.songs) || !Array.isArray(state.collections)) throw new Error("Invalid library backup"); return state as SongLibraryState;
+  const state = migrateSongLibraryState(JSON.parse(new TextDecoder().decode(plaintext))); if (!state.songs.length && !state.collections.length) throw new Error("Invalid library backup"); return state;
 }
 
 /**

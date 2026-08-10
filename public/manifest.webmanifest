@@ -1,0 +1,17 @@
+{
+  "name": "Chord Hero Practice Studio",
+  "short_name": "Chord Hero",
+  "description": "Offline-first chord, song, and right-hand guitar practice.",
+  "start_url": "/practice",
+  "display": "standalone",
+  "background_color": "#f7f1e8",
+  "theme_color": "#1f7a74",
+  "icons": [
+    { "src": "/chord-hero-logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Daily plan", "url": "/practice" },
+    { "name": "Right-hand studio", "url": "/right-hand" },
+    { "name": "Chord trainer", "url": "/trainer" }
+  ]
+}

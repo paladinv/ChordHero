@@ -2,10 +2,14 @@ import "./globals.css";
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
+import AppEnhancements from "../components/AppEnhancements";
 
 export const metadata: Metadata = {
   title: "Chord Hero",
-  description: "Focused guitar chord practice tools for fast changes, songs, and voicing study."
+  description: "Focused guitar chord practice tools for fast changes, songs, and voicing study.",
+  manifest: "/manifest.webmanifest",
+  themeColor: "#1f7a74",
+  appleWebApp: { capable: true, title: "Chord Hero", statusBarStyle: "default" }
 };
 
 export default function RootLayout({
@@ -29,6 +33,7 @@ export default function RootLayout({
           </Link>
           <nav className="site-nav">
             <Link href="/">Home</Link>
+            <Link href="/practice">Daily Plan</Link>
             <Link href="/trainer">Trainer</Link>
             <Link href="/right-hand">Right Hand</Link>
             <Link href="/songs">Songs</Link>
@@ -39,6 +44,7 @@ export default function RootLayout({
           </nav>
         </header>
         {children}
+        <AppEnhancements />
         <footer className="site-footer">
           <strong>License:</strong> GNU GPL v3.0. You are free to share and adapt this project
           under the terms of the GPL-3.0 license.

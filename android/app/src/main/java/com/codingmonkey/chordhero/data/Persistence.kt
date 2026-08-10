@@ -68,6 +68,12 @@ data class SongLibraryEntity(
     val isQueue: Boolean = false,
     val resumeSongId: String? = null,
     val resumeVariationId: String? = null,
+    val targetDurationMinutes: Int = 30,
+    val capoChangesJson: String = "[]",
+    val tuningChangesJson: String = "[]",
+    val archivedAt: Long? = null,
+    val transitionBreakSeconds: Int = 30,
+    val localRole: String = "owner",
 )
 
 @Entity(tableName = "imported_song_records")
@@ -79,6 +85,7 @@ data class ImportedSongEntity(
     val sourceUrl: String,
     val notes: String = "",
     val importedAt: Long = System.currentTimeMillis(),
+    val archivedAt: Long? = null,
 )
 
 @Entity(tableName = "song_practice_records", primaryKeys = ["profileId", "songId"])
@@ -91,6 +98,35 @@ data class SongPracticeEntity(
     val lastPracticedAt: Long? = null,
     val sectionMasteryJson: String = "{}",
     val streakDays: Int = 0,
+    val nextReviewAt: Long? = null,
+    val simplifyMode: Boolean = false,
+    val adaptiveOverrideJson: String? = null,
+    val targetTempo: Int? = null,
+)
+
+@Entity(tableName = "song_annotations")
+data class SongAnnotationEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val profileId: String,
+    val songId: String,
+    val sectionId: String,
+    val markerChord: String? = null,
+    val markerMeasure: Int? = null,
+    val body: String,
+    val createdAt: Long = System.currentTimeMillis(),
+    val updatedAt: Long = createdAt,
+)
+
+@Entity(tableName = "song_collaborator_comments")
+data class SongCollaboratorCommentEntity(
+    @PrimaryKey val id: String = UUID.randomUUID().toString(),
+    val profileId: String,
+    val songId: String,
+    val sectionId: String? = null,
+    val body: String,
+    val authorId: String,
+    val role: String = "viewer",
+    val createdAt: Long = System.currentTimeMillis(),
 )
 
 @Entity(tableName = "song_queue_history")
@@ -120,6 +156,7 @@ data class SongRecordingEntity(
     val filePath: String,
     val durationMs: Long,
     val createdAt: Long = System.currentTimeMillis(),
+    val archivedAt: Long? = null,
 )
 
 class StringListConverter {
@@ -190,9 +227,21 @@ interface SongRecordingDao {
     @Query("DELETE FROM song_recordings WHERE id = :id") suspend fun delete(id: String)
 }
 
+@Dao
+interface SongAnnotationDao {
+    @Query("SELECT * FROM song_annotations WHERE profileId = :profileId ORDER BY updatedAt DESC") fun observe(profileId: String): Flow<List<SongAnnotationEntity>>
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun upsert(annotation: SongAnnotationEntity)
+}
+
+@Dao
+interface SongCommentDao {
+    @Query("SELECT * FROM song_collaborator_comments WHERE profileId = :profileId ORDER BY createdAt DESC") fun observe(profileId: String): Flow<List<SongCollaboratorCommentEntity>>
+    @Insert(onConflict = OnConflictStrategy.REPLACE) suspend fun insert(comment: SongCollaboratorCommentEntity)
+}
+
 @Database(
-    entities = [StudentProfileEntity::class, ChordProgressEntity::class, CustomPracticePackEntity::class, SongLibraryEntity::class, ImportedSongEntity::class, SongPracticeEntity::class, SongQueueHistoryEntity::class, WeeklyPracticeGoalEntity::class, SongRecordingEntity::class],
-    version = 4,
+    entities = [StudentProfileEntity::class, ChordProgressEntity::class, CustomPracticePackEntity::class, SongLibraryEntity::class, ImportedSongEntity::class, SongPracticeEntity::class, SongQueueHistoryEntity::class, WeeklyPracticeGoalEntity::class, SongRecordingEntity::class, SongAnnotationEntity::class, SongCollaboratorCommentEntity::class],
+    version = 6,
     exportSchema = true,
 )
 @TypeConverters(StringListConverter::class)
@@ -206,6 +255,8 @@ abstract class ChordHeroDatabase : RoomDatabase() {
     abstract fun songQueueHistory(): SongQueueHistoryDao
     abstract fun weeklyGoals(): WeeklyGoalDao
     abstract fun songRecordings(): SongRecordingDao
+    abstract fun songAnnotations(): SongAnnotationDao
+    abstract fun songComments(): SongCommentDao
 
     companion object {
         fun create(context: Context): ChordHeroDatabase =
@@ -229,6 +280,26 @@ abstract class ChordHeroDatabase : RoomDatabase() {
                         db.execSQL("CREATE TABLE IF NOT EXISTS song_queue_history (id TEXT NOT NULL PRIMARY KEY, profileId TEXT NOT NULL, queueId TEXT NOT NULL, songIds TEXT NOT NULL, completedAt INTEGER NOT NULL, lastSongId TEXT)")
                         db.execSQL("CREATE TABLE IF NOT EXISTS weekly_practice_goals (profileId TEXT NOT NULL, weekStart TEXT NOT NULL, targetSessions INTEGER NOT NULL, completedSessions INTEGER NOT NULL, PRIMARY KEY(profileId, weekStart))")
                         db.execSQL("CREATE TABLE IF NOT EXISTS song_recordings (id TEXT NOT NULL PRIMARY KEY, profileId TEXT NOT NULL, songId TEXT NOT NULL, sectionId TEXT, filePath TEXT NOT NULL, durationMs INTEGER NOT NULL, createdAt INTEGER NOT NULL)")
+                    }
+                }, object : androidx.room.migration.Migration(4, 5) {
+                    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                        db.execSQL("ALTER TABLE song_library_collections ADD COLUMN targetDurationMinutes INTEGER NOT NULL DEFAULT 30")
+                        db.execSQL("ALTER TABLE song_library_collections ADD COLUMN capoChangesJson TEXT NOT NULL DEFAULT '[]'")
+                        db.execSQL("ALTER TABLE song_library_collections ADD COLUMN tuningChangesJson TEXT NOT NULL DEFAULT '[]'")
+                        db.execSQL("ALTER TABLE song_practice_records ADD COLUMN nextReviewAt INTEGER")
+                        db.execSQL("ALTER TABLE song_practice_records ADD COLUMN simplifyMode INTEGER NOT NULL DEFAULT 0")
+                        db.execSQL("CREATE TABLE IF NOT EXISTS song_annotations (id TEXT NOT NULL PRIMARY KEY, profileId TEXT NOT NULL, songId TEXT NOT NULL, sectionId TEXT NOT NULL, markerChord TEXT, markerMeasure INTEGER, body TEXT NOT NULL, createdAt INTEGER NOT NULL, updatedAt INTEGER NOT NULL)")
+                        db.execSQL("CREATE TABLE IF NOT EXISTS song_collaborator_comments (id TEXT NOT NULL PRIMARY KEY, profileId TEXT NOT NULL, songId TEXT NOT NULL, sectionId TEXT, body TEXT NOT NULL, authorId TEXT NOT NULL, role TEXT NOT NULL, createdAt INTEGER NOT NULL)")
+                    }
+                }, object : androidx.room.migration.Migration(5, 6) {
+                    override fun migrate(db: androidx.sqlite.db.SupportSQLiteDatabase) {
+                        db.execSQL("ALTER TABLE song_library_collections ADD COLUMN archivedAt INTEGER")
+                        db.execSQL("ALTER TABLE song_library_collections ADD COLUMN transitionBreakSeconds INTEGER NOT NULL DEFAULT 30")
+                        db.execSQL("ALTER TABLE song_library_collections ADD COLUMN localRole TEXT NOT NULL DEFAULT 'owner'")
+                        db.execSQL("ALTER TABLE imported_song_records ADD COLUMN archivedAt INTEGER")
+                        db.execSQL("ALTER TABLE song_practice_records ADD COLUMN adaptiveOverrideJson TEXT")
+                        db.execSQL("ALTER TABLE song_practice_records ADD COLUMN targetTempo INTEGER")
+                        db.execSQL("ALTER TABLE song_recordings ADD COLUMN archivedAt INTEGER")
                     }
                 }).build()
     }
@@ -260,6 +331,10 @@ interface ProgressRepository {
     fun songRecordings(profileId: String): Flow<List<SongRecordingEntity>>
     suspend fun saveSongRecording(recording: SongRecordingEntity)
     suspend fun deleteSongRecording(id: String)
+    fun songAnnotations(profileId: String): Flow<List<SongAnnotationEntity>>
+    suspend fun saveSongAnnotation(annotation: SongAnnotationEntity)
+    fun songComments(profileId: String): Flow<List<SongCollaboratorCommentEntity>>
+    suspend fun saveSongComment(comment: SongCollaboratorCommentEntity)
 }
 
 class RoomProgressRepository(private val db: ChordHeroDatabase) : ProgressRepository {
@@ -321,4 +396,8 @@ class RoomProgressRepository(private val db: ChordHeroDatabase) : ProgressReposi
     override fun songRecordings(profileId: String) = db.songRecordings().observe(profileId)
     override suspend fun saveSongRecording(recording: SongRecordingEntity) = db.songRecordings().insert(recording)
     override suspend fun deleteSongRecording(id: String) = db.songRecordings().delete(id)
+    override fun songAnnotations(profileId: String): Flow<List<SongAnnotationEntity>> = db.songAnnotations().observe(profileId)
+    override suspend fun saveSongAnnotation(annotation: SongAnnotationEntity) = db.songAnnotations().upsert(annotation)
+    override fun songComments(profileId: String): Flow<List<SongCollaboratorCommentEntity>> = db.songComments().observe(profileId)
+    override suspend fun saveSongComment(comment: SongCollaboratorCommentEntity) = db.songComments().insert(comment)
 }

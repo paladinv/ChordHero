@@ -1,5 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
+import { validateHarmonicNotes } from "./validate-harmonic-notes.mjs";
 
 const directory = path.join(process.cwd(), "shared/content/v1");
 const read = (name) => JSON.parse(fs.readFileSync(path.join(directory, name), "utf8"));
@@ -65,4 +66,6 @@ for (const song of songs.songs) {
 if (songs.songs.length !== 50) fail(`Expected 50 songs, found ${songs.songs.length}`);
 if (settings.tunings.length !== 4) fail("Expected four tunings");
 
-console.log("Shared content is valid: 346 chords, 4 levels, 4 packs, 36 exercises, 50 songs, 4 tunings.");
+const harmonicReport = validateHarmonicNotes(chords.chordLibrary);
+
+console.log(`Shared content is valid: 346 chords, 4 levels, 4 packs, 36 exercises, 50 songs, 4 tunings. Harmonic coverage: ${harmonicReport.complete} complete, ${harmonicReport.partial} intentional/partial, ${harmonicReport.bassWarnings} bass-label warnings.`);

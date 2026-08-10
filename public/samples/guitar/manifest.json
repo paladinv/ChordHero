@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "fallbackRootDirectory": "/samples/guitar",
+  "voices": {
+    "steel": { "fallbackVoice": "clean", "articulations": { "strum": [{ "minVelocity": 0, "maxVelocity": 0.55, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/steel/strum/soft/{midi}.wav" }, { "minVelocity": 0.56, "maxVelocity": 1, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/steel/strum/hard/{midi}.wav" }], "arpeggio": [{ "minVelocity": 0, "maxVelocity": 0.55, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/steel/arpeggio/soft/{midi}.wav" }, { "minVelocity": 0.56, "maxVelocity": 1, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/steel/arpeggio/hard/{midi}.wav" }] } },
+    "nylon": { "fallbackVoice": "clean", "articulations": { "strum": [{ "minVelocity": 0, "maxVelocity": 0.55, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/nylon/strum/soft/{midi}.wav" }, { "minVelocity": 0.56, "maxVelocity": 1, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/nylon/strum/hard/{midi}.wav" }], "arpeggio": [{ "minVelocity": 0, "maxVelocity": 0.55, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/nylon/arpeggio/soft/{midi}.wav" }, { "minVelocity": 0.56, "maxVelocity": 1, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/nylon/arpeggio/hard/{midi}.wav" }] } },
+    "muted": { "fallbackVoice": "muted", "articulations": { "strum": [{ "minVelocity": 0, "maxVelocity": 1, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/muted/strum/{midi}.wav" }], "arpeggio": [{ "minVelocity": 0, "maxVelocity": 1, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/muted/arpeggio/{midi}.wav" }] } },
+    "picked": { "fallbackVoice": "clean", "articulations": { "strum": [{ "minVelocity": 0, "maxVelocity": 0.55, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/picked/strum/soft/{midi}.wav" }, { "minVelocity": 0.56, "maxVelocity": 1, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/picked/strum/hard/{midi}.wav" }], "arpeggio": [{ "minVelocity": 0, "maxVelocity": 0.55, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/picked/arpeggio/soft/{midi}.wav" }, { "minVelocity": 0.56, "maxVelocity": 1, "pathTemplate": "/samples/guitar/per-voicing/{voicing}/picked/arpeggio/hard/{midi}.wav" }] } }
+  },
+  "voicings": {}
+}

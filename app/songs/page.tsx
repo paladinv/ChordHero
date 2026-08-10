@@ -5,7 +5,7 @@ import ChordDiagram from "../../components/ChordDiagram";
 import { CHORD_LOOKUP } from "../../lib/chords";
 import { playRecordedClick } from "../../lib/recordedAudio";
 import sharedSongContent from "../../shared/content/v1/songs.json";
-import { transposeChord } from "../../lib/songLibrary";
+import { readSongLibraryState, simplifyChord, transposeChord } from "../../lib/songLibrary";
 
 type Song = {
   id?: string;
@@ -27,6 +27,8 @@ type Song = {
 type SongVariation = { id: string; name: string; technique: string; key: string; timeSignature: string; bpm: number; tuningId: string; capo: number; pattern: string; feel: string };
 type VoiceRecognition = { continuous: boolean; lang: string; onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; start: () => void; stop: () => void };
 type VoiceRecognitionConstructor = new () => VoiceRecognition;
+type WebMidiInput = { name?: string; onmidimessage: ((event: { data?: Uint8Array }) => void) | null };
+type WebMidiAccess = { inputs: Map<string, WebMidiInput> };
 
 type SharedSong = Omit<Song, "chords" | "strumPattern" | "strumFeel"> & { id: string; sections: { id: string; title: string; blocks: { type: string; chords?: string[] }[] }[]; variations: SongVariation[] };
 
@@ -216,15 +218,19 @@ export default function SongsPage() {
   const [transpose, setTranspose] = useState(0);
   const [largePrint, setLargePrint] = useState(false);
   const [handsFree, setHandsFree] = useState(false);
+  const [simplifyMode, setSimplifyMode] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState("");
+  const [midiStatus, setMidiStatus] = useState("MIDI pedal not connected");
   const [loopSectionId, setLoopSectionId] = useState<string | null>(null);
+  const [setlistSongIds, setSetlistSongIds] = useState<string[]>([]);
 
   const songTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
+  const midiCleanupRef = useRef<(() => void) | null>(null);
 
   const activeSong = SONGS[songIndex];
   const activeVariation = activeSong.variations?.find((variation) => variation.id === variationId) ?? activeSong.variations?.[0];
-  const displayedChords = activeSong.chords.map((chord) => transposeChord(chord, transpose));
+  const displayedChords = activeSong.chords.map((chord) => transposeChord(simplifyMode ? simplifyChord(chord) : chord, transpose));
   const sectionRanges = useMemo(() => {
     let cursor = 0;
     return (activeSong.sections ?? []).map((section) => { const length = section.blocks.flatMap((block) => block.type === "chords" ? block.chords ?? [] : []).length; const range = { ...section, start: cursor, end: Math.max(cursor, cursor + length - 1) }; cursor += length; return range; });
@@ -245,6 +251,8 @@ export default function SongsPage() {
     const requestedSongId = params.get("songId");
     const nextIndex = Math.max(0, SONGS.findIndex((song) => song.id === requestedSongId));
     const requestedVariationId = params.get("variationId");
+    const requestedSetlistId = params.get("setlistId");
+    if (requestedSetlistId) setSetlistSongIds(readSongLibraryState().setlists.find((setlist) => setlist.id === requestedSetlistId)?.entries.map((entry) => entry.songId) ?? []);
     if (requestedSongId && SONGS[nextIndex]) {
       setSongIndex(nextIndex);
       setSongTempoBpm(SONGS[nextIndex].bpm);
@@ -252,6 +260,7 @@ export default function SongsPage() {
       setTranspose(Number(params.get("transpose") ?? 0));
       setLargePrint(params.get("largePrint") === "1");
       setHandsFree(params.get("handsFree") === "1");
+      setSimplifyMode(params.get("simplify") === "1");
     }
   }, []);
 
@@ -271,6 +280,33 @@ export default function SongsPage() {
     } else setVoiceStatus("Use Space to pause/resume; voice control is unavailable.");
     return () => { window.removeEventListener("keydown", handleKey); try { recognition?.stop(); } catch { /* no-op */ } };
   }, [handsFree, resetSong]);
+
+  const enableMidi = useCallback(async () => {
+    const requestMidi = (navigator as Navigator & { requestMIDIAccess?: () => Promise<WebMidiAccess> }).requestMIDIAccess;
+    if (!requestMidi) { setMidiStatus("Web MIDI is unavailable in this browser."); return; }
+    try {
+      const access = await requestMidi.call(navigator);
+      const inputs = [...access.inputs.values()];
+      const onMessage = (event: { data?: Uint8Array }) => { const data = event.data ?? new Uint8Array(); const status = data[0] & 0xf0; const note = data[1]; if (status !== 0x90 || !data[2]) return; if (note === 60) setSongStatus((value) => value === "running" || value === "countin" ? "paused" : "running"); else if (note === 62) setSongStep((value) => Math.min(value + 1, displayedChords.length - 1)); else if (note === 64) resetSong(); };
+      inputs.forEach((input) => { input.onmidimessage = onMessage; });
+      midiCleanupRef.current = () => inputs.forEach((input) => { input.onmidimessage = null; });
+      setMidiStatus(inputs.length ? `${inputs.length} MIDI input${inputs.length === 1 ? "" : "s"} ready · C4 play/pause · D4 next · E4 reset` : "MIDI access granted; no inputs found.");
+    } catch { setMidiStatus("MIDI permission was not granted."); }
+  }, [displayedChords.length, resetSong]);
+
+  useEffect(() => () => { midiCleanupRef.current?.(); }, []);
+
+  const advanceToNextSong = () => {
+    const setlistPosition = setlistSongIds.indexOf(activeSong?.id ?? "");
+    const queuedSongId: string | undefined = setlistPosition >= 0 && setlistSongIds.length > 0 ? setlistSongIds[(setlistPosition + 1) % setlistSongIds.length] : undefined;
+    const queuedIndex = queuedSongId === undefined ? -1 : SONGS.findIndex((song) => song.id === queuedSongId);
+    const nextIndex = queuedIndex >= 0 ? queuedIndex : (songIndex + 1) % SONGS.length;
+    setSongIndex(nextIndex);
+    setSongTempoBpm(SONGS[nextIndex]?.bpm ?? 90);
+    setVariationId(SONGS[nextIndex]?.variations?.[0]?.id ?? "");
+    setTranspose(0);
+    resetSong();
+  };
 
   const ensureAudioContext = useCallback(async () => {
     if (!audioContextRef.current) {
@@ -479,8 +515,10 @@ export default function SongsPage() {
                 {metronomeOn ? "Metronome on" : "Metronome off"}
               </button>
               <button className={`btn ${handsFree ? "primary" : ""}`} onClick={() => setHandsFree((value) => !value)} aria-pressed={handsFree}>{handsFree ? "Hands-free on" : "Hands-free mode"}</button>
+              <button className="btn" onClick={() => void enableMidi()}>Connect MIDI pedal</button>
+              <button className="btn" onClick={() => window.print()}>Print lead sheet</button>
             </div>
-            {handsFree && <p className="muted" role="status">{voiceStatus || "Space pauses/resumes. Say start, pause, resume, or reset."}</p>}
+            {(handsFree || midiStatus !== "MIDI pedal not connected") && <p className="muted" role="status">{voiceStatus || "Space pauses/resumes. Say start, pause, resume, or reset."} · {midiStatus}</p>}
             <div className="song-guidance">
               <div className="song-guidance-card">
                 <span className="label">Strumming pattern</span>
@@ -533,6 +571,7 @@ export default function SongsPage() {
                 </span>
               ))}
             </div>
+            {songStatus === "paused" && <button className="btn primary next-song-button" type="button" onClick={advanceToNextSong}>Launch next song · {SONGS[(songIndex + 1) % SONGS.length]?.title}</button>}
           </div>
         </div>
       </section>

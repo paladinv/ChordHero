@@ -10,7 +10,11 @@
     "lint": "next lint",
     "content:export": "node scripts/export-shared-content.mjs",
     "content:validate": "node scripts/validate-shared-content.mjs",
-    "song-library:compatibility": "node scripts/validate-song-library-compatibility.mjs"
+    "harmony:validate": "node --experimental-strip-types scripts/validate-harmony.mjs",
+    "song-library:compatibility": "node scripts/validate-song-library-compatibility.mjs",
+    "ci:performance": "node scripts/check-performance-budget.mjs",
+    "ci:visual": "node scripts/check-visual-regression.mjs",
+    "ci:quality": "npm run content:validate && npm run build && npm run ci:performance && npm run ci:visual"
   },
   "dependencies": {
     "next": "^14.2.0",

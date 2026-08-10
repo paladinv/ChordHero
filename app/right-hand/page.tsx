@@ -1,6 +1,7 @@
 "use client";
 
 import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import {
   DIFFICULTY_DETAILS,
   RIGHT_HAND_EXERCISES,
@@ -15,6 +16,12 @@ import {
   playRecordedGuitarStep,
   preloadRightHandAudio
 } from "../../lib/recordedAudio";
+import type { RecordingAnalysis } from "../../lib/songRecordingAnalysis";
+
+const RightHandRecordingCoach = dynamic(() => import("../../components/RightHandRecordingCoach"), {
+  ssr: false,
+  loading: () => <div className="recording-coach-loading">Loading microphone coach…</div>
+});
 
 type PracticeStatus = "idle" | "countin" | "running" | "paused" | "complete";
 type SoundMode = "click" | "guitar" | "both" | "silent";
@@ -26,7 +33,12 @@ type ExerciseProgress = {
   cleanSessions: number;
   totalSeconds: number;
   lastPracticed: string;
+  cleanStreak?: number;
+  bestTimingScore?: number;
+  recentMisses?: number[];
 };
+type ClickFeel = "straight" | "swing";
+type AccentMode = "downbeat" | "two-four" | "pattern";
 
 const TECHNIQUES = Object.keys(TECHNIQUE_DETAILS) as RightHandTechnique[];
 const DIFFICULTIES = Object.keys(DIFFICULTY_DETAILS) as RightHandDifficulty[];
@@ -56,6 +68,33 @@ const GUIDED_PATHS = [
     exercises: ["finger-thumb", "finger-pima", "finger-pinches", "finger-travis"]
   }
 ];
+
+const PRACTICE_STORAGE_KEY = "chord-hero:practice-platform:v1";
+
+function readPracticeAudioPreferences() {
+  try {
+    const state = JSON.parse(window.localStorage.getItem(PRACTICE_STORAGE_KEY) ?? "null");
+    return {
+      audioMuted: Boolean(state?.accessibility?.audioMuted),
+      audioVolume: Number(state?.accessibility?.audioVolume) || 0.8
+    };
+  } catch {
+    return { audioMuted: false, audioVolume: 0.8 };
+  }
+}
+
+function savePracticeResult(result: {
+  area: "rightHand";
+  itemId: string;
+  title: string;
+  seconds: number;
+  score?: number;
+  misses?: number;
+  tempo?: number;
+  note?: string;
+}) {
+  void import("../../lib/practicePlatform").then(({ recordPracticeResult }) => recordPracticeResult(result));
+}
 
 function describeStep(step: string, technique: RightHandTechnique) {
   const accent = step.endsWith("!");
@@ -142,6 +181,15 @@ export default function RightHandPage() {
   const [hydrated, setHydrated] = useState(false);
   const [midiEnabled, setMidiEnabled] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready to practise");
+  const [clickFeel, setClickFeel] = useState<ClickFeel>("straight");
+  const [accentMode, setAccentMode] = useState<AccentMode>("pattern");
+  const [silentEvery, setSilentEvery] = useState(0);
+  const [troubleLoop, setTroubleLoop] = useState<{ start: number; end: number } | null>(null);
+  const [showRecordingCoach, setShowRecordingCoach] = useState(false);
+  const [customTitle, setCustomTitle] = useState("");
+  const [customPattern, setCustomPattern] = useState("");
+  const [customRoutineCount, setCustomRoutineCount] = useState(0);
+  const [voiceEnabled, setVoiceEnabled] = useState(false);
 
   const audioContextRef = useRef<AudioContext | null>(null);
   const schedulerRef = useRef<number | null>(null);
@@ -247,10 +295,16 @@ export default function RightHandPage() {
     startAt: number,
     generation: number
   ) => {
-    const stepDuration = 60 / bpm / subdivisionsPerBeat(exercise.subdivision);
+    const perBeat = subdivisionsPerBeat(exercise.subdivision);
+    const baseStepDuration = 60 / bpm / perBeat;
+    const patternIndexes = troubleLoop
+      ? Array.from({ length: troubleLoop.end - troubleLoop.start + 1 }, (_, index) => troubleLoop.start + index)
+      : exercise.pattern.map((_, index) => index);
     let nextStepTime = startAt;
     let scheduledIndex = 0;
     const sessionStart = startAt;
+    const preferences = readPracticeAudioPreferences();
+    const masterVolume = preferences.audioMuted ? 0 : preferences.audioVolume;
     statusRef.current = "running";
 
     const scheduleAhead = () => {
@@ -268,36 +322,41 @@ export default function RightHandPage() {
         }
 
         const stepOrdinal = scheduledIndex;
-        const patternIndex = stepOrdinal % exercise.pattern.length;
+        const patternIndex = patternIndexes[stepOrdinal % patternIndexes.length];
         const rawStep = exercise.pattern[patternIndex];
         const step = describeStep(rawStep, exercise.technique);
-        const isBeat = scheduledIndex % subdivisionsPerBeat(exercise.subdivision) === 0;
+        const isBeat = scheduledIndex % perBeat === 0;
+        const beatNumber = Math.floor(scheduledIndex / perBeat);
+        const isSilentGap = silentEvery > 0 && beatNumber > 0 && beatNumber % silentEvery === silentEvery - 1;
+        const metronomeAccent = accentMode === "two-four"
+          ? isBeat && beatNumber % 4 % 2 === 1
+          : accentMode === "downbeat" ? isBeat && beatNumber % 4 === 0 : step.accent || isBeat;
         const when = nextStepTime;
-
-        if (!step.rest && (soundMode === "click" || soundMode === "both")) {
-          void playRecordedClick(context, { accent: step.accent || isBeat, volume: 0.13, when });
+        if (!step.rest && !isSilentGap && masterVolume > 0 && (soundMode === "click" || soundMode === "both")) {
+          void playRecordedClick(context, { accent: metronomeAccent, volume: 0.13 * masterVolume, when });
         }
-        if (!step.rest && (soundMode === "guitar" || soundMode === "both")) {
+        if (!step.rest && masterVolume > 0 && (soundMode === "guitar" || soundMode === "both")) {
           void playRecordedGuitarStep(context, {
             token: rawStep,
             technique: exercise.technique,
             accent: step.accent,
-            volume: soundMode === "both" ? 0.15 : 0.22,
+            volume: (soundMode === "both" ? 0.15 : 0.22) * masterVolume,
             when
           });
         }
-        if (backing !== "off" && isBeat) {
-          void playRecordedBackingPulse(context, backing, when, 0.07);
+        if (backing !== "off" && isBeat && masterVolume > 0) {
+          void playRecordedBackingPulse(context, backing, when, 0.07 * masterVolume);
         }
 
         scheduleTimeout(() => {
           if (generation !== sourcesGenerationRef.current) return;
           setActiveStep(patternIndex);
-          if (patternIndex === 0 && stepOrdinal > 1) setLoopsCompleted((value) => value + 1);
+          if (stepOrdinal > 0 && stepOrdinal % patternIndexes.length === 0) setLoopsCompleted((value) => value + 1);
         }, (when - context.currentTime) * 1000);
 
         scheduledIndex += 1;
-        nextStepTime += stepDuration;
+        const swingable = clickFeel === "swing" && perBeat === 2;
+        nextStepTime += swingable ? (scheduledIndex % 2 === 1 ? baseStepDuration * 4 / 3 : baseStepDuration * 2 / 3) : baseStepDuration;
       }
     };
 
@@ -315,7 +374,7 @@ export default function RightHandPage() {
 
     scheduleAhead();
     schedulerRef.current = window.setInterval(scheduleAhead, 25);
-  }, [backing, bpm, finishSession, roundSeconds, scheduleTimeout, soundMode]);
+  }, [accentMode, backing, bpm, clickFeel, finishSession, roundSeconds, scheduleTimeout, silentEvery, soundMode, troubleLoop]);
 
   const startSession = useCallback(async () => {
     if (!selectedExercise || statusRef.current === "running" || statusRef.current === "countin") return;
@@ -339,6 +398,7 @@ export default function RightHandPage() {
 
   const selectExercise = useCallback((exercise: RightHandExercise) => {
     resetSession();
+    setTroubleLoop(null);
     setTechnique(exercise.technique);
     setDifficulty(exercise.difficulty);
     setSelectedId(exercise.id);
@@ -362,7 +422,9 @@ export default function RightHandPage() {
 
   const rateSession = useCallback((rating: Rating) => {
     if (!selectedExercise) return;
-    const nextBpm = rating === "clean" && autoRamp
+    const previousStreak = progress[selectedExercise.id]?.cleanStreak ?? 0;
+    const earnedRamp = rating === "clean" && previousStreak + 1 >= 2;
+    const nextBpm = earnedRamp && autoRamp
       ? Math.min(180, bpm + rampAmount)
       : rating === "fast"
         ? Math.max(40, bpm - 6)
@@ -381,19 +443,59 @@ export default function RightHandPage() {
           [selectedExercise.id]: {
             ...current,
             bestBpm: Math.max(current.bestBpm, bpm),
-            cleanSessions: current.cleanSessions + 1
+            cleanSessions: current.cleanSessions + 1,
+            cleanStreak: earnedRamp ? 0 : previousStreak + 1
           }
         };
       });
     }
+    if (rating !== "clean") {
+      setProgress((previous) => ({
+        ...previous,
+        [selectedExercise.id]: { ...(previous[selectedExercise.id] ?? { bestBpm: 0, sessions: 1, cleanSessions: 0, totalSeconds: roundSeconds || elapsedSeconds, lastPracticed: new Date().toISOString() }), cleanStreak: 0 }
+      }));
+    }
+    savePracticeResult({
+      area: "rightHand", itemId: selectedExercise.id, title: selectedExercise.title,
+      seconds: roundSeconds || elapsedSeconds, tempo: bpm,
+      score: rating === "clean" ? 100 : rating === "mistakes" ? 68 : 52,
+      misses: rating === "clean" ? 0 : rating === "mistakes" ? 2 : 4,
+      note: rating === "fast" ? "Tempo felt too fast." : rating === "mistakes" ? "Repeat at the same tempo." : "Self-rated clean round."
+    });
     resetSession();
     setBpm(nextBpm);
     setStatusMessage(
       rating === "clean"
-        ? autoRamp ? `Clean round. Next tempo: ${nextBpm} BPM.` : "Clean round saved."
+        ? earnedRamp && autoRamp ? `Two clean rounds. Next tempo: ${nextBpm} BPM.` : `Clean streak ${previousStreak + 1}/2. Repeat once before raising tempo.`
         : rating === "fast" ? `Tempo reduced to ${nextBpm} BPM.` : "Repeat at the same tempo."
     );
-  }, [autoRamp, bpm, elapsedSeconds, rampAmount, resetSession, roundSeconds, selectedExercise]);
+  }, [autoRamp, bpm, elapsedSeconds, progress, rampAmount, resetSession, roundSeconds, selectedExercise]);
+
+  const handleRecordingAnalysis = useCallback((analysis: RecordingAnalysis) => {
+    if (!selectedExercise) return;
+    setProgress((previous) => {
+      const current = previous[selectedExercise.id] ?? { bestBpm: 0, sessions: 0, cleanSessions: 0, totalSeconds: 0, lastPracticed: "" };
+      return { ...previous, [selectedExercise.id]: {
+        ...current,
+        bestTimingScore: Math.max(current.bestTimingScore ?? 0, analysis.timingScore),
+        recentMisses: analysis.troubleBeats.slice(0, 8),
+        lastPracticed: new Date().toISOString()
+      } };
+    });
+    savePracticeResult({
+      area: "rightHand", itemId: selectedExercise.id, title: `${selectedExercise.title} · recorded take`,
+      seconds: Math.round(analysis.durationMs / 1000), tempo: bpm, score: analysis.timingScore,
+      misses: analysis.troubleBeats.length, note: `${analysis.timingTendency}; chord-attack ${analysis.chordAttackScore}%`
+    });
+  }, [bpm, selectedExercise]);
+
+  const loopTroubleStep = useCallback((step: number) => {
+    if (!selectedExercise) return;
+    const start = Math.max(0, Math.min(step, selectedExercise.pattern.length - 1));
+    setTroubleLoop({ start, end: Math.min(selectedExercise.pattern.length - 1, start + 3) });
+    resetSession();
+    setStatusMessage(`Looping steps ${start + 1}–${Math.min(selectedExercise.pattern.length, start + 4)}.`);
+  }, [resetSession, selectedExercise]);
 
   const tapTempo = useCallback(() => {
     const now = performance.now();
@@ -425,6 +527,44 @@ export default function RightHandPage() {
     setStatusMessage("MIDI pedal enabled. Any note toggles playback.");
   }, []);
 
+  const enableVoiceControl = useCallback(() => {
+    type Recognition = { continuous: boolean; lang: string; start: () => void; stop: () => void; onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null };
+    type RecognitionConstructor = new () => Recognition;
+    const voiceWindow = window as Window & { SpeechRecognition?: RecognitionConstructor; webkitSpeechRecognition?: RecognitionConstructor };
+    const Constructor = voiceWindow.SpeechRecognition ?? voiceWindow.webkitSpeechRecognition;
+    if (!Constructor) { setStatusMessage("Voice control is not supported in this browser."); return; }
+    const recognition = new Constructor();
+    recognition.continuous = true;
+    recognition.lang = "en-US";
+    recognition.onresult = (event) => {
+      const transcript = Array.from(event.results).map((result) => result[0]?.transcript ?? "").join(" ").toLowerCase();
+      if (/\b(start|play|pause|stop)\b/.test(transcript)) togglePlaybackRef.current();
+      if (/\bfaster\b/.test(transcript)) setBpm((value) => Math.min(180, value + 2));
+      if (/\bslower\b/.test(transcript)) setBpm((value) => Math.max(40, value - 2));
+    };
+    recognition.onend = () => setVoiceEnabled(false);
+    recognition.start();
+    setVoiceEnabled(true);
+    setStatusMessage("Voice control ready: start, pause, faster, or slower.");
+  }, []);
+
+  const saveCustomRoutine = useCallback(() => {
+    if (!selectedExercise) return;
+    const tokens = customPattern.trim().split(/[\s,]+/).filter(Boolean);
+    if (!customTitle.trim() || tokens.length < 2) {
+      setStatusMessage("Name the routine and enter at least two pattern tokens.");
+      return;
+    }
+    void import("../../lib/practicePlatform").then(({ updatePracticePlatformState }) => {
+      updatePracticePlatformState((state) => ({ ...state, customRoutines: [...state.customRoutines, {
+        id: crypto.randomUUID(), title: customTitle.trim(), pattern: tokens.slice(0, 32),
+        technique: selectedExercise.technique, bpm, createdAt: new Date().toISOString()
+      }] }));
+    });
+    setCustomTitle(""); setCustomPattern(""); setCustomRoutineCount((count) => count + 1);
+    setStatusMessage("Custom routine saved to your practice workspace.");
+  }, [bpm, customPattern, customTitle, selectedExercise]);
+
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
@@ -445,6 +585,9 @@ export default function RightHandPage() {
         if (["off", "G", "C", "Am"].includes(settings.backing)) setBacking(settings.backing);
         if (typeof settings.autoRamp === "boolean") setAutoRamp(settings.autoRamp);
         if ([2, 4, 6].includes(settings.rampAmount)) setRampAmount(settings.rampAmount);
+        if (["straight", "swing"].includes(settings.clickFeel)) setClickFeel(settings.clickFeel);
+        if (["downbeat", "two-four", "pattern"].includes(settings.accentMode)) setAccentMode(settings.accentMode);
+        if ([0, 4, 8].includes(settings.silentEvery)) setSilentEvery(settings.silentEvery);
       } catch { /* Ignore malformed local data. */ }
     }
     const linkedExercise = exerciseById(params.get("exercise"));
@@ -462,6 +605,9 @@ export default function RightHandPage() {
       setBpm(Number.isFinite(savedTempo) && savedTempo >= 40 && savedTempo <= 180 ? savedTempo : initial.bpm);
     }
     setHydrated(true);
+    void import("../../lib/practicePlatform").then(({ readPracticePlatformState }) => {
+      setCustomRoutineCount(readPracticePlatformState().customRoutines.length);
+    });
   }, [hydrated]);
 
   useEffect(() => {
@@ -472,12 +618,12 @@ export default function RightHandPage() {
     window.localStorage.setItem(`chord-hero:right-hand:last:${technique}:${difficulty}`, selectedExercise.id);
     window.localStorage.setItem(`chord-hero:right-hand:tempo:${selectedExercise.id}`, String(bpm));
     window.localStorage.setItem("chord-hero:right-hand:settings", JSON.stringify({
-      roundSeconds, soundMode, backing, autoRamp, rampAmount
+      roundSeconds, soundMode, backing, autoRamp, rampAmount, clickFeel, accentMode, silentEvery
     }));
     const url = new URL(window.location.href);
     url.searchParams.set("exercise", selectedExercise.id);
     window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-  }, [activePathId, autoRamp, backing, bpm, difficulty, hydrated, progress, rampAmount, roundSeconds, selectedExercise, soundMode, technique]);
+  }, [accentMode, activePathId, autoRamp, backing, bpm, clickFeel, difficulty, hydrated, progress, rampAmount, roundSeconds, selectedExercise, silentEvery, soundMode, technique]);
 
   useEffect(() => {
     const toggle = () => {
@@ -556,7 +702,7 @@ export default function RightHandPage() {
         <div className="right-hand-session-note" aria-label="Current practice progress">
           <span className="label">Your practice</span>
           <strong>{exerciseProgress?.bestBpm ? `${exerciseProgress.bestBpm} BPM best` : "Start with control"}</strong>
-          <span>{exerciseProgress?.sessions ?? 0} rounds · {formatTime(exerciseProgress?.totalSeconds ?? 0)} practised</span>
+          <span>{exerciseProgress?.sessions ?? 0} rounds · {formatTime(exerciseProgress?.totalSeconds ?? 0)} practised{exerciseProgress?.bestTimingScore ? ` · ${exerciseProgress.bestTimingScore}% timing` : ""}</span>
         </div>
       </section>
 
@@ -678,7 +824,7 @@ export default function RightHandPage() {
               <div className="pattern-strip scroll-hint" role="list" aria-label="Follow-along pattern">
                 {describedPattern.map((step, index) => (
                   <div
-                    className={`pattern-step ${index === activeStep ? "active" : ""} ${step.accent ? "accent" : ""} ${step.rest ? "rest" : ""}`}
+                    className={`pattern-step ${index === activeStep ? "active" : ""} ${step.accent ? "accent" : ""} ${step.rest ? "rest" : ""} ${troubleLoop && index >= troubleLoop.start && index <= troubleLoop.end ? "looped" : ""}`}
                     key={`${selectedExercise.pattern[index]}-${index}`}
                     role="listitem"
                     aria-current={index === activeStep ? "step" : undefined}
@@ -746,14 +892,38 @@ export default function RightHandPage() {
           </div>
 
           <div className="practice-options">
-            <label><input type="checkbox" checked={autoRamp} onChange={(event) => setAutoRamp(event.target.checked)} /> Auto-raise after a clean round</label>
+            <label><input type="checkbox" checked={autoRamp} onChange={(event) => setAutoRamp(event.target.checked)} /> Raise tempo after two clean rounds</label>
             <select aria-label="Automatic tempo increase" value={rampAmount} onChange={(event) => setRampAmount(Number(event.target.value))} disabled={!autoRamp}>
               <option value={2}>+2 BPM</option>
               <option value={4}>+4 BPM</option>
               <option value={6}>+6 BPM</option>
             </select>
             <button type="button" className={midiEnabled ? "active" : ""} onClick={() => void enableMidi()}>{midiEnabled ? "MIDI pedal ready" : "Enable MIDI pedal"}</button>
+            <button type="button" className={voiceEnabled ? "active" : ""} onClick={enableVoiceControl}>{voiceEnabled ? "Voice ready" : "Voice control"}</button>
           </div>
+
+          <details className="advanced-practice-tools">
+            <summary>Feel, silent bars & trouble loops</summary>
+            <div className="advanced-practice-grid">
+              <label>Feel<select value={clickFeel} onChange={(event) => setClickFeel(event.target.value as ClickFeel)}><option value="straight">Straight</option><option value="swing">Swing eighths</option></select></label>
+              <label>Accents<select value={accentMode} onChange={(event) => setAccentMode(event.target.value as AccentMode)}><option value="pattern">Pattern + beat</option><option value="downbeat">Beat 1</option><option value="two-four">Beats 2 & 4</option></select></label>
+              <label>Silent-gap challenge<select value={silentEvery} onChange={(event) => setSilentEvery(Number(event.target.value))}><option value={0}>Off</option><option value={4}>Every 4th beat</option><option value={8}>Every 8th beat</option></select></label>
+              <button type="button" onClick={() => loopTroubleStep(activeStep)}>Loop current 4 steps</button>
+              {troubleLoop ? <button type="button" onClick={() => { setTroubleLoop(null); resetSession(); }}>Clear trouble loop</button> : null}
+            </div>
+            <div className="challenge-checkpoint"><strong>{loopsCompleted >= 4 ? "Checkpoint reached" : `${Math.min(loopsCompleted, 4)} / 4 clean loops`}</strong><span>{loopsCompleted >= 4 ? "Listen back or rate the round before adding speed." : "Stay relaxed through four loops; silent gaps make the checkpoint harder."}</span></div>
+          </details>
+
+          <section className="practice-safety-strip" aria-label="Technique preparation and recovery">
+            <div><span className="label">Warm up · 90 sec</span><strong>Muted strings at half tempo</strong><p>Keep the pick grip light and make the motion smaller than feels necessary.</p></div>
+            <div><span className="label">Cool down · 60 sec</span><strong>Open-hand reset</strong><p>Stop for sharp pain, numbness, or persistent tension. Shake out gently; never stretch into pain.</p></div>
+          </section>
+
+          <section className="microphone-coach-launch">
+            <div><span className="label">Microphone feedback</span><h3>Compare a short take with the target pulse.</h3><p>Permission is requested only when you start recording. The latest take stays in this browser.</p></div>
+            <button type="button" onClick={() => setShowRecordingCoach((show) => !show)}>{showRecordingCoach ? "Close coach" : "Open timing coach"}</button>
+          </section>
+          {showRecordingCoach ? <RightHandRecordingCoach bpm={bpm} subdivisionsPerBeat={subdivisionsPerBeat(selectedExercise.subdivision)} expectedSteps={selectedExercise.pattern.length} exerciseId={selectedExercise.id} onAnalysis={handleRecordingAnalysis} onLoopTrouble={loopTroubleStep} /> : null}
 
           {status === "complete" && (
             <section className="round-feedback" aria-labelledby="round-feedback-title">
@@ -770,6 +940,19 @@ export default function RightHandPage() {
             <span className="coach-mark">i</span>
             <div><span className="label">Coach&apos;s cue</span><p>{selectedExercise.coaching}</p></div>
           </div>
+
+          <details className="technique-clinic">
+            <summary>Close-up motion lesson</summary>
+            <div className="motion-storyboard" aria-label={`${selectedExercise.technique} motion demonstration`}>
+              <span><b>1</b>Set a relaxed grip</span><span><b>2</b>Move through the target string</span><span><b>3</b>Return without locking the wrist</span>
+            </div>
+            <p>The mirrored follow-along animation responds to the global left/right-handed setting. Downloadable instructor video assets are not bundled, so this offline lesson uses a lightweight animated storyboard.</p>
+          </details>
+
+          <details className="custom-routine-builder">
+            <summary>Build a custom routine · {customRoutineCount} saved</summary>
+            <div><label>Routine name<input value={customTitle} onChange={(event) => setCustomTitle(event.target.value)} placeholder="My crossing warmup" /></label><label>Pattern tokens<input value={customPattern} onChange={(event) => setCustomPattern(event.target.value)} placeholder={selectedExercise.pattern.join(" ")} /></label><button type="button" onClick={saveCustomRoutine}>Save routine</button></div>
+          </details>
 
           <details className="notation-guide">
             <summary>How to read this pattern</summary>

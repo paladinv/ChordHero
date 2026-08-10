@@ -2,6 +2,14 @@ import Link from "next/link";
 
 const dashboardCards = [
   {
+    href: "/practice",
+    eyebrow: "Recommended today",
+    title: "Daily Practice Plan",
+    symbol: "00",
+    description: "Balance chord changes, songs, and right-hand work with adaptive local recommendations.",
+    meta: ["Daily goals", "Weak-skill picks", "Shareable reports"]
+  },
+  {
     href: "/trainer",
     eyebrow: "Timed practice",
     title: "Trainer",

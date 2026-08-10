@@ -1,5 +1,6 @@
 import { Chord } from "../components/ChordDiagram";
 import sharedChordContent from "../shared/content/v1/chords.json";
+import type { HarmonicEvent, HarmonicRole, HarmonyMode } from "./harmony";
 
 export type Level = {
   name: string;
@@ -15,12 +16,12 @@ export type DifficultyTag =
   | "partial"
   | "color tone";
 
-export type HarmonicRole = "I" | "ii" | "iii" | "IV" | "V" | "vi";
-
 export type FunctionContext = {
   key: string;
   roles: HarmonicRole[];
   label: string;
+  mode?: HarmonyMode;
+  event?: HarmonicEvent;
 };
 
 export type NearbyAlternative = {
@@ -1596,6 +1597,8 @@ export const CHORD_FUNCTION_KEYS = Array.from(
 ).sort((left, right) => left.localeCompare(right));
 
 export const HARMONIC_FUNCTION_OPTIONS: HarmonicRole[] = ["I", "ii", "iii", "IV", "V", "vi"];
+
+export type { HarmonicEvent, HarmonicRole, HarmonyMode } from "./harmony";
 
 export const CHORD_LOOKUP = new Map(dedupeByName(CHORD_LIBRARY).map((chord) => [chord.name, chord]));
 

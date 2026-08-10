@@ -163,6 +163,8 @@ struct SongVariation: Codable, Identifiable, Hashable, Sendable {
     let capo: Int
     let pattern: String
     let feel: String
+    let instrument: String?
+    let tuningLabel: String?
 }
 
 struct ChordTip: Codable, Hashable, Sendable {

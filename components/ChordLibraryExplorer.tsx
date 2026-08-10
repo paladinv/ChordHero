@@ -16,7 +16,33 @@ import {
   type HarmonicRole,
   type ProgressionPack
 } from "../lib/chords";
+import {
+  analyzeChordFunction,
+  analyzeProgression,
+  getCircleOfFifths,
+  getConfusableRoles,
+  getFunctionOptions,
+  getNextRoles,
+  scoreTransition,
+  type HarmonicEvent,
+  type HarmonicFunction,
+  type HarmonyMode
+} from "../lib/harmony";
 import { loadRecordedAudio } from "../lib/recordedAudio";
+import { loadGuitarSampleManifest, selectGuitarSamplePaths, type GuitarSampleManifest, type GuitarSampleVoice } from "../lib/guitarSampleManifest";
+import { createStudentProfileSyncClient } from "../lib/profileSyncClient";
+import {
+  DEFAULT_INSTRUMENT_PROFILE,
+  createStudentProfile,
+  mergeStudentCloudStates,
+  normalizeStudentCloudState,
+  normalizeStudentProfile,
+  type InstrumentProfile,
+  type PracticeStats,
+  type StudentCloudState,
+  type StudentProfile,
+  type TeacherAssignment
+} from "../lib/studentProfile";
 import sharedSettings from "../shared/content/v1/settings.json";
 
 const RECENTS_STORAGE_KEY = "chord-hero-library-recents";
@@ -25,7 +51,10 @@ const CUSTOM_PACKS_STORAGE_KEY = "chord-hero-library-custom-packs";
 const PRACTICE_STATS_STORAGE_KEY = "chord-hero-library-practice-stats";
 const USER_NOTES_STORAGE_KEY = "chord-hero-library-user-notes";
 const STRING_MISTAKES_STORAGE_KEY = "chord-hero-library-string-mistakes";
+const EAR_MISSES_STORAGE_KEY = "chord-hero-library-ear-misses";
 const STUDENT_PROFILES_STORAGE_KEY = "chord-hero-library-student-profiles";
+const TEACHER_ASSIGNMENTS_STORAGE_KEY = "chord-hero-library-teacher-assignments";
+const DISPLAY_SETTINGS_STORAGE_KEY = "chord-hero-library-display-settings";
 const SAMPLE_BASE_PATH = "/samples/guitar";
 const RECORDED_GUITAR_ROOTS = [37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 69, 72, 75, 78, 81, 84, 86];
 const OPEN_STRING_FREQUENCIES = [82.41, 110, 146.83, 196, 246.94, 329.63];
@@ -77,7 +106,7 @@ const LEGACY_TUNINGS = [
 ] as const;
 
 const RIGHT_HAND_PATTERNS = sharedSettings.rightHandPatterns;
-const SAMPLE_VOICES = sharedSettings.sampleVoices as Array<"clean" | "warm" | "muted" | "picked">;
+const SAMPLE_VOICES = sharedSettings.sampleVoices as readonly GuitarSampleVoice[];
 const TUNINGS = sharedSettings.tunings;
 void LEGACY_RIGHT_HAND_PATTERNS;
 void LEGACY_SAMPLE_VOICES;
@@ -113,23 +142,15 @@ type SampleVoice = (typeof SAMPLE_VOICES)[number];
 type TuningId = (typeof TUNINGS)[number]["id"];
 type InversionSelection = "all" | string;
 type CustomPack = ProgressionPack & { custom: true };
-type PracticeStats = Record<
-  string,
-  { seconds: number; reps: number; misses?: number; nextReviewAt?: string; strength?: number }
->;
 type EarTarget = {
   entry: ChordLibraryItem;
   prompt: "chord" | "function";
   options: string[];
+  function: HarmonicFunction | null;
+  referenceRoles: string[];
 };
-type StudentProfile = {
-  id: string;
-  name: string;
-  favorites: string[];
-  recents: string[];
-  practiceStats: PracticeStats;
-  userNotes: Record<string, string>;
-};
+type SyncStatus = "local" | "syncing" | "synced" | "offline" | "error";
+type DisplaySettings = { handedness: "right" | "left"; highContrast: boolean; largeCharts: boolean };
 type HeatmapNote = {
   key: string;
   stringIndex: number;
@@ -250,15 +271,37 @@ const getVoiceLeadingNotes = (from: ChordLibraryItem, to: ChordLibraryItem) => {
   return changes.length ? changes.slice(0, 4) : ["Keep the same shape and focus on a clean transition."];
 };
 
+const snapshotProfile = (
+  id: string,
+  name: string,
+  values: Pick<StudentProfile, "favorites" | "recents" | "practiceStats" | "userNotes" | "stringMistakes" | "instrumentProfile">
+): StudentProfile => ({ ...values, id, name, updatedAt: new Date().toISOString() });
+
+const getPitchClasses = (chord: Chord, tuning: (typeof TUNINGS)[number]) =>
+  new Set(getChordNoteNames(chord, tuning).map((note) => NOTE_INDEX.get(note)).filter((note): note is number => typeof note === "number"));
+
+const loadFirstRecordedSample = async (context: AudioContext, paths: string[]) => {
+  for (const path of paths) {
+    const buffer = await loadRecordedAudio(context, path);
+    if (buffer) return { buffer, path };
+  }
+  return null;
+};
+
 export default function ChordLibraryExplorer() {
   const [workspace, setWorkspace] = useState<LibraryWorkspace>("browse");
-  const [libraryRoot, setLibraryRoot] = useState(DEFAULT_LIBRARY_ITEM?.root ?? "");
-  const [libraryQuality, setLibraryQuality] = useState(DEFAULT_LIBRARY_ITEM?.quality ?? "");
+  const [libraryRoot, setLibraryRoot] = useState("any");
+  const [libraryQuality, setLibraryQuality] = useState("any");
   const [libraryInversion, setLibraryInversion] = useState<InversionSelection>("all");
   const [libraryTag, setLibraryTag] = useState<"all" | DifficultyTag>("all");
   const [libraryFunctionKey, setLibraryFunctionKey] = useState<"any" | string>("G");
+  const [libraryMode, setLibraryMode] = useState<HarmonyMode>("major");
+  const [libraryHarmonicEvent, setLibraryHarmonicEvent] = useState<HarmonicEvent | "all">("all");
   const [libraryFunctionRole, setLibraryFunctionRole] = useState<"any" | HarmonicRole>("any");
   const [librarySearch, setLibrarySearch] = useState("");
+  const [progressionInput, setProgressionInput] = useState("");
+  const [progressionAnalysis, setProgressionAnalysis] = useState<ReturnType<typeof analyzeProgression> | null>(null);
+  const [earMisses, setEarMisses] = useState<Record<string, number>>({});
   const [activePackId, setActivePackId] = useState<"all" | string>("all");
   const [activeCollection, setActiveCollection] = useState<"all" | "favorites" | "recent">("all");
   const [selectedLibraryId, setSelectedLibraryId] = useState(DEFAULT_LIBRARY_ITEM?.id ?? "");
@@ -272,7 +315,8 @@ export default function ChordLibraryExplorer() {
   const [activeTimerId, setActiveTimerId] = useState<string | null>(null);
   const [userNotes, setUserNotes] = useState<Record<string, string>>({});
   const [capoFret, setCapoFret] = useState(0);
-  const [sampleVoice, setSampleVoice] = useState<SampleVoice>("clean");
+  const [sampleVoice, setSampleVoice] = useState<SampleVoice>("steel");
+  const [sampleVelocity, setSampleVelocity] = useState(0.72);
   const [tuningId, setTuningId] = useState<TuningId>("standard");
   const [teacherKey, setTeacherKey] = useState("G");
   const [teacherSkill, setTeacherSkill] = useState<"all" | DifficultyTag>("beginner");
@@ -285,7 +329,16 @@ export default function ChordLibraryExplorer() {
   const [studentProfiles, setStudentProfiles] = useState<StudentProfile[]>([]);
   const [activeStudentId, setActiveStudentId] = useState("default-student");
   const [newStudentName, setNewStudentName] = useState("");
+  const [teacherAssignments, setTeacherAssignments] = useState<TeacherAssignment[]>([]);
+  const [newAssignmentTitle, setNewAssignmentTitle] = useState("");
+  const [newAssignmentDueAt, setNewAssignmentDueAt] = useState("");
+  const [instrumentProfile, setInstrumentProfile] = useState<InstrumentProfile>({ ...DEFAULT_INSTRUMENT_PROFILE });
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>("local");
+  const [syncMessage, setSyncMessage] = useState("Local-only profile storage");
+  const [storageHydrated, setStorageHydrated] = useState(false);
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>({ handedness: "right", highContrast: false, largeCharts: false });
   const [midiStatus, setMidiStatus] = useState("MIDI not connected");
+  const [midiHeldNotes, setMidiHeldNotes] = useState<number[]>([]);
   const [fretFilter, setFretFilter] = useState<"all" | "4" | "8" | "12">("all");
   const [stringFilter, setStringFilter] = useState<"all" | "open" | "partial" | "full">("all");
   const [voicingLimit, setVoicingLimit] = useState(MAX_VISIBLE_VOICINGS);
@@ -294,6 +347,18 @@ export default function ChordLibraryExplorer() {
 
   const deferredLibrarySearch = useDeferredValue(librarySearch.trim().toLowerCase());
   const audioContextRef = useRef<AudioContext | null>(null);
+  const sampleManifestRef = useRef<GuitarSampleManifest | null>(null);
+  const profileSyncClientRef = useRef<ReturnType<typeof createStudentProfileSyncClient> | null>(null);
+  const profileSyncRevisionRef = useRef(0);
+  const profileSyncLastSignatureRef = useRef("");
+  const profileSyncTimerRef = useRef<number | null>(null);
+  const profileSyncReadyRef = useRef(false);
+  const syncCloudStateRef = useRef<StudentCloudState | null>(null);
+  const syncCloudSignatureRef = useRef("");
+  const applyCloudStateRef = useRef<(state: StudentCloudState) => void>(() => undefined);
+  const earTargetRef = useRef<EarTarget | null>(null);
+  const midiHeldNotesRef = useRef<Set<number>>(new Set());
+  const midiCleanupRef = useRef<(() => void) | null>(null);
   const allProgressionPacks = useMemo(
     () => [...PROGRESSION_PACKS, ...customPacks],
     [customPacks]
@@ -301,6 +366,19 @@ export default function ChordLibraryExplorer() {
   const selectedPack = allProgressionPacks.find((pack) => pack.id === activePackId) ?? null;
   const selectedTuning = TUNINGS.find((tuning) => tuning.id === tuningId) ?? TUNINGS[0];
   const favoriteSet = useMemo(() => new Set(favoriteIds), [favoriteIds]);
+  const profileSyncConfig = useMemo(() => ({
+    baseURL: process.env.NEXT_PUBLIC_CHORD_HERO_SYNC_URL ?? "",
+    libraryID: process.env.NEXT_PUBLIC_CHORD_HERO_SYNC_LIBRARY_ID ?? "",
+    accountID: process.env.NEXT_PUBLIC_CHORD_HERO_SYNC_ACCOUNT_ID ?? ""
+  }), []);
+  const syncCloudState = useMemo<StudentCloudState>(() => {
+    const activeName = studentProfiles.find((profile) => profile.id === activeStudentId)?.name ?? "Current device profile";
+    const activeProfile = snapshotProfile(activeStudentId, activeName, { favorites: favoriteIds, recents: recentIds, practiceStats, userNotes, stringMistakes, instrumentProfile });
+    return { profiles: [...studentProfiles.filter((profile) => profile.id !== activeStudentId), activeProfile], assignments: teacherAssignments };
+  }, [activeStudentId, favoriteIds, instrumentProfile, practiceStats, recentIds, stringMistakes, studentProfiles, teacherAssignments, userNotes]);
+  const syncCloudSignature = useMemo(() => JSON.stringify(syncCloudState), [syncCloudState]);
+  syncCloudStateRef.current = syncCloudState;
+  syncCloudSignatureRef.current = syncCloudSignature;
 
   const collectionEntries = useMemo(() => {
     if (activeCollection === "favorites") {
@@ -324,25 +402,23 @@ export default function ChordLibraryExplorer() {
 
   const availableRoots = useMemo(
     () =>
-      Array.from(new Set(libraryPool.map((entry) => entry.root))).sort((left, right) =>
+      ["any", ...Array.from(new Set(libraryPool.map((entry) => entry.root))).sort((left, right) =>
         left.localeCompare(right)
-      ),
+      )],
     [libraryPool]
   );
   const rootPool = useMemo(
-    () => libraryPool.filter((entry) => entry.root === libraryRoot),
+    () => libraryRoot === "any" ? libraryPool : libraryPool.filter((entry) => entry.root === libraryRoot),
     [libraryPool, libraryRoot]
   );
   const availableLibraryQualities = useMemo(
     () =>
-      CHORD_QUALITY_OPTIONS.filter((option) =>
-        rootPool.some((entry) => entry.quality === option.value)
-      ),
+      [{ value: "any", label: "Any chord identity" }, ...CHORD_QUALITY_OPTIONS.filter((option) => rootPool.some((entry) => entry.quality === option.value))],
     [rootPool]
   );
   const availableInversionOptions = useMemo(() => {
     const entries = rootPool
-      .filter((entry) => entry.quality === libraryQuality)
+      .filter((entry) => libraryQuality === "any" || entry.quality === libraryQuality)
       .sort((left, right) => left.id.localeCompare(right.id));
     return [
       { value: "all", label: "All positions" },
@@ -359,8 +435,8 @@ export default function ChordLibraryExplorer() {
   const filteredLibraryEntries = useMemo(
     () =>
       libraryPool.filter((entry) => {
-        if (entry.root !== libraryRoot) return false;
-        if (entry.quality !== libraryQuality) return false;
+        if (libraryRoot !== "any" && entry.root !== libraryRoot) return false;
+        if (libraryQuality !== "any" && entry.quality !== libraryQuality) return false;
         if (libraryInversion !== "all" && entry.id !== libraryInversion) return false;
         if (libraryTag !== "all" && !entry.difficultyTags.includes(libraryTag)) return false;
         if (fretFilter !== "all" && entry.chord.frets.some((fret) => fret > Number(fretFilter))) return false;
@@ -368,17 +444,17 @@ export default function ChordLibraryExplorer() {
         if (stringFilter === "partial" && !entry.difficultyTags.includes("partial")) return false;
         if (stringFilter === "full" && entry.chord.frets.filter((fret) => fret >= 0).length < 5) return false;
 
-        if (libraryFunctionRole !== "any" || libraryFunctionKey !== "any") {
-          const matchingContexts = entry.functionContexts.filter((context) =>
-            libraryFunctionKey === "any" ? true : context.key === libraryFunctionKey
-          );
-          if (!matchingContexts.length) return false;
-          if (
-            libraryFunctionRole !== "any" &&
-            !matchingContexts.some((context) => context.roles.includes(libraryFunctionRole))
-          ) {
-            return false;
-          }
+        if (libraryFunctionRole !== "any" || libraryFunctionKey !== "any" || libraryHarmonicEvent !== "all") {
+          const computedFunctions = (libraryFunctionKey === "any" ? CHORD_FUNCTION_KEYS : [libraryFunctionKey]).flatMap((key) => analyzeChordFunction({
+              key,
+              mode: libraryMode,
+              root: entry.root,
+              quality: entry.quality,
+              requestedRole: libraryFunctionRole,
+              event: libraryHarmonicEvent
+            }));
+          if (libraryFunctionKey !== "any" && !computedFunctions.length) return false;
+          if (libraryFunctionRole !== "any" && !computedFunctions.some((fn) => fn.available)) return false;
         }
 
         if (deferredLibrarySearch.length > 0) {
@@ -399,12 +475,14 @@ export default function ChordLibraryExplorer() {
     [
       deferredLibrarySearch,
       fretFilter,
+      libraryHarmonicEvent,
       libraryFunctionKey,
       libraryFunctionRole,
       libraryInversion,
       libraryPool,
       libraryQuality,
       libraryRoot,
+      libraryMode,
       libraryTag,
       stringFilter
     ]
@@ -426,10 +504,64 @@ export default function ChordLibraryExplorer() {
   const thirdCompareEntry =
     (thirdCompareChordId ? CHORD_ITEM_LOOKUP.get(thirdCompareChordId) : null) ?? null;
   const selectedTheory = selectedLibraryEntry ? getTheoryNotes(selectedLibraryEntry) : null;
+  const activeHarmonyKey = libraryFunctionKey === "any" ? "G" : libraryFunctionKey;
+  const selectedFunctions = useMemo(
+    () => selectedLibraryEntry ? analyzeChordFunction({
+      key: activeHarmonyKey,
+      mode: libraryMode,
+      root: selectedLibraryEntry.root,
+      quality: selectedLibraryEntry.quality,
+      requestedRole: libraryFunctionRole,
+      event: libraryHarmonicEvent
+    }) : [],
+    [activeHarmonyKey, libraryFunctionRole, libraryHarmonicEvent, libraryMode, selectedLibraryEntry]
+  );
+  const selectedFunction = selectedFunctions.find((fn) => fn.available) ?? selectedFunctions[0] ?? null;
+  const availableFunctionOptions = useMemo(
+    () => getFunctionOptions(libraryMode, libraryHarmonicEvent),
+    [libraryHarmonicEvent, libraryMode]
+  );
+  const circlePoints = useMemo(
+    () => getCircleOfFifths(activeHarmonyKey, libraryMode),
+    [activeHarmonyKey, libraryMode]
+  );
+  const functionalGroups = useMemo(() => {
+    const groups = new Map<string, { identity: string; function: HarmonicFunction | null; entries: ChordLibraryItem[] }>();
+    filteredLibraryEntries.forEach((entry) => {
+      const fn = analyzeChordFunction({ key: activeHarmonyKey, mode: libraryMode, root: entry.root, quality: entry.quality, requestedRole: libraryFunctionRole, event: libraryHarmonicEvent }).find((candidate) => candidate.available) ?? null;
+      const identity = `${entry.root}:${entry.quality}`;
+      const group = groups.get(identity) ?? { identity, function: fn, entries: [] };
+      group.entries.push(entry);
+      if (!group.function && fn) group.function = fn;
+      groups.set(identity, group);
+    });
+    return Array.from(groups.values()).map((group) => ({
+      ...group,
+      entries: group.entries.sort((left, right) => getDifficultyScore(left) - getDifficultyScore(right) || left.id.localeCompare(right.id))
+    }));
+  }, [activeHarmonyKey, filteredLibraryEntries, libraryFunctionRole, libraryHarmonicEvent, libraryMode]);
+  const transitionRecommendations = useMemo(() => {
+    if (!selectedLibraryEntry) return [];
+    return filteredLibraryEntries
+      .filter((entry) => entry.id !== selectedLibraryEntry.id)
+      .slice(0, 48)
+      .map((entry) => ({ entry, cost: scoreTransition(selectedLibraryEntry.chord, entry.chord) }))
+      .sort((left, right) => left.cost.score - right.cost.score)
+      .slice(0, 4);
+  }, [filteredLibraryEntries, selectedLibraryEntry]);
   const visibleVoicingEntries = useMemo(
     () => filteredLibraryEntries.slice(0, voicingLimit),
     [filteredLibraryEntries, voicingLimit]
   );
+  const visibleFunctionalGroups = useMemo(() => {
+    let remaining = voicingLimit;
+    return functionalGroups.flatMap((group) => {
+      if (remaining <= 0) return [];
+      const entries = group.entries.slice(0, remaining);
+      remaining -= entries.length;
+      return entries.length ? [{ ...group, entries }] : [];
+    });
+  }, [functionalGroups, voicingLimit]);
   const customChord: Chord = {
     name: "Custom voicing",
     frets: customFrets,
@@ -525,10 +657,12 @@ export default function ChordLibraryExplorer() {
     return audioContextRef.current;
   };
 
-  const playChordPreview = async (chord: Chord, mode: "strum" | "arpeggio") => {
+  const playChordPreview = async (chord: Chord, mode: "strum" | "arpeggio", voicingId = selectedLibraryId) => {
     const ctx = await ensureAudioContext();
     const frequencies = getVoicingFrequencies(chord, capoFret, selectedTuning.semitoneOffsets);
     if (!frequencies.length) return;
+
+    if (!sampleManifestRef.current) sampleManifestRef.current = await loadGuitarSampleManifest();
 
     const midiNotes = frequencies.map((frequency) => Math.round(69 + 12 * Math.log2(frequency / 440)));
     const recordedRoots = midiNotes.map((midiNote) =>
@@ -536,16 +670,25 @@ export default function ChordLibraryExplorer() {
         Math.abs(candidate - midiNote) < Math.abs(closest - midiNote) ? candidate : closest
       )
     );
-    const samplePaths = sampleVoice === "muted"
-      ? midiNotes.map(() => `${SAMPLE_BASE_PATH}/muted.mp3`)
-      : recordedRoots.map((root) => `${SAMPLE_BASE_PATH}/clean/${root}.mp3`);
-    const sampleBuffers = await Promise.all(samplePaths.map((path) => loadRecordedAudio(ctx, path)));
+    const sampleResults = await Promise.all(midiNotes.map((midiNote, index) => {
+      const paths = sampleManifestRef.current
+        ? selectGuitarSamplePaths(sampleManifestRef.current, {
+            voicingId,
+            voice: sampleVoice,
+            articulation: mode,
+            velocity: Math.min(1, sampleVelocity + index * 0.02),
+            midi: recordedRoots[index]
+          })
+        : [sampleVoice === "muted" ? `${SAMPLE_BASE_PATH}/muted.mp3` : `${SAMPLE_BASE_PATH}/clean/${recordedRoots[index]}.mp3`];
+      return loadFirstRecordedSample(ctx, paths);
+    }));
+    const sampleBuffers = sampleResults.map((result) => result?.buffer ?? null);
 
     if (sampleBuffers.every((buffer): buffer is AudioBuffer => Boolean(buffer))) {
       const output = ctx.createBiquadFilter();
       output.type = "lowpass";
-      output.frequency.value = sampleVoice === "warm" ? 1900 : sampleVoice === "muted" ? 2600 : 5200;
-      output.Q.value = sampleVoice === "warm" ? 0.65 : 0.35;
+      output.frequency.value = sampleVoice === "nylon" ? 1900 : sampleVoice === "muted" ? 2600 : 5200;
+      output.Q.value = sampleVoice === "nylon" ? 0.65 : 0.35;
       output.connect(ctx.destination);
 
       const now = ctx.currentTime;
@@ -568,7 +711,8 @@ export default function ChordLibraryExplorer() {
         source.start(startAt);
         source.stop(startAt + sustain + 0.05);
       });
-      setSampleStatus(`Recorded ${sampleVoice} guitar loaded`);
+      const usedFallback = sampleResults.some((result) => result?.path.includes("/clean/") || result?.path.endsWith("/muted.mp3"));
+      setSampleStatus(`Recorded ${sampleVoice} ${mode} loaded${usedFallback ? " with bundled fallback" : " from mapped layer"}`);
       return;
     }
 
@@ -577,8 +721,8 @@ export default function ChordLibraryExplorer() {
     const masterGain = ctx.createGain();
     const filter = ctx.createBiquadFilter();
     filter.type = "lowpass";
-    filter.frequency.value = sampleVoice === "warm" ? 1250 : sampleVoice === "muted" ? 900 : 2600;
-    filter.Q.value = sampleVoice === "warm" ? 0.7 : 1.15;
+    filter.frequency.value = sampleVoice === "nylon" ? 1250 : sampleVoice === "muted" ? 900 : 2600;
+    filter.Q.value = sampleVoice === "nylon" ? 0.7 : 1.15;
     filter.connect(ctx.destination);
     masterGain.connect(filter);
     masterGain.gain.value = 0.0001;
@@ -597,7 +741,7 @@ export default function ChordLibraryExplorer() {
       const osc = ctx.createOscillator();
       const noteGain = ctx.createGain();
       const startAt = now + index * step;
-      osc.type = sampleVoice === "warm" ? "sine" : mode === "strum" ? "triangle" : "sawtooth";
+      osc.type = sampleVoice === "nylon" ? "sine" : mode === "strum" ? "triangle" : "sawtooth";
       osc.frequency.value = frequency;
       noteGain.gain.value = 0.0001;
       osc.connect(noteGain);
@@ -650,13 +794,13 @@ export default function ChordLibraryExplorer() {
     ]);
   };
 
-  const snapshotStudent = (id: string, name: string): StudentProfile => ({
-    id,
-    name,
+  const snapshotStudent = (id: string, name: string): StudentProfile => snapshotProfile(id, name, {
     favorites: favoriteIds,
     recents: recentIds,
     practiceStats,
-    userNotes
+    userNotes,
+    stringMistakes,
+    instrumentProfile
   });
 
   const saveStudentProfile = () => {
@@ -680,6 +824,33 @@ export default function ChordLibraryExplorer() {
     setRecentIds(next.recents);
     setPracticeStats(next.practiceStats);
     setUserNotes(next.userNotes);
+    setStringMistakes(next.stringMistakes ?? {});
+    setInstrumentProfile({ ...DEFAULT_INSTRUMENT_PROFILE, ...next.instrumentProfile });
+    setTuningId((next.instrumentProfile?.tuningId ?? "standard") as TuningId);
+  };
+
+  const updateInstrumentProfile = (patch: Partial<InstrumentProfile>) => {
+    setInstrumentProfile((previous) => ({ ...previous, ...patch, updatedAt: new Date().toISOString() }));
+    if (patch.tuningId) setTuningId(patch.tuningId as TuningId);
+  };
+
+  const createAssignment = () => {
+    const title = newAssignmentTitle.trim();
+    if (!title) return;
+    const chordIds = selectedPack?.chordIds ?? teacherSheetEntries.map((entry) => entry.id);
+    const now = new Date().toISOString();
+    setTeacherAssignments((previous) => [{ id: `assignment-${Date.now()}`, studentId: activeStudentId, title, description: `${chordIds.length} chord voicings from the current library filter.`, chordIds, dueAt: newAssignmentDueAt ? new Date(`${newAssignmentDueAt}T23:59:59`).toISOString() : undefined, updatedAt: now }, ...previous]);
+    setNewAssignmentTitle("");
+    setNewAssignmentDueAt("");
+  };
+
+  const toggleAssignment = (assignment: TeacherAssignment) => {
+    const now = new Date().toISOString();
+    setTeacherAssignments((previous) => previous.map((item) => item.id === assignment.id ? { ...item, completedAt: item.completedAt ? undefined : now, updatedAt: now } : item));
+  };
+
+  const deleteAssignment = (id: string) => {
+    setTeacherAssignments((previous) => previous.filter((assignment) => assignment.id !== id));
   };
 
   const exportTeacherPacks = () => {
@@ -707,30 +878,68 @@ export default function ChordLibraryExplorer() {
     reader.readAsText(file);
   };
 
+  const evaluateMidiNotes = (notes: Set<number>) => {
+    const target = earTargetRef.current;
+    if (!target) return;
+    const correctFunction = target.function?.role ?? "I";
+    if (notes.size === 1) {
+      const note = noteAt([...notes][0]);
+      const correctRoot = note === target.entry.root;
+      setEarAnswer(correctRoot ? (target.prompt === "chord" ? target.entry.chord.name : correctFunction) : note);
+      setEarResult(correctRoot ? "Correct root-note fallback" : `Root-note fallback: try ${target.entry.root}`);
+      return;
+    }
+    const expected = getPitchClasses(target.entry.chord, selectedTuning);
+    const matches = expected.size === notes.size && [...expected].every((note) => notes.has(note));
+    if (matches) {
+      setEarAnswer(target.prompt === "chord" ? target.entry.chord.name : correctFunction);
+      setEarResult("Correct polyphonic chord");
+    } else {
+      setEarResult(`MIDI heard ${notes.size} pitch classes; add or release notes to match the voicing.`);
+    }
+  };
+
   const connectMidi = async () => {
-    const midiNavigator = navigator as Navigator & { requestMIDIAccess?: () => Promise<any> };
+    const midiNavigator = navigator as Navigator & { requestMIDIAccess?: () => Promise<MIDIAccess> };
     if (!midiNavigator.requestMIDIAccess) {
       setMidiStatus("Web MIDI is not supported in this browser");
       return;
     }
     try {
+      midiCleanupRef.current?.();
       const access = await midiNavigator.requestMIDIAccess();
-      const handleMessage = (event: any) => {
-        const [status, note] = event.data ?? [];
-        if ((status & 0xf0) !== 0x90 || !note || event.data[2] === 0) return;
-        const midiNote = noteAt(note % 12);
-        setMidiStatus(`Last MIDI note: ${midiNote}`);
-        if (!earTarget) return;
-        const targetRoot = earTarget.entry.root;
-        const correct = midiNote === targetRoot;
-        setEarAnswer(correct ? (earTarget.prompt === "chord" ? earTarget.entry.chord.name : earTarget.entry.functionContexts[0]?.roles[0] ?? "I") : midiNote);
-        setEarResult(correct ? "Correct MIDI root" : `Try again; the root is ${targetRoot}`);
+      const handleMessage = (event: MIDIMessageEvent) => {
+        if (!event.data) return;
+        const [status, note, velocity] = event.data;
+        const pitch = note % 12;
+        const isNoteOn = (status & 0xf0) === 0x90 && velocity > 0;
+        const isNoteOff = (status & 0xf0) === 0x80 || ((status & 0xf0) === 0x90 && velocity === 0);
+        if (!Number.isFinite(note) || (!isNoteOn && !isNoteOff)) return;
+        if (isNoteOn) midiHeldNotesRef.current.add(pitch);
+        if (isNoteOff) midiHeldNotesRef.current.delete(pitch);
+        const held = [...midiHeldNotesRef.current].sort((left, right) => left - right);
+        setMidiHeldNotes(held);
+        setMidiStatus(`Held MIDI notes: ${held.length ? held.map((item) => noteAt(item)).join(", ") : "none"}`);
+        if (isNoteOn) evaluateMidiNotes(midiHeldNotesRef.current);
       };
-      access.inputs.forEach((input: any) => { input.onmidimessage = handleMessage; });
+      access.inputs.forEach((input) => { input.onmidimessage = handleMessage; });
+      midiCleanupRef.current = () => access.inputs.forEach((input) => { input.onmidimessage = null; });
       setMidiStatus(`${access.inputs.size} MIDI input${access.inputs.size === 1 ? "" : "s"} connected`);
     } catch {
       setMidiStatus("MIDI permission was not granted");
     }
+  };
+
+  const clearMidiNotes = () => {
+    midiHeldNotesRef.current.clear();
+    setMidiHeldNotes([]);
+    setMidiStatus("MIDI notes cleared");
+  };
+
+  const playEarContext = async (entry: ChordLibraryItem, fn: HarmonicFunction | null) => {
+    const tonicEntry = CHORD_LIBRARY.find((candidate) => analyzeChordFunction({ key: activeHarmonyKey, mode: libraryMode, root: candidate.root, quality: candidate.quality, requestedRole: libraryMode === "major" ? "I" : "i" }).some((candidateFunction) => candidateFunction.available));
+    if (tonicEntry) await playChordPreview(tonicEntry.chord, "strum", tonicEntry.id);
+    window.setTimeout(() => { void playChordPreview(entry.chord, "arpeggio", entry.id); }, fn ? 520 : 180);
   };
 
   const addPracticeRep = (id: string) => {
@@ -777,32 +986,37 @@ export default function ChordLibraryExplorer() {
   const startEarTraining = (prompt: "chord" | "function") => {
     const pool = filteredLibraryEntries.length ? filteredLibraryEntries : CHORD_LIBRARY;
     const entry = pool[Math.floor(Math.random() * pool.length)];
-    const correct =
-      prompt === "chord"
-        ? entry.chord.name
-        : entry.functionContexts[0]?.roles[0] ?? "I";
+    const fn = analyzeChordFunction({ key: activeHarmonyKey, mode: libraryMode, root: entry.root, quality: entry.quality }).find((candidate) => candidate.available) ?? null;
+    const correct = prompt === "chord" ? entry.chord.name : fn?.role ?? entry.functionContexts[0]?.roles[0] ?? "I";
     const distractors =
       prompt === "chord"
         ? CHORD_LIBRARY.map((candidate) => candidate.chord.name)
-        : HARMONIC_FUNCTION_OPTIONS;
+        : getConfusableRoles(fn?.role ?? "I", libraryMode, earMisses);
     const options = Array.from(new Set(distractors))
       .filter((option) => option !== correct)
       .slice(0, 3);
     const shuffled = [correct, ...options].sort(() => Math.random() - 0.5);
-    setEarTarget({ entry, prompt, options: shuffled });
+    const nextTarget = { entry, prompt, options: shuffled, function: fn, referenceRoles: fn ? [libraryMode === "major" ? "I" : "i", fn.role] : [] };
+    earTargetRef.current = nextTarget;
+    setEarTarget(nextTarget);
     setEarAnswer("");
     setEarResult("");
-    void playChordPreview(entry.chord, "strum");
+    void playEarContext(entry, fn);
   };
 
   const answerEarTraining = (answer: string) => {
     if (!earTarget) return;
-    const correct =
-      earTarget.prompt === "chord"
-        ? earTarget.entry.chord.name
-        : earTarget.entry.functionContexts[0]?.roles[0] ?? "I";
+    const correct = earTarget.prompt === "chord" ? earTarget.entry.chord.name : earTarget.function?.role ?? "I";
     setEarAnswer(answer);
-    setEarResult(answer === correct ? "Correct" : `Listen again: ${correct}`);
+    if (answer === correct) setEarResult("Correct");
+    else {
+      setEarMisses((previous) => ({ ...previous, [correct]: (previous[correct] ?? 0) + 1 }));
+      setEarResult(`Listen again: ${correct}`);
+    }
+  };
+
+  const runProgressionAnalysis = () => {
+    setProgressionAnalysis(analyzeProgression(progressionInput, activeHarmonyKey, libraryMode));
   };
 
   useEffect(() => {
@@ -813,7 +1027,10 @@ export default function ChordLibraryExplorer() {
       const storedPracticeStats = window.localStorage.getItem(PRACTICE_STATS_STORAGE_KEY);
       const storedUserNotes = window.localStorage.getItem(USER_NOTES_STORAGE_KEY);
       const storedStringMistakes = window.localStorage.getItem(STRING_MISTAKES_STORAGE_KEY);
+      const storedEarMisses = window.localStorage.getItem(EAR_MISSES_STORAGE_KEY);
       const storedProfiles = window.localStorage.getItem(STUDENT_PROFILES_STORAGE_KEY);
+      const storedAssignments = window.localStorage.getItem(TEACHER_ASSIGNMENTS_STORAGE_KEY);
+      const storedDisplaySettings = window.localStorage.getItem(DISPLAY_SETTINGS_STORAGE_KEY);
       if (storedFavorites) {
         setFavoriteIds(JSON.parse(storedFavorites));
       }
@@ -832,69 +1049,207 @@ export default function ChordLibraryExplorer() {
       if (storedStringMistakes) {
         setStringMistakes(JSON.parse(storedStringMistakes));
       }
+      if (storedEarMisses) setEarMisses(JSON.parse(storedEarMisses));
       if (storedProfiles) {
-        setStudentProfiles(JSON.parse(storedProfiles));
+        const parsed = JSON.parse(storedProfiles) as Partial<StudentProfile>[];
+        setStudentProfiles(parsed.filter((profile): profile is Partial<StudentProfile> & Pick<StudentProfile, "id"> => Boolean(profile?.id)).map((profile) => normalizeStudentProfile(profile)));
+      }
+      if (storedAssignments) {
+        setTeacherAssignments(JSON.parse(storedAssignments));
+      }
+      if (storedDisplaySettings) {
+        setDisplaySettings({ handedness: "right", highContrast: false, largeCharts: false, ...JSON.parse(storedDisplaySettings) });
       }
     } catch {
       // Ignore storage failures and keep the UI usable.
+    } finally {
+      setStorageHydrated(true);
     }
   }, []);
 
   useEffect(() => {
+    if (!storageHydrated) return;
     try {
       window.localStorage.setItem(FAVORITES_STORAGE_KEY, JSON.stringify(favoriteIds));
     } catch {
       // Ignore storage failures and keep the UI usable.
     }
-  }, [favoriteIds]);
+  }, [favoriteIds, storageHydrated]);
 
   useEffect(() => {
+    if (!storageHydrated) return;
     try {
       window.localStorage.setItem(RECENTS_STORAGE_KEY, JSON.stringify(recentIds));
     } catch {
       // Ignore storage failures and keep the UI usable.
     }
-  }, [recentIds]);
+  }, [recentIds, storageHydrated]);
 
   useEffect(() => {
+    if (!storageHydrated) return;
     try {
       window.localStorage.setItem(CUSTOM_PACKS_STORAGE_KEY, JSON.stringify(customPacks));
     } catch {
       // Ignore storage failures and keep the UI usable.
     }
-  }, [customPacks]);
+  }, [customPacks, storageHydrated]);
 
   useEffect(() => {
+    if (!storageHydrated) return;
     try {
       window.localStorage.setItem(PRACTICE_STATS_STORAGE_KEY, JSON.stringify(practiceStats));
     } catch {
       // Ignore storage failures and keep the UI usable.
     }
-  }, [practiceStats]);
+  }, [practiceStats, storageHydrated]);
 
   useEffect(() => {
+    if (!storageHydrated) return;
     try {
       window.localStorage.setItem(USER_NOTES_STORAGE_KEY, JSON.stringify(userNotes));
     } catch {
       // Ignore storage failures and keep the UI usable.
     }
-  }, [userNotes]);
+  }, [storageHydrated, userNotes]);
 
   useEffect(() => {
+    if (!storageHydrated) return;
     try {
       window.localStorage.setItem(STUDENT_PROFILES_STORAGE_KEY, JSON.stringify(studentProfiles));
     } catch {
       // Ignore storage failures and keep the UI usable.
     }
-  }, [studentProfiles]);
+  }, [storageHydrated, studentProfiles]);
 
   useEffect(() => {
+    if (!storageHydrated) return;
     try {
       window.localStorage.setItem(STRING_MISTAKES_STORAGE_KEY, JSON.stringify(stringMistakes));
     } catch {
       // Ignore storage failures and keep the UI usable.
     }
-  }, [stringMistakes]);
+  }, [storageHydrated, stringMistakes]);
+
+  useEffect(() => {
+    if (!storageHydrated) return;
+    try { window.localStorage.setItem(EAR_MISSES_STORAGE_KEY, JSON.stringify(earMisses)); } catch { /* Keep ear training usable when storage is unavailable. */ }
+  }, [earMisses, storageHydrated]);
+
+  useEffect(() => {
+    if (!storageHydrated) return;
+    try {
+      window.localStorage.setItem(TEACHER_ASSIGNMENTS_STORAGE_KEY, JSON.stringify(teacherAssignments));
+      window.localStorage.setItem(DISPLAY_SETTINGS_STORAGE_KEY, JSON.stringify(displaySettings));
+    } catch {
+      // Keep the library usable when storage is unavailable.
+    }
+  }, [displaySettings, storageHydrated, teacherAssignments]);
+
+  useEffect(() => {
+    earTargetRef.current = earTarget;
+  }, [earTarget]);
+
+  useEffect(() => () => midiCleanupRef.current?.(), []);
+
+  const applyCloudState = (state: StudentCloudState) => {
+    const profiles = state.profiles.map((profile) => normalizeStudentProfile(profile));
+    setStudentProfiles(profiles);
+    setTeacherAssignments(state.assignments);
+    const active = profiles.find((profile) => profile.id === activeStudentId);
+    if (!active) return;
+    setFavoriteIds(active.favorites);
+    setRecentIds(active.recents);
+    setPracticeStats(active.practiceStats);
+    setUserNotes(active.userNotes);
+    setStringMistakes(active.stringMistakes);
+    setInstrumentProfile(active.instrumentProfile);
+    setTuningId(active.instrumentProfile.tuningId as TuningId);
+  };
+  applyCloudStateRef.current = applyCloudState;
+
+  useEffect(() => {
+    if (!storageHydrated) return;
+    const { baseURL, libraryID, accountID } = profileSyncConfig;
+    if (!baseURL || !libraryID || !accountID) {
+      setSyncStatus("local");
+      setSyncMessage("Local-only profile storage; add sync environment variables to enable cloud sync.");
+      profileSyncReadyRef.current = true;
+      return;
+    }
+    const client = createStudentProfileSyncClient(baseURL, libraryID, accountID);
+    profileSyncClientRef.current = client;
+    setSyncStatus("syncing");
+    setSyncMessage("Pulling the latest student profile and assignments...");
+    void client.pull().then((envelope) => {
+      const merged = mergeStudentCloudStates(syncCloudStateRef.current ?? normalizeStudentCloudState(envelope.state), normalizeStudentCloudState(envelope.state));
+      profileSyncRevisionRef.current = envelope.revision;
+      profileSyncLastSignatureRef.current = JSON.stringify(merged);
+      applyCloudStateRef.current(merged);
+      setSyncStatus("synced");
+      setSyncMessage(`Synced ${new Date(envelope.updatedAt).toLocaleTimeString()}`);
+    }).catch(() => {
+      profileSyncLastSignatureRef.current = syncCloudSignatureRef.current;
+      setSyncStatus(navigator.onLine ? "error" : "offline");
+      setSyncMessage("Cloud sync unavailable; changes remain safely local.");
+    }).finally(() => {
+      profileSyncReadyRef.current = true;
+    });
+  }, [profileSyncConfig, storageHydrated]);
+
+  useEffect(() => {
+    if (!storageHydrated || !profileSyncReadyRef.current || !profileSyncClientRef.current) return;
+    if (!navigator.onLine) {
+      setSyncStatus("offline");
+      setSyncMessage("Offline; changes will sync when the connection returns.");
+      return;
+    }
+    if (profileSyncLastSignatureRef.current === syncCloudSignature) return;
+    if (profileSyncTimerRef.current) window.clearTimeout(profileSyncTimerRef.current);
+    profileSyncTimerRef.current = window.setTimeout(() => {
+      const client = profileSyncClientRef.current;
+      if (!client) return;
+      setSyncStatus("syncing");
+      setSyncMessage("Saving profile changes...");
+      const state = syncCloudStateRef.current;
+      if (!state) return;
+      void client.push(state, profileSyncRevisionRef.current).then((envelope) => {
+        profileSyncRevisionRef.current = envelope.revision;
+        profileSyncLastSignatureRef.current = syncCloudSignatureRef.current;
+        setSyncStatus("synced");
+        setSyncMessage(`Synced ${new Date(envelope.updatedAt).toLocaleTimeString()}`);
+      }).catch((error: Error & { conflict?: { revision: number; state: StudentCloudState } }) => {
+        if (error.conflict) {
+          const merged = mergeStudentCloudStates(syncCloudStateRef.current ?? normalizeStudentCloudState(error.conflict.state), normalizeStudentCloudState(error.conflict.state));
+          profileSyncRevisionRef.current = error.conflict.revision;
+          profileSyncLastSignatureRef.current = JSON.stringify(merged);
+          applyCloudStateRef.current(merged);
+        }
+        setSyncStatus("error");
+        setSyncMessage("Sync conflict or network error; local changes were retained.");
+      });
+    }, 900);
+    return () => {
+      if (profileSyncTimerRef.current) window.clearTimeout(profileSyncTimerRef.current);
+    };
+  }, [storageHydrated, syncCloudSignature, syncCloudState]);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      profileSyncLastSignatureRef.current = "";
+      setSyncStatus(profileSyncClientRef.current ? "syncing" : "local");
+      setSyncMessage("Connection restored; preparing profile sync...");
+    };
+    const handleOffline = () => {
+      setSyncStatus("offline");
+      setSyncMessage("Offline; changes will remain local.");
+    };
+    window.addEventListener("online", handleOnline);
+    window.addEventListener("offline", handleOffline);
+    return () => {
+      window.removeEventListener("online", handleOnline);
+      window.removeEventListener("offline", handleOffline);
+    };
+  }, []);
 
   useEffect(() => {
     if (!selectedLibraryEntry) return;
@@ -907,7 +1262,7 @@ export default function ChordLibraryExplorer() {
   useEffect(() => {
     if (!availableRoots.length) return;
     if (!availableRoots.includes(libraryRoot)) {
-      setLibraryRoot(availableRoots[0]);
+      setLibraryRoot("any");
     }
   }, [availableRoots, libraryRoot]);
 
@@ -966,7 +1321,7 @@ export default function ChordLibraryExplorer() {
   }, [selectedLibraryEntry?.id]);
 
   return (
-    <section className="library library-redesign">
+    <section className={`library library-redesign ${displaySettings.highContrast ? "library-high-contrast" : ""} ${displaySettings.largeCharts ? "library-large-charts" : ""}`}>
       <header className="library-heading studio-heading">
         <div>
           <span className="tag">Interactive reference</span>
@@ -998,71 +1353,64 @@ export default function ChordLibraryExplorer() {
       </div>
 
       <div className="library-card library-shell">
-        <div className="library-findbar">
-          <div className="library-search">
-            <label className="label" htmlFor="library-search">Search chords</label>
-            <input
-              id="library-search"
-              type="search"
-              value={librarySearch}
-              onChange={(event) => setLibrarySearch(event.target.value)}
-              placeholder="Try Dm7, G/B, Fmaj7..."
-            />
+        <section className="library-harmonic-finder" aria-labelledby="harmonic-finder-title">
+          <div className="library-section-heading">
+            <div><span className="label">Primary search</span><h3 id="harmonic-finder-title">Harmonic Finder</h3></div>
+            <span className="muted">Choose the role first, then compare guitar shapes.</span>
           </div>
-          <div>
-            <label className="label" htmlFor="library-root">Root</label>
-            <select id="library-root" value={libraryRoot} onChange={(event) => setLibraryRoot(event.target.value)}>
-              {(availableRoots.length ? availableRoots : CHORD_LIBRARY_ROOTS).map((root) => (
-                <option key={root} value={root}>{root}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="label" htmlFor="library-quality">Type</label>
-            <select id="library-quality" value={libraryQuality} onChange={(event) => setLibraryQuality(event.target.value)}>
-              {availableLibraryQualities.map((option) => (
-                <option key={option.value} value={option.value}>{option.label}</option>
-              ))}
-            </select>
-          </div>
-          <details className="library-more-filters">
-            <summary>More filters</summary>
-            <div className="library-filter-popover">
-              <label htmlFor="library-inversion">Position</label>
-              <select id="library-inversion" value={libraryInversion} onChange={(event) => setLibraryInversion(event.target.value)}>
-                {availableInversionOptions.map((option) => (
-                  <option key={option.value} value={option.value}>{option.label}</option>
-                ))}
-              </select>
-              <label htmlFor="library-tag">Difficulty</label>
-              <select id="library-tag" value={libraryTag} onChange={(event) => setLibraryTag(event.target.value as "all" | DifficultyTag)}>
-                <option value="all">All difficulties</option>
-                {CHORD_DIFFICULTY_TAGS.map((tag) => <option key={tag} value={tag}>{tag}</option>)}
-              </select>
-              <label htmlFor="library-function-key">Common in key</label>
-              <select id="library-function-key" value={libraryFunctionKey} onChange={(event) => setLibraryFunctionKey(event.target.value)}>
+          <div className="library-harmony-controls">
+            <label>Key
+              <select value={libraryFunctionKey} onChange={(event) => setLibraryFunctionKey(event.target.value)}>
                 <option value="any">Any key</option>
                 {CHORD_FUNCTION_KEYS.map((key) => <option key={key} value={key}>{key}</option>)}
               </select>
-              <label htmlFor="library-function-role">Function</label>
-              <select id="library-function-role" value={libraryFunctionRole} onChange={(event) => setLibraryFunctionRole(event.target.value as "any" | HarmonicRole)}>
-                <option value="any">Any role</option>
-                {HARMONIC_FUNCTION_OPTIONS.map((role) => <option key={role} value={role}>{role}</option>)}
+            </label>
+            <label>Mode
+              <select value={libraryMode} onChange={(event) => { setLibraryMode(event.target.value as HarmonyMode); setLibraryFunctionRole("any"); }}>
+                <option value="major">Major</option><option value="minor">Minor</option>
               </select>
+            </label>
+            <label>Function / role
+              <select value={libraryFunctionRole} onChange={(event) => setLibraryFunctionRole(event.target.value as "any" | HarmonicRole)}>
+                <option value="any">All functions</option>
+                {availableFunctionOptions.map((role) => <option key={role} value={role}>{role}</option>)}
+              </select>
+            </label>
+            <label>Harmonic event
+              <select value={libraryHarmonicEvent} onChange={(event) => { setLibraryHarmonicEvent(event.target.value as HarmonicEvent | "all"); setLibraryFunctionRole("any"); }}>
+                <option value="all">Diatonic and chromatic</option>
+                <option value="diatonic">Diatonic</option><option value="borrowed">Borrowed / modal interchange</option>
+                <option value="secondary-dominant">Secondary dominants</option><option value="tonicization">Tonicization</option><option value="cadence">Cadences</option>
+              </select>
+            </label>
+          </div>
+          {selectedFunction ? <p className="library-harmony-explanation"><strong>{selectedFunction.role}</strong> {selectedFunction.explanation} {selectedFunction.tendencyTones.length ? `Tendency tones: ${selectedFunction.tendencyTones.join(", ")}.` : ""} {selectedFunction.suggestedResolution}</p> : <p className="library-harmony-explanation muted">No playable shape is currently tagged for this role. The theory role remains available for analysis and can be added when a matching quality is present.</p>}
+          <div className="library-circle" aria-label={`Circle of fifths for ${activeHarmonyKey} ${libraryMode}`}>
+            {circlePoints.slice(0, 8).map((point) => <button key={`${point.note}-${point.role}`} type="button" className={point.note === activeHarmonyKey ? "active" : ""} onClick={() => setLibraryFunctionKey(point.note)} aria-label={`${point.note}, ${point.role}, resolves toward ${point.likelyResolution}`}><strong>{point.note}</strong><small>{point.degree} · {point.role}</small></button>)}
+          </div>
+        </section>
+
+        <div className="library-findbar library-secondary-filters">
+          <div className="library-search">
+            <label className="label" htmlFor="library-search">Shape or chord-name search</label>
+            <input id="library-search" type="search" value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} placeholder="Try Dm7, G/B, Fmaj7..." />
+          </div>
+          <details className="library-more-filters">
+            <summary>Shape filters</summary>
+            <div className="library-filter-popover">
+              <label htmlFor="library-root">Root identity</label>
+              <select id="library-root" value={libraryRoot} onChange={(event) => setLibraryRoot(event.target.value)}>{(availableRoots.length ? availableRoots : CHORD_LIBRARY_ROOTS).map((root) => <option key={root} value={root}>{root === "any" ? "Any root" : root}</option>)}</select>
+              <label htmlFor="library-quality">Chord type</label>
+              <select id="library-quality" value={libraryQuality} onChange={(event) => setLibraryQuality(event.target.value)}>{availableLibraryQualities.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+              <label htmlFor="library-inversion">Position / shape</label>
+              <select id="library-inversion" value={libraryInversion} onChange={(event) => setLibraryInversion(event.target.value)}>{availableInversionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+              <label htmlFor="library-tag">Difficulty</label>
+              <select id="library-tag" value={libraryTag} onChange={(event) => setLibraryTag(event.target.value as "all" | DifficultyTag)}><option value="all">All difficulties</option>{CHORD_DIFFICULTY_TAGS.map((tag) => <option key={tag} value={tag}>{tag}</option>)}</select>
               <label htmlFor="library-fret-range">Fret range</label>
-              <select id="library-fret-range" value={fretFilter} onChange={(event) => setFretFilter(event.target.value as typeof fretFilter)}>
-                <option value="all">Any fret</option>
-                <option value="4">Open to fret 4</option>
-                <option value="8">Open to fret 8</option>
-                <option value="12">Open to fret 12</option>
-              </select>
+              <select id="library-fret-range" value={fretFilter} onChange={(event) => setFretFilter(event.target.value as typeof fretFilter)}><option value="all">Any fret</option><option value="4">Open to fret 4</option><option value="8">Open to fret 8</option><option value="12">Open to fret 12</option></select>
               <label htmlFor="library-string-set">String set</label>
-              <select id="library-string-set" value={stringFilter} onChange={(event) => setStringFilter(event.target.value as typeof stringFilter)}>
-                <option value="all">Any string set</option>
-                <option value="open">Includes open strings</option>
-                <option value="partial">Partial chords</option>
-                <option value="full">Five or more ringing strings</option>
-              </select>
+              <select id="library-string-set" value={stringFilter} onChange={(event) => setStringFilter(event.target.value as typeof stringFilter)}><option value="all">Any string set</option><option value="open">Includes open strings</option><option value="partial">Partial chords</option><option value="full">Five or more ringing strings</option></select>
+              <button className="btn ghost" type="button" onClick={() => { setLibraryRoot("any"); setLibraryQuality("any"); setLibraryInversion("all"); setLibraryTag("all"); setFretFilter("all"); setStringFilter("all"); }}>Reset shape filters</button>
             </div>
           </details>
         </div>
@@ -1099,6 +1447,12 @@ export default function ChordLibraryExplorer() {
           ))}
         </nav>
 
+        <section className="library-progression-analyzer" aria-labelledby="progression-analyzer-title">
+          <div className="library-section-heading"><div><span className="label">Context tool</span><h3 id="progression-analyzer-title">Analyze a progression</h3></div><span className="muted">Try <code>G Em Am D7</code> or paste a short chord sequence.</span></div>
+          <div className="library-progression-input"><input aria-label="Progression input" value={progressionInput} onChange={(event) => setProgressionInput(event.target.value)} placeholder="G · Em · Am · D7" /><button className="btn" type="button" onClick={runProgressionAnalysis}>Analyze in {activeHarmonyKey} {libraryMode}</button></div>
+          {progressionAnalysis ? <div className="library-progression-results"><p><strong>{progressionAnalysis.summary}</strong> {progressionAnalysis.items.length ? "Choose a role below to return to functional shapes." : ""}</p>{progressionAnalysis.items.map((item, index) => <article key={`${item.symbol}-${index}`}><strong>{item.symbol}</strong><span>{item.function?.role ?? "Unmapped"}</span><p>{item.notes}</p><small>Substitutions: {item.substitutions.join(", ") || "none"} · Simpler: {item.simplerAlternatives.join(", ") || "none"}</small>{item.function ? <button className="inline-link" type="button" onClick={() => { setLibraryFunctionRole(item.function?.role ?? "any"); setLibraryFunctionKey(progressionAnalysis.key); }}>Show {item.function.role} shapes</button> : null}</article>)}</div> : null}
+        </section>
+
         {selectedLibraryEntry ? (
           <div className="library-workspace">
             <aside className="library-voicing-list" aria-label="Matching chord voicings">
@@ -1106,19 +1460,16 @@ export default function ChordLibraryExplorer() {
                 <span className="label">Voicings</span>
                 <strong>{filteredLibraryEntries.length}</strong>
               </div>
-              {visibleVoicingEntries.map((entry) => (
-                <button
-                  key={entry.id}
-                  type="button"
-                  className={`library-voicing-row ${entry.id === selectedLibraryEntry.id ? "active" : ""}`}
-                  onClick={() => setSelectedLibraryId(entry.id)}
-                >
-                  <span>
-                    <strong>{entry.chord.name}</strong>
-                    <small>{entry.position}</small>
-                  </span>
-                  <small>{getDifficultyScore(entry)}/8</small>
-                </button>
+              {visibleFunctionalGroups.map((group) => (
+                <div key={group.identity} className="library-identity-group">
+                  <div className="library-identity-heading"><strong>{group.identity.replace(":", " ")}</strong><small>{group.function?.role ?? "Shape identity"}</small></div>
+                  {group.entries.map((entry) => (
+                    <button key={entry.id} type="button" className={`library-voicing-row ${entry.id === selectedLibraryEntry.id ? "active" : ""}`} onClick={() => setSelectedLibraryId(entry.id)}>
+                      <span><strong>{entry.chord.name}</strong><small>{entry.position}</small></span>
+                      <small>{getDifficultyScore(entry)}/8</small>
+                    </button>
+                  ))}
+                </div>
               ))}
               {visibleVoicingEntries.length < filteredLibraryEntries.length ? (
                 <button className="btn ghost library-load-more" type="button" onClick={() => setVoicingLimit((limit) => limit + MAX_VISIBLE_VOICINGS)}>
@@ -1150,7 +1501,7 @@ export default function ChordLibraryExplorer() {
               {workspace === "browse" ? (
                 <div className="library-browse-view">
                   <div className="library-primary-diagram">
-                    <ChordDiagram chord={selectedLibraryEntry.chord} />
+                    <ChordDiagram chord={selectedLibraryEntry.chord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} />
                   </div>
                   <div className="library-primary-copy">
                     <div className="library-tag-row">
@@ -1166,6 +1517,11 @@ export default function ChordLibraryExplorer() {
                       <div><span className="label">Practice focus</span><p>{selectedLibraryEntry.practiceFocus}</p></div>
                       <div><span className="label">Frets</span><p>{selectedLibraryEntry.chord.frets.map((fret) => fret < 0 ? "X" : fret === 0 ? "O" : fret).join(" ")}</p></div>
                     </div>
+                    <div className="library-function-card">
+                      <span className="label">Computed function</span>
+                      {selectedFunction ? <><strong>{selectedFunction.role} · {selectedFunction.event}</strong><p>{selectedFunction.explanation}</p><small>{selectedFunction.tendencyTones.length ? `Tendency tones: ${selectedFunction.tendencyTones.join(", ")}. ` : ""}{selectedFunction.suggestedResolution}</small><div className="chip-row"><span className="muted">Next:</span>{selectedFunction.nextRoles.map((role) => <button key={role} type="button" className="chip" onClick={() => setLibraryFunctionRole(role)}>{role}</button>)}</div></> : <p className="muted">This identity is not a playable match for the selected computed role.</p>}
+                    </div>
+                    {transitionRecommendations.length ? <div className="library-transition-card"><span className="label">Low-cost next shapes</span>{transitionRecommendations.map(({ entry, cost }) => <button key={entry.id} type="button" className="library-transition-row" onClick={() => setSelectedLibraryId(entry.id)}><span><strong>{entry.chord.name}</strong><small>{entry.position}</small></span><small>{cost.score}/100 · {cost.explanation}</small></button>)}</div> : null}
                     <details className="library-disclosure">
                       <summary>Technique notes</summary>
                       <div className="library-disclosure-content">
@@ -1263,8 +1619,8 @@ export default function ChordLibraryExplorer() {
                         <div className="ear-training-box">
                           <p>{earTarget.prompt === "chord" ? "Which chord did you hear?" : "Which function did you hear?"}</p>
                           <div className="chip-row">{earTarget.options.map((option) => <button key={option} type="button" className={`chip ${earAnswer === option ? "active" : ""}`} onClick={() => answerEarTraining(option)}>{option}</button>)}</div>
-                          <div className="chip-row"><button className="btn ghost" type="button" onClick={() => playChordPreview(earTarget.entry.chord, "arpeggio")}>Replay</button><button className="btn ghost" type="button" onClick={connectMidi}>Connect MIDI</button></div>
-                          {earResult ? <strong>{earResult}</strong> : null}<p className="muted">{midiStatus}</p>
+                          <div className="chip-row"><button className="btn ghost" type="button" onClick={() => playChordPreview(earTarget.entry.chord, "arpeggio", earTarget.entry.id)}>Replay</button><button className="btn ghost" type="button" onClick={connectMidi}>Connect MIDI</button><button className="btn ghost" type="button" onClick={clearMidiNotes}>Clear MIDI</button></div>
+                          {earResult ? <strong>{earResult}</strong> : null}<p className="muted">{midiStatus}{midiHeldNotes.length > 1 ? " · polyphonic recognition active" : " · one held note uses root fallback"}</p>
                         </div>
                       ) : null}
                     </div>
@@ -1289,7 +1645,7 @@ export default function ChordLibraryExplorer() {
                       <article key={entry.id} className={index === 0 ? "active" : ""}>
                         <span className="label">{index === 0 ? "Primary" : `Option ${index + 1}`}</span>
                         <h4>{entry.chord.name}</h4>
-                        <ChordDiagram chord={entry.chord} />
+                        <ChordDiagram chord={entry.chord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} />
                         <p>{entry.summary}</p>
                         <div className="chip-row"><button className="btn" type="button" onClick={() => playChordPreview(entry.chord, "strum")}>Play</button>{index > 0 ? <button className="btn ghost" type="button" onClick={() => jumpToChord(entry.id)}>Make primary</button> : null}</div>
                       </article>
@@ -1319,7 +1675,7 @@ export default function ChordLibraryExplorer() {
                     <div className="library-compact-controls">
                       <div><label htmlFor="library-capo">Capo {capoFret}</label><input id="library-capo" type="range" min="0" max="7" value={capoFret} onChange={(event) => setCapoFret(Number(event.target.value))}/><p>{selectedLibraryEntry.chord.name} sounds as {selectedCapoName}.</p></div>
                       <div><label htmlFor="library-tuning">Tuning</label><select id="library-tuning" value={tuningId} onChange={(event) => setTuningId(event.target.value as TuningId)}>{TUNINGS.map((tuning) => <option key={tuning.id} value={tuning.id}>{tuning.label}</option>)}</select><p>{getChordNoteNames(selectedLibraryEntry.chord, selectedTuning).join(" ")}</p></div>
-                      <div><span>Sample voice</span><div className="chip-row">{SAMPLE_VOICES.map((voice) => <button key={voice} type="button" className={`chip ${sampleVoice === voice ? "active" : ""}`} onClick={() => setSampleVoice(voice)}>{voice}</button>)}</div><p>{sampleStatus}</p></div>
+                      <div><span>Sample voice</span><div className="chip-row">{SAMPLE_VOICES.map((voice) => <button key={voice} type="button" className={`chip ${sampleVoice === voice ? "active" : ""}`} onClick={() => setSampleVoice(voice)}>{voice}</button>)}</div><label htmlFor="sample-velocity">Velocity {Math.round(sampleVelocity * 100)}%</label><input id="sample-velocity" type="range" min="0" max="1" step="0.01" value={sampleVelocity} onChange={(event) => setSampleVelocity(Number(event.target.value))} /><p>{sampleStatus}</p></div>
                     </div>
                     <div className="custom-fretboard-editor">
                       <div className="library-section-heading"><div><span className="label">Voicing builder</span><h4>Make a custom shape</h4></div><button className="btn ghost" type="button" onClick={() => setCustomFrets([-1, -1, -1, -1, -1, -1])}>Clear</button></div>
@@ -1331,7 +1687,7 @@ export default function ChordLibraryExplorer() {
                           </button>
                         ))}
                       </div>
-                      <div className="custom-fretboard-preview"><ChordDiagram chord={customChord} /><button className="btn" type="button" onClick={() => playChordPreview(customChord, "strum")}>Play custom shape</button></div>
+                      <div className="custom-fretboard-preview"><ChordDiagram chord={customChord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} /><button className="btn" type="button" onClick={() => playChordPreview(customChord, "strum", "custom")}>Play custom shape</button></div>
                     </div>
                   </section>
                   <section>
@@ -1355,6 +1711,35 @@ export default function ChordLibraryExplorer() {
                       <input value={newStudentName} onChange={(event) => setNewStudentName(event.target.value)} placeholder="Student name" aria-label="New student name"/>
                       <button className="btn" type="button" onClick={saveStudentProfile}>Save profile</button>
                     </div>
+                    <p className={`sync-status sync-${syncStatus}`} role="status"><strong>{syncStatus === "synced" ? "Cloud synced" : syncStatus === "syncing" ? "Syncing" : syncStatus === "offline" ? "Offline" : syncStatus === "error" ? "Sync issue" : "Local profile"}</strong> · {syncMessage}</p>
+                    <div className="instrument-profile-grid">
+                      <label>Scale length (in)<input type="number" min="20" max="30" step="0.1" value={instrumentProfile.scaleLengthInches} onChange={(event) => updateInstrumentProfile({ scaleLengthInches: Math.max(20, Math.min(30, Number(event.target.value) || 25.5)) })} /></label>
+                      <label>Action<select value={instrumentProfile.action} onChange={(event) => updateInstrumentProfile({ action: event.target.value as InstrumentProfile["action"] })}><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></label>
+                      <label>Preferred tuning<select value={instrumentProfile.tuningId} onChange={(event) => updateInstrumentProfile({ tuningId: event.target.value })}>{TUNINGS.map((tuning) => <option key={tuning.id} value={tuning.id}>{tuning.label}</option>)}</select></label>
+                    </div>
+                    <div className="display-mode-controls">
+                      <span className="label">Display</span>
+                      <label><input type="checkbox" checked={displaySettings.handedness === "left"} onChange={(event) => setDisplaySettings((previous) => ({ ...previous, handedness: event.target.checked ? "left" : "right" }))} /> Left-handed</label>
+                      <label><input type="checkbox" checked={displaySettings.highContrast} onChange={(event) => setDisplaySettings((previous) => ({ ...previous, highContrast: event.target.checked }))} /> High contrast</label>
+                      <label><input type="checkbox" checked={displaySettings.largeCharts} onChange={(event) => setDisplaySettings((previous) => ({ ...previous, largeCharts: event.target.checked }))} /> Larger charts</label>
+                    </div>
+                  </section>
+                  <section>
+                    <div className="library-section-heading"><div><span className="label">Teacher assignments</span><h4>Practice tasks</h4></div></div>
+                    <div className="assignment-builder">
+                      <input aria-label="Assignment title" value={newAssignmentTitle} onChange={(event) => setNewAssignmentTitle(event.target.value)} placeholder="Assignment title" />
+                      <input aria-label="Assignment due date" type="date" value={newAssignmentDueAt} onChange={(event) => setNewAssignmentDueAt(event.target.value)} />
+                      <button className="btn" type="button" onClick={createAssignment}>Assign current set</button>
+                    </div>
+                    <div className="assignment-list">
+                      {teacherAssignments.filter((assignment) => assignment.studentId === activeStudentId).length ? teacherAssignments.filter((assignment) => assignment.studentId === activeStudentId).map((assignment) => (
+                        <article key={assignment.id} className={`assignment-card ${assignment.completedAt ? "complete" : ""}`}>
+                          <label><input type="checkbox" checked={Boolean(assignment.completedAt)} onChange={() => toggleAssignment(assignment)} /><strong>{assignment.title}</strong></label>
+                          <small>{assignment.description}{assignment.dueAt ? ` · Due ${new Date(assignment.dueAt).toLocaleDateString()}` : ""}</small>
+                          <button className="text-button" type="button" onClick={() => deleteAssignment(assignment.id)}>Remove</button>
+                        </article>
+                      )) : <p className="muted">No assignments for this student yet.</p>}
+                    </div>
                   </section>
                   <section className="teacher-export">
                     <div className="library-section-heading"><div><span className="label">Teacher export</span><h4>Printable practice sheet</h4></div><button className="btn primary" type="button" onClick={() => window.print()}>Print or save PDF</button></div>
@@ -1371,7 +1756,7 @@ export default function ChordLibraryExplorer() {
                         {teacherSheetEntries.map((entry) => (
                           <article key={`teacher-${entry.id}`} className="teacher-sheet-card">
                             <h3>{entry.chord.name}</h3>
-                            <ChordDiagram chord={entry.chord} />
+                            <ChordDiagram chord={entry.chord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} />
                             <p>{entry.position}</p>
                             <p className="muted">{entry.practiceFocus}</p>
                           </article>
@@ -1384,7 +1769,7 @@ export default function ChordLibraryExplorer() {
 
               <div className="print-compare-sheet">
                 {[selectedLibraryEntry, compareEntry, thirdCompareEntry].filter((entry): entry is ChordLibraryItem => Boolean(entry)).map((entry) => (
-                  <article key={`print-${entry.id}`} className="print-compare-card"><h3>{entry.chord.name}</h3><p>{entry.position}</p><ChordDiagram chord={entry.chord}/><p>{entry.recommendedVariant}</p></article>
+                  <article key={`print-${entry.id}`} className="print-compare-card"><h3>{entry.chord.name}</h3><p>{entry.position}</p><ChordDiagram chord={entry.chord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts}/><p>{entry.recommendedVariant}</p></article>
                 ))}
               </div>
             </div>

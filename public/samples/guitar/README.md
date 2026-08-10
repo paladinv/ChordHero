@@ -9,6 +9,11 @@ trimmed to three seconds, faded, converted to mono 44.1 kHz MP3 at 96 kbps, and 
 MIDI root pitches. Playback chooses the closest recorded root for each guitar string and makes a
 small pitch correction, so chord quality, voicing, capo, and alternate tuning remain accurate.
 
+`manifest.json` defines optional velocity-layered per-voicing recordings. Use the naming pattern
+`per-voicing/{voicing-id}/{voice}/{strum|arpeggio}/{soft|hard}/{midi}.wav`; the web player can
+fall back to the existing `clean/*.mp3` and `muted.mp3` assets when a layer is absent. Add only
+licensed recordings and never store provider credentials in this directory.
+
 Source release:
 https://github.com/sfzinstruments/karoryfer.emilyguitar/releases/tag/v1.001
 

@@ -82,6 +82,9 @@ final class SongLibraryCollection {
     var isQueue: Bool
     var resumeSongID: String?
     var resumeVariationID: String?
+    var archivedAt: Date?
+    var transitionBreakSeconds: Int?
+    var localRole: String?
 
     init(id: UUID = UUID(), profileID: UUID, name: String, description: String = "", songIDs: [String] = [], now: Date = .now) {
         self.id = id
@@ -92,6 +95,9 @@ final class SongLibraryCollection {
         self.createdAt = now
         self.updatedAt = now
         self.isQueue = false
+        self.archivedAt = nil
+        self.transitionBreakSeconds = 30
+        self.localRole = "owner"
     }
 }
 
@@ -104,6 +110,7 @@ final class ImportedSongRecord {
     var sourceURL: String
     var notes: String
     var importedAt: Date
+    var archivedAt: Date?
 
     init(id: UUID = UUID(), profileID: UUID, title: String, artist: String, sourceURL: String, notes: String = "", now: Date = .now) {
         self.id = id
@@ -113,6 +120,7 @@ final class ImportedSongRecord {
         self.sourceURL = sourceURL
         self.notes = notes
         self.importedAt = now
+        self.archivedAt = nil
     }
 }
 
@@ -127,6 +135,8 @@ final class SongPracticeRecord {
     var lastPracticedAt: Date?
     var sectionMasteryJSON: String
     var streakDays: Int
+    var adaptiveOverrideJSON: String?
+    var targetTempo: Int?
 
     init(profileID: UUID, songID: String, variationID: String = "") {
         self.compoundID = "\(profileID.uuidString):\(songID)"
@@ -137,6 +147,8 @@ final class SongPracticeRecord {
         self.practiceCount = 0
         self.sectionMasteryJSON = "{}"
         self.streakDays = 0
+        self.adaptiveOverrideJSON = nil
+        self.targetTempo = nil
     }
 }
 
@@ -176,9 +188,11 @@ final class SongRecordingRecord {
     var filePath: String
     var durationSeconds: Double
     var createdAt: Date
+    var archivedAt: Date?
 
     init(profileID: UUID, songID: String, sectionID: String? = nil, filePath: String, durationSeconds: Double, now: Date = .now) {
         self.id = UUID(); self.profileID = profileID; self.songID = songID; self.sectionID = sectionID; self.filePath = filePath; self.durationSeconds = durationSeconds; self.createdAt = now
+        self.archivedAt = nil
     }
 }
 

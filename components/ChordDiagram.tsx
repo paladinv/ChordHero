@@ -22,6 +22,9 @@ export const normalizeChord = (chord: Chord): Chord => ({
 
 type ChordDiagramProps = {
   chord: Chord;
+  orientation?: "right" | "left";
+  highContrast?: boolean;
+  largeChart?: boolean;
 };
 
 const STRING_COUNT = 6;
@@ -37,7 +40,7 @@ function getBaseFret(chord: Chord) {
   return chord.barre?.fret ?? minFret;
 }
 
-export default function ChordDiagram({ chord }: ChordDiagramProps) {
+export default function ChordDiagram({ chord, orientation = "right", highContrast = false, largeChart = false }: ChordDiagramProps) {
   const chart = normalizeChord(chord);
   const width = 200;
   const height = 230;
@@ -54,16 +57,17 @@ export default function ChordDiagram({ chord }: ChordDiagramProps) {
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      className="diagram"
+      className={`diagram ${orientation === "left" ? "diagram-left-handed" : ""} ${highContrast ? "diagram-high-contrast" : ""} ${largeChart ? "diagram-large" : ""}`}
       role="img"
-      aria-label={`Chord diagram for ${chart.name}. X means muted, O means open, and numbers show fingerings.`}
+      aria-label={`Chord diagram for ${chart.name}. ${orientation === "left" ? "Left-handed mirrored chart. " : ""}X means muted, O means open, and numbers show fingerings.`}
     >
       <title>{`Chord diagram for ${chart.name}`}</title>
-      <desc>Six-string guitar chart. X means muted, O means open, and numbers show recommended fingers.</desc>
+      <desc>Six-string {orientation === "left" ? "left-handed mirrored " : ""}guitar chart. X means muted, O means open, and numbers show recommended fingers.</desc>
       <rect x="0" y="0" width={width} height={height} rx="18" className="diagram-bg" />
 
       {Array.from({ length: STRING_COUNT }).map((_, index) => {
-        const x = paddingX + index * stringGap;
+          const visualIndex = orientation === "left" ? STRING_COUNT - index - 1 : index;
+          const x = paddingX + visualIndex * stringGap;
         return (
           <line
             key={`string-${index}`}
@@ -98,7 +102,7 @@ export default function ChordDiagram({ chord }: ChordDiagramProps) {
 
       {chart.barre && (
         <rect
-          x={paddingX + chart.barre.from * stringGap - 8}
+          x={paddingX + (orientation === "left" ? STRING_COUNT - 1 - chart.barre.to : chart.barre.from) * stringGap - 8}
           y={paddingY + (chart.barre.fret - baseFret + 1) * fretGap - fretGap / 2 - 8}
           width={(chart.barre.to - chart.barre.from) * stringGap + 16}
           height={16}
@@ -108,7 +112,8 @@ export default function ChordDiagram({ chord }: ChordDiagramProps) {
       )}
 
       {chart.frets.map((fret, stringIndex) => {
-        const x = paddingX + stringIndex * stringGap;
+        const visualIndex = orientation === "left" ? STRING_COUNT - stringIndex - 1 : stringIndex;
+        const x = paddingX + visualIndex * stringGap;
         if (fret === 0) {
           return (
             <text key={`open-${stringIndex}`} x={x} y={paddingY - 12} className="diagram-open">

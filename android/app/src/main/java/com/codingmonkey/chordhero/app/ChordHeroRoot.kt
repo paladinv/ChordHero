@@ -204,7 +204,7 @@ private fun Screen(
             Destination.Dashboard -> DashboardScreen(onNavigate)
             Destination.Trainer -> TrainerScreen(content, container.audio)
             Destination.RightHand -> RightHandScreen(content, container.audio)
-            Destination.Songs -> SongCoachScreen(content, container.audio, container.recorder, selectedSongForCoach?.first, selectedSongForCoach?.second)
+            Destination.Songs -> SongCoachScreen(content, container.audio, container.recorder, container.midi, selectedSongForCoach?.first, selectedSongForCoach?.second)
             Destination.SongLibrary -> SongLibraryScreen(content, profile, container, onOpenSong)
             Destination.Library -> LibraryScreen(content, profile, container)
             Destination.Chart -> ChartScreen(content, container)

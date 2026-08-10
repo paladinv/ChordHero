@@ -79,7 +79,7 @@ fun SongLibraryScreen(content: ContentBundle, profile: StudentProfileEntity, con
         selected?.let { song ->
             item {
                 Card(Modifier.fillMaxWidth()) { Column(verticalArrangement = Arrangement.spacedBy(8.dp)) { Text(song.title, style = MaterialTheme.typography.headlineSmall); Text("${song.artist} · ${song.source}"); Text("${song.key} · ${song.timeSignature} · ${song.difficulty}")
-                    song.variations.forEach { item -> FilterChip(variation?.id == item.id, { variationID = item.id }, { Text("${item.name} · ${item.technique}") }) }
+                    song.variations.forEach { item -> FilterChip(variation?.id == item.id, { variationID = item.id }, { Text("${item.name} · ${item.instrument} · ${item.tuningLabel ?: item.tuningId} · capo ${item.capo}") }) }
                     Text(variation?.pattern ?: song.strumPattern, style = MaterialTheme.typography.titleMedium); Text(variation?.feel ?: song.strumFeel)
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Button(onClick = { variation?.let { val existing = practiceRecords.firstOrNull { record -> record.songId == song.id }; scope.launch { container.progress.saveSongPractice((existing ?: SongPracticeEntity(profile.id, song.id)).copy(variationId = it.id, practiceCount = (existing?.practiceCount ?: 0) + 1, lastPracticedAt = System.currentTimeMillis())); onOpenSong(song.id, it.id) } } }) { Text("Open Song Coach") }

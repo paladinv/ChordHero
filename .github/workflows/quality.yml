@@ -1,0 +1,21 @@
+name: Quality budgets
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - run: npm run content:validate
+      - run: npm run build
+      - run: npm run ci:performance
+      - run: npm run ci:visual

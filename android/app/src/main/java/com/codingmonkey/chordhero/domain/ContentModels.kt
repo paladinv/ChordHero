@@ -172,6 +172,8 @@ data class SongVariation(
     val capo: Int,
     val pattern: String,
     val feel: String,
+    val instrument: String = "guitar",
+    val tuningLabel: String? = null,
 )
 
 @Serializable
