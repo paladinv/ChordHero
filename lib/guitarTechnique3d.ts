@@ -29,6 +29,22 @@ export type TechniqueMotion = {
   durationMs: number;
 };
 
+/** Standard 25.5in guitar scale represented in the scene's world units. */
+export const GUITAR_SCALE_LENGTH = 10.5;
+
+/** Camera positions are data-only so the renderer and validation can share them. */
+export const GUITAR_CAMERA_PRESETS = {
+  overview: { position: [8.6, 5.6, 11.4] as [number, number, number], target: [0, 0.25, 2.1] as [number, number, number] },
+  fretting: { position: [5.2, 3.3, 3.2] as [number, number, number], target: [0, 0.3, -1.1] as [number, number, number] },
+  picking: { position: [-4.4, 3.1, 9.2] as [number, number, number], target: [0, 0.35, 5.6] as [number, number, number] }
+} as const;
+
+/** Distance from the nut to a fret using the physical 12th-root-of-two spacing. */
+export function guitarFretPosition(fret: number, nutPosition = -3.3, scaleLength = GUITAR_SCALE_LENGTH) {
+  const bounded = Math.max(0, Math.min(24, integer(fret, 0)));
+  return nutPosition + scaleLength * (1 - Math.pow(2, -bounded / 12));
+}
+
 const STRING_COUNT = 6;
 
 function integer(value: unknown, fallback: number) {

@@ -2,14 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import {
-  chordToLeftHandTargets,
-  normalizeGuitarChord,
-  techniqueToMotionPlan,
-  type GuitarChordShape,
-  type GuitarHandedness,
-  type RightHandTechnique
-} from "../lib/guitarTechnique3d";
+import { chordToLeftHandTargets, guitarFretPosition, GUITAR_CAMERA_PRESETS, normalizeGuitarChord, techniqueToMotionPlan, type GuitarChordShape, type GuitarHandedness, type RightHandTechnique } from "../lib/guitarTechnique3d";
 
 export type GuitarTechnique3DProps = {
   chord?: GuitarChordShape | null;
@@ -19,7 +12,6 @@ export type GuitarTechnique3DProps = {
   activeStrings?: readonly number[];
   mode?: "left-hand" | "right-hand" | "both";
   labels?: boolean;
-  /** Changes trigger a short gesture when the host advances its pattern step. */
   gestureKey?: string | number;
   autoPlay?: boolean;
   className?: string;
@@ -27,356 +19,86 @@ export type GuitarTechnique3DProps = {
   onGesture?: (kind: RightHandTechnique) => void;
 };
 
-type Segment = { mesh: THREE.Mesh; tip: THREE.Mesh };
-type FingerVisual = { segment: Segment; accent: THREE.Mesh };
+type Segment = { mesh: THREE.Mesh; joint: THREE.Mesh; pad: THREE.Mesh; nail: THREE.Mesh };
+type FingerVisual = { segments: Segment[]; accent: THREE.Mesh };
+type HandVisual = { group: THREE.Group; fingers: FingerVisual[]; thumb: Segment[]; pick?: THREE.Mesh };
+type PresetName = keyof typeof GUITAR_CAMERA_PRESETS;
 
-const STRING_X = (string: number) => (string - 2.5) * 0.2;
-const FRET_Z = (fret: number) => -2.2 + Math.max(0, fret - 0.5) * 0.3;
+const STRING_X = (string: number) => (string - 2.5) * 0.19;
+const NUT_Z = -3.3;
+const FRET_Z = (fret: number) => guitarFretPosition(fret, NUT_Z);
+const STRING_START = NUT_Z - 0.15;
+const STRING_END = 7.15;
+const direction = new THREE.Vector3();
 
-function setSegment(segment: Segment, from: THREE.Vector3, to: THREE.Vector3) {
-  const delta = new THREE.Vector3().subVectors(to, from);
+function setSegment(segment: Segment, from: THREE.Vector3, to: THREE.Vector3, width = 1) {
+  direction.subVectors(to, from);
   segment.mesh.position.copy(from).add(to).multiplyScalar(0.5);
-  segment.mesh.scale.set(1, delta.length() / 1, 1);
-  segment.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), delta.normalize());
-  segment.tip.position.copy(to);
+  segment.mesh.scale.set(width, Math.max(0.04, direction.length()), width);
+  segment.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+  segment.joint.position.copy(to); segment.pad.position.copy(to); segment.nail.position.copy(to); segment.nail.quaternion.copy(segment.mesh.quaternion);
 }
 
-function makeSegment(geometry: THREE.BufferGeometry, material: THREE.Material, group: THREE.Group): Segment {
-  const mesh = new THREE.Mesh(geometry, material);
-  const tip = new THREE.Mesh(new THREE.SphereGeometry(0.12, 6, 4), material);
-  group.add(mesh, tip);
-  return { mesh, tip };
+function makeSegment(group: THREE.Group, geometry: THREE.BufferGeometry, jointGeometry: THREE.BufferGeometry, nailGeometry: THREE.BufferGeometry, material: THREE.Material, padMaterial: THREE.Material, nailMaterial: THREE.Material): Segment {
+  const mesh = new THREE.Mesh(geometry, material); const joint = new THREE.Mesh(jointGeometry, material); const pad = new THREE.Mesh(jointGeometry, padMaterial); const nail = new THREE.Mesh(nailGeometry, nailMaterial);
+  mesh.scale.setScalar(0.13); joint.scale.setScalar(0.16); pad.scale.setScalar(0.1); nail.scale.set(0.09, 0.045, 0.05); group.add(mesh, joint, pad, nail); return { mesh, joint, pad, nail };
 }
 
-function makeFingerSet(
-  group: THREE.Group,
-  geometry: THREE.BufferGeometry,
-  material: THREE.Material,
-  accentMaterial: THREE.Material
-): FingerVisual[] {
-  return Array.from({ length: 4 }, (_, finger) => ({
-    segment: makeSegment(geometry, material, group),
-    accent: new THREE.Mesh(new THREE.SphereGeometry(0.14, 6, 4), accentMaterial)
-  })).map((finger) => {
-    group.add(finger.accent);
-    return finger;
-  });
+function makeHand(side: "left" | "right", shared: { segment: THREE.BufferGeometry; joint: THREE.BufferGeometry; nailGeometry: THREE.BufferGeometry; skin: THREE.Material; skinLight: THREE.Material; nail: THREE.Material; accent: THREE.Material; pick: THREE.Material }): HandVisual {
+  const group = new THREE.Group(); const palm = new THREE.Mesh(new THREE.SphereGeometry(0.72, 18, 12), shared.skin); palm.scale.set(1.17, 0.75, 1.32); group.add(palm);
+  const wrist = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.75, 8, 12), shared.skin); wrist.rotation.x = Math.PI / 2; wrist.position.z = side === "left" ? -1.15 : 7.25; group.add(wrist);
+  const fingers = Array.from({ length: 4 }, (_, index) => ({ segments: Array.from({ length: 3 }, () => makeSegment(group, shared.segment, shared.joint, shared.nailGeometry, shared.skinLight, shared.skin, shared.nail)), accent: (() => { const mesh = new THREE.Mesh(shared.joint, shared.accent); mesh.scale.set(0.14, 0.06, 0.14); group.add(mesh); return mesh; })() }));
+  const thumb = Array.from({ length: 2 }, () => makeSegment(group, shared.segment, shared.joint, shared.nailGeometry, shared.skin, shared.skinLight, shared.nail));
+  const pick = side === "right" ? new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.42, 6), shared.pick) : undefined; if (pick) { pick.rotation.x = Math.PI / 2; pick.visible = false; group.add(pick); }
+  return { group, fingers, thumb, pick };
 }
 
-function disposeScene(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
-  scene.traverse((object) => {
-    if (!(object instanceof THREE.Mesh)) return;
-    object.geometry.dispose();
-    const materials = Array.isArray(object.material) ? object.material : [object.material];
-    materials.forEach((material) => material.dispose());
-  });
-  renderer.dispose();
+function bodyShape() {
+  const shape = new THREE.Shape(); shape.moveTo(0, -2.26); shape.bezierCurveTo(-0.8, -2.28, -1.25, -2.05, -1.42, -1.46); shape.bezierCurveTo(-1.54, -1.06, -1.12, -0.76, -1, -0.37); shape.bezierCurveTo(-0.9, -0.05, -1.26, 0.22, -1.62, 0.55); shape.bezierCurveTo(-2.23, 1.08, -2.5, 1.67, -2.27, 2.08); shape.bezierCurveTo(-1.85, 2.75, -0.74, 2.78, 0, 2.72); shape.bezierCurveTo(0.74, 2.78, 1.85, 2.75, 2.27, 2.08); shape.bezierCurveTo(2.5, 1.67, 2.23, 1.08, 1.62, 0.55); shape.bezierCurveTo(1.26, 0.22, 0.9, -0.05, 1, -0.37); shape.bezierCurveTo(1.12, -0.76, 1.54, -1.06, 1.42, -1.46); shape.bezierCurveTo(1.25, -2.05, 0.8, -2.28, 0, -2.26); return shape;
 }
 
-/**
- * A small, lazy-friendly Three.js lesson engine. It owns its renderer and scene,
- * renders only on input/tween/resize, and exposes no per-frame React state.
- */
-export default function GuitarTechnique3D({
-  chord,
-  handedness = "right",
-  technique = "strumming",
-  activePatternStep = 0,
-  activeStrings = [],
-  mode = "both",
-  labels = true,
-  className,
-  gestureKey,
-  autoPlay = false,
-  onTargetChange,
-  onGesture
-}: GuitarTechnique3DProps) {
-  const hostRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const chordRef = useRef(normalizeGuitarChord(chord));
-  const configRef = useRef({ technique, activePatternStep, activeStrings: [...activeStrings], handedness, mode });
-  const targetRef = useRef({ string: 0, fret: 1 });
-  const leftFingersRef = useRef<FingerVisual[]>([]);
-  const rightFingersRef = useRef<FingerVisual[]>([]);
-  const rightHandRef = useRef<THREE.Group | null>(null);
-  const leftHandRef = useRef<THREE.Group | null>(null);
-  const manualTargetRef = useRef<THREE.Mesh | null>(null);
-  const lastGestureKeyRef = useRef<string | number | undefined>(undefined);
-  const renderRef = useRef<(() => void) | null>(null);
-  const refreshRef = useRef<(() => void) | null>(null);
-  const animateRef = useRef<(() => void) | null>(null);
-  const motionRef = useRef<{ started: number; duration: number; direction: "down" | "up" | "neutral" } | null>(null);
-  const rafRef = useRef<number | null>(null);
-  const [fallback, setFallback] = useState(false);
-  const [target, setTarget] = useState(targetRef.current);
+function bodyPart(material: THREE.Material, depth: number, bevel: number) { const geometry = new THREE.ExtrudeGeometry(bodyShape(), { depth, bevelEnabled: true, bevelSegments: 3, bevelSize: bevel, bevelThickness: bevel, curveSegments: 18 }); geometry.rotateX(Math.PI / 2); geometry.translate(0, depth / 2, 0); return new THREE.Mesh(geometry, material); }
+function rod(geometry: THREE.BufferGeometry, material: THREE.Material, from: THREE.Vector3, to: THREE.Vector3) { const mesh = new THREE.Mesh(geometry, material); direction.subVectors(to, from); mesh.position.copy(from).add(to).multiplyScalar(0.5); mesh.scale.set(1, direction.length(), 1); mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize()); return mesh; }
+function disposeScene(scene: THREE.Scene, renderer: THREE.WebGLRenderer) { const geometries = new Set<THREE.BufferGeometry>(); const materials = new Set<THREE.Material>(); scene.traverse((object) => { if (object instanceof THREE.Mesh) { geometries.add(object.geometry); (Array.isArray(object.material) ? object.material : [object.material]).forEach((material) => materials.add(material)); } }); geometries.forEach((geometry) => geometry.dispose()); materials.forEach((material) => material.dispose()); renderer.dispose(); }
 
+/** Offline, asset-free studio guitar. Static resources are shared and the renderer is event-driven. */
+export default function GuitarTechnique3D({ chord, handedness = "right", technique = "strumming", activePatternStep = 0, activeStrings = [], mode = "both", labels = true, className, gestureKey, autoPlay = false, onTargetChange, onGesture }: GuitarTechnique3DProps) {
+  const hostRef = useRef<HTMLDivElement>(null); const canvasRef = useRef<HTMLCanvasElement>(null); const chordRef = useRef(normalizeGuitarChord(chord)); const configRef = useRef({ technique, activePatternStep, activeStrings: [...activeStrings], handedness, mode }); const initialHandednessRef = useRef(handedness); const initialModeRef = useRef(mode); const onGestureRef = useRef(onGesture); const targetRef = useRef({ string: 0, fret: 1 }); const handsRef = useRef<{ left: HandVisual | null; right: HandVisual | null }>({ left: null, right: null }); const refreshRef = useRef<(() => void) | null>(null); const gestureRef = useRef<(() => void) | null>(null); const cameraPresetRef = useRef<(name: PresetName) => void>(() => {}); const requestedPresetRef = useRef<PresetName>("overview"); const lastGestureKeyRef = useRef<string | number | undefined>(); const rafRef = useRef<number | null>(null); const [fallback, setFallback] = useState(false); const [target, setTarget] = useState(targetRef.current); const [preset, setPreset] = useState<PresetName>("overview");
+  useEffect(() => { chordRef.current = normalizeGuitarChord(chord); refreshRef.current?.(); }, [chord]);
+  useEffect(() => { onGestureRef.current = onGesture; }, [onGesture]);
+  useEffect(() => { configRef.current = { technique, activePatternStep, activeStrings: [...activeStrings], handedness, mode }; const { left, right } = handsRef.current; if (left) { left.group.visible = mode === "left-hand" || mode === "both"; left.group.scale.x = handedness === "left" ? -1 : 1; } if (right) { right.group.visible = mode === "right-hand" || mode === "both"; right.group.scale.x = handedness === "left" ? -1 : 1; } refreshRef.current?.(); }, [activePatternStep, activeStrings, handedness, mode, technique]);
   useEffect(() => {
-    chordRef.current = normalizeGuitarChord(chord);
-    refreshRef.current?.();
-  }, [chord]);
-
-  useEffect(() => {
-    configRef.current = { technique, activePatternStep, activeStrings: [...activeStrings], handedness, mode };
-    if (leftHandRef.current) leftHandRef.current.scale.x = handedness === "left" ? -1 : 1;
-    if (leftHandRef.current) leftHandRef.current.visible = mode === "left-hand" || mode === "both";
-    if (rightHandRef.current) rightHandRef.current.visible = mode === "right-hand" || mode === "both";
-    if (manualTargetRef.current) manualTargetRef.current.visible = mode === "left-hand" || mode === "both";
-    refreshRef.current?.();
-  }, [activePatternStep, activeStrings, handedness, mode, technique]);
-
-  useEffect(() => {
-    const host = hostRef.current;
-    const canvas = canvasRef.current;
-    if (!host || !canvas) return;
-    let renderer: THREE.WebGLRenderer;
-    try {
-      renderer = new THREE.WebGLRenderer({ canvas, antialias: window.devicePixelRatio <= 1.25, alpha: true, powerPreference: "low-power" });
-    } catch {
-      setFallback(true);
-      return;
-    }
-    setFallback(false);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
-    renderer.outputColorSpace = THREE.SRGBColorSpace;
-    const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0xf2ecdf);
-    const camera = new THREE.PerspectiveCamera(35, 1, 0.1, 100);
-    camera.position.set(0, 5.2, 10.4);
-    camera.lookAt(0, 0, 2.4);
-    scene.add(new THREE.HemisphereLight(0xfff8ed, 0x35585b, 2.2));
-    const key = new THREE.DirectionalLight(0xffffff, 2.4);
-    key.position.set(-4, 8, 5);
-    scene.add(key);
-
-    const wood = new THREE.MeshStandardMaterial({ color: 0x7b4d2b, roughness: 0.8 });
-    const board = new THREE.MeshStandardMaterial({ color: 0x3b2925, roughness: 0.72 });
-    const fretMetal = new THREE.MeshStandardMaterial({ color: 0xd3bf9d, metalness: 0.8, roughness: 0.28 });
-    const stringMetal = new THREE.MeshStandardMaterial({ color: 0xe7d8bd, metalness: 0.75, roughness: 0.3 });
-    const skin = new THREE.MeshStandardMaterial({ color: 0xd88463, roughness: 0.9 });
-    const skinLight = new THREE.MeshStandardMaterial({ color: 0xf0ae89, roughness: 0.86 });
-    const accent = new THREE.MeshStandardMaterial({ color: 0x16a6a0, emissive: 0x073b3d, emissiveIntensity: 0.5 });
-    const activeAccent = new THREE.MeshStandardMaterial({ color: 0xffbd55, emissive: 0x7e3b0c, emissiveIntensity: 0.8 });
-    const ink = new THREE.MeshStandardMaterial({ color: 0x182d30, roughness: 0.9 });
-
-    const guitar = new THREE.Group();
-    const neck = new THREE.Mesh(new THREE.BoxGeometry(1.65, 0.22, 8), wood);
-    neck.position.set(0, 0, 1.6);
-    guitar.add(neck);
-    const fingerboard = new THREE.Mesh(new THREE.BoxGeometry(1.48, 0.06, 7.7), board);
-    fingerboard.position.set(0, 0.14, 1.6);
-    guitar.add(fingerboard);
-    for (let fret = 0; fret <= 24; fret += 1) {
-      const fretBar = new THREE.Mesh(new THREE.BoxGeometry(1.53, 0.07, fret === 0 ? 0.08 : 0.035), fretMetal);
-      fretBar.position.set(0, 0.21, fret === 0 ? -2.35 : FRET_Z(fret) + 0.15);
-      guitar.add(fretBar);
-    }
-    for (let string = 0; string < 6; string += 1) {
-      const stringMesh = new THREE.Mesh(new THREE.CylinderGeometry(0.018 + string * 0.002, 0.018 + string * 0.002, 8, 5), stringMetal);
-      stringMesh.rotation.x = Math.PI / 2;
-      stringMesh.position.set(STRING_X(string), 0.27, 1.6);
-      guitar.add(stringMesh);
-    }
-    const body = new THREE.Mesh(new THREE.SphereGeometry(2.25, 16, 10), wood);
-    body.scale.set(1, 0.17, 1.16);
-    body.position.set(0, -0.01, 6.25);
-    guitar.add(body);
-    const soundHole = new THREE.Mesh(new THREE.CylinderGeometry(0.75, 0.75, 0.08, 24), ink);
-    soundHole.rotation.x = Math.PI / 2;
-    soundHole.position.set(0, 0.2, 6.1);
-    guitar.add(soundHole);
-    const rosette = new THREE.Mesh(new THREE.TorusGeometry(0.84, 0.06, 6, 24), fretMetal);
-    rosette.rotation.x = Math.PI / 2;
-    rosette.position.set(0, 0.25, 6.1);
-    guitar.add(rosette);
-    scene.add(guitar);
-
-    const leftHand = new THREE.Group();
-    leftHand.visible = mode === "left-hand" || mode === "both";
-    leftHand.scale.x = handedness === "left" ? -1 : 1;
-    const leftPalm = new THREE.Mesh(new THREE.SphereGeometry(0.62, 8, 6), skin);
-    leftPalm.scale.set(1.1, 0.75, 1.25);
-    leftPalm.position.set(-1.65, 0.75, -0.8);
-    leftHand.add(leftPalm);
-    const leftThumb = makeSegment(new THREE.CylinderGeometry(0.14, 0.17, 1, 6), skinLight, leftHand);
-    const leftFingerGeometry = new THREE.CylinderGeometry(0.105, 0.125, 1, 6);
-    leftFingersRef.current = makeFingerSet(leftHand, leftFingerGeometry, skin, activeAccent);
-    scene.add(leftHand);
-    leftHandRef.current = leftHand;
-
-    const rightHand = new THREE.Group();
-    rightHand.visible = mode === "right-hand" || mode === "both";
-    rightHand.position.set(0, 0.1, 0);
-    const rightPalm = new THREE.Mesh(new THREE.SphereGeometry(0.6, 8, 6), skin);
-    rightPalm.scale.set(1.25, 0.7, 1.0);
-    rightPalm.position.set(0, 0.8, 6.75);
-    rightHand.add(rightPalm);
-    const rightFingerGeometry = new THREE.CylinderGeometry(0.11, 0.13, 1, 6);
-    rightFingersRef.current = makeFingerSet(rightHand, rightFingerGeometry, skinLight, accent);
-    scene.add(rightHand);
-    rightHandRef.current = rightHand;
-
-    const markers = Array.from({ length: 6 }, (_, string) => {
-      const marker = new THREE.Mesh(new THREE.SphereGeometry(0.075, 6, 4), activeAccent);
-      marker.position.set(STRING_X(string), 0.34, FRET_Z(1));
-      marker.visible = false;
-      scene.add(marker);
-      return marker;
-    });
-    const manualTarget = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.045, 6, 16), activeAccent);
-    manualTarget.rotation.x = Math.PI / 2;
-    manualTarget.position.set(STRING_X(targetRef.current.string), 0.38, FRET_Z(targetRef.current.fret));
-    manualTarget.visible = mode === "left-hand" || mode === "both";
-    scene.add(manualTarget);
-    manualTargetRef.current = manualTarget;
-    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    let visible = true;
-    let disposed = false;
-
-    const resize = () => {
-      if (disposed) return;
-      const width = Math.max(280, host.clientWidth);
-      const height = Math.max(260, Math.min(520, host.clientHeight || width * 0.58));
-      renderer.setSize(width, height, false);
-      camera.aspect = width / height;
-      camera.updateProjectionMatrix();
-      renderer.render(scene, camera);
-    };
-    const render = () => {
-      if (!disposed && visible) renderer.render(scene, camera);
-    };
-    const updateLeftHand = () => {
-      const targets = chordToLeftHandTargets(chordRef.current);
-      const byFinger = new Map<number, (typeof targets)[number][]>();
-      targets.forEach((item) => { byFinger.set(item.finger, [...(byFinger.get(item.finger) ?? []), item]); });
-      leftFingersRef.current.forEach((finger, index) => {
-        const fingerTargets = byFinger.get(index + 1) ?? [];
-        const target = fingerTargets.length ? {
-          ...fingerTargets[0],
-          string: fingerTargets.reduce((sum, item) => sum + item.string, 0) / fingerTargets.length,
-          fret: fingerTargets.reduce((sum, item) => sum + item.fret, 0) / fingerTargets.length
-        } : null;
-        const from = new THREE.Vector3(-1.65 + index * 0.12, 0.92, -0.8 + index * 0.08);
-        const to = target ? new THREE.Vector3(STRING_X(target.string), 0.32, FRET_Z(target.fret)) : new THREE.Vector3(-0.7 + index * 0.18, 0.33, -1.8);
-        setSegment(finger.segment, from, to);
-        finger.accent.position.copy(to);
-        finger.accent.visible = Boolean(target);
-      });
-      setSegment(leftThumb, new THREE.Vector3(-1.48, 0.78, -0.5), new THREE.Vector3(0.72, 0.26, -0.95));
-      markers.forEach((marker, string) => {
-        const fret = chordRef.current.frets[string];
-        marker.visible = fret > 0;
-        marker.position.set(STRING_X(string), 0.34, FRET_Z(fret));
-      });
-      manualTarget.position.set(STRING_X(targetRef.current.string), 0.39, FRET_Z(targetRef.current.fret));
-    };
-    const updateRightHand = (progress = 0) => {
-      const config = configRef.current;
-      const plan = techniqueToMotionPlan(config.technique, config.activePatternStep, config.activeStrings);
-      const motion = motionRef.current;
-      const phase = motion ? Math.min(1, Math.max(0, progress)) : 0;
-      const sweep = plan.direction === "up" ? 0.8 - phase * 1.6 : -0.8 + phase * 1.6;
-      if (rightHand) rightHand.position.x = motion && plan.kind !== "fingerpick" ? sweep : 0;
-      rightFingersRef.current.forEach((finger, index) => {
-        const string = plan.strings[index % Math.max(1, plan.strings.length)] ?? index;
-        const isActive = plan.kind === "fingerpick" ? plan.strings.includes(string) : index === 0;
-        const base = new THREE.Vector3(-0.05 + index * 0.14, 1.02, 6.65 + index * 0.05);
-        const dip = motion && isActive ? Math.sin(Math.PI * phase) * (plan.kind === "fingerpick" ? 0.42 : 0.18) : 0;
-        const to = new THREE.Vector3(STRING_X(string), 0.34 - dip, 6.15 + (string % 2) * 0.08);
-        setSegment(finger.segment, base, to);
-        finger.accent.position.copy(to);
-        finger.accent.visible = isActive && Boolean(motion);
-      });
-    };
-    updateLeftHand();
-    updateRightHand();
-    renderRef.current = render;
-    refreshRef.current = () => { updateLeftHand(); updateRightHand(); render(); };
-    animateRef.current = () => {
-      if (disposed || !motionRef.current) return;
-      const motion = motionRef.current;
-      const elapsed = performance.now() - motion.started;
-      const progress = reducedMotion ? 1 : Math.min(1, elapsed / motion.duration);
-      updateRightHand(progress);
-      render();
-      if (progress < 1 && visible) rafRef.current = requestAnimationFrame(animateRef.current!);
-      else { motionRef.current = null; updateRightHand(); render(); }
-    };
-    const observer = new ResizeObserver(resize);
-    observer.observe(host);
-    const intersection = new IntersectionObserver(([entry]) => { visible = Boolean(entry?.isIntersecting); if (visible) render(); });
-    intersection.observe(host);
-    const onVisibility = () => { visible = document.visibilityState === "visible"; if (!visible && rafRef.current) cancelAnimationFrame(rafRef.current); else if (visible) render(); };
-    document.addEventListener("visibilitychange", onVisibility);
-    resize();
-    const onPointer = () => {
-      const next = { string: (targetRef.current.string + 1) % 6, fret: targetRef.current.fret };
-      targetRef.current = next;
-      setTarget(next);
-      refreshRef.current?.();
-      onTargetChange?.(next);
-    };
-    canvas.addEventListener("pointerdown", onPointer);
-    return () => {
-      disposed = true;
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      observer.disconnect();
-      intersection.disconnect();
-      document.removeEventListener("visibilitychange", onVisibility);
-      canvas.removeEventListener("pointerdown", onPointer);
-      renderRef.current = null;
-      refreshRef.current = null;
-      animateRef.current = null;
-      rightHandRef.current = null;
-      leftHandRef.current = null;
-      manualTargetRef.current = null;
-      disposeScene(scene, renderer);
-    };
+    const host = hostRef.current; const canvas = canvasRef.current; if (!host || !canvas) return; let renderer: THREE.WebGLRenderer;
+    try { renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false, powerPreference: "low-power" }); } catch { setFallback(true); return; }
+    setFallback(false); renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5)); renderer.outputColorSpace = THREE.SRGBColorSpace; renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.08;
+    const scene = new THREE.Scene(); scene.background = new THREE.Color(0x101316); const camera = new THREE.PerspectiveCamera(32, 1, 0.1, 100); camera.position.set(...GUITAR_CAMERA_PRESETS.overview.position); camera.lookAt(...GUITAR_CAMERA_PRESETS.overview.target);
+    scene.add(new THREE.HemisphereLight(0xd8e6e5, 0x111418, 1.7)); const key = new THREE.DirectionalLight(0xffe4c2, 2.8); key.position.set(-5, 9, 7); scene.add(key); const fill = new THREE.DirectionalLight(0x8eb8d6, 1.35); fill.position.set(6, 4, 1); scene.add(fill); const rim = new THREE.DirectionalLight(0xb7d8cc, 1.8); rim.position.set(0, 5, -8); scene.add(rim);
+    const wood = new THREE.MeshPhysicalMaterial({ color: 0x7b3f25, roughness: 0.34, clearcoat: 0.28, clearcoatRoughness: 0.24 }); const spruce = new THREE.MeshPhysicalMaterial({ color: 0xc79257, roughness: 0.46, clearcoat: 0.2 }); const darkWood = new THREE.MeshStandardMaterial({ color: 0x291c1b, roughness: 0.55 }); const ebony = new THREE.MeshStandardMaterial({ color: 0x171a1c, roughness: 0.38 }); const binding = new THREE.MeshStandardMaterial({ color: 0xd5b47d, metalness: 0.2, roughness: 0.28 }); const fretMetal = new THREE.MeshStandardMaterial({ color: 0xbfc5ca, metalness: 0.95, roughness: 0.2 }); const stringMetal = new THREE.MeshStandardMaterial({ color: 0xe4d4b0, metalness: 0.82, roughness: 0.23 }); const skin = new THREE.MeshPhysicalMaterial({ color: 0xb9684f, roughness: 0.56, sheen: 0.2, sheenColor: 0xd98263 }); const skinLight = new THREE.MeshPhysicalMaterial({ color: 0xd58c6a, roughness: 0.52, sheen: 0.22, sheenColor: 0xf3b28f }); const nail = new THREE.MeshPhysicalMaterial({ color: 0xffd5bd, roughness: 0.33, clearcoat: 0.22 }); const accent = new THREE.MeshStandardMaterial({ color: 0xf4b350, emissive: 0x7a3206, emissiveIntensity: 0.48, roughness: 0.34 }); const cyan = new THREE.MeshStandardMaterial({ color: 0x68d4d0, emissive: 0x073a3b, emissiveIntensity: 0.45 }); const pickMaterial = new THREE.MeshPhysicalMaterial({ color: 0xd84c38, roughness: 0.27, clearcoat: 0.65 });
+    const sharedSegment = new THREE.CapsuleGeometry(1, 1, 6, 10); const sharedJoint = new THREE.SphereGeometry(1, 10, 8); const sharedNail = new THREE.SphereGeometry(1, 8, 6); const guitar = new THREE.Group();
+    const back = bodyPart(darkWood, 0.42, 0.1); back.position.set(0, -0.14, 5.8); guitar.add(back); const top = bodyPart(spruce, 0.14, 0.06); top.position.set(0, 0.22, 5.8); guitar.add(top); const purfling = bodyPart(binding, 0.055, 0.02); purfling.scale.set(0.985, 1, 0.985); purfling.position.set(0, 0.39, 5.8); guitar.add(purfling);
+    const neck = new THREE.Mesh(new THREE.BoxGeometry(1.66, 0.34, 7), wood); neck.position.set(0, 0.08, -0.25); guitar.add(neck); const heel = new THREE.Mesh(new THREE.CapsuleGeometry(0.48, 0.8, 8, 12), wood); heel.rotation.x = Math.PI / 2; heel.position.set(0, 0.1, 3.15); guitar.add(heel); const board = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.12, 5.55), ebony); board.position.set(0, 0.31, -0.55); guitar.add(board); const nut = new THREE.Mesh(new THREE.BoxGeometry(1.56, 0.12, 0.08), binding); nut.position.set(0, 0.39, NUT_Z); guitar.add(nut);
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(1.58, 0.18, 0.32), darkWood); bridge.position.set(0, 0.48, 7.08); guitar.add(bridge); const saddle = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.11, 0.07), binding); saddle.position.set(0, 0.62, 7.06); guitar.add(saddle);
+    const fretGeometry = new THREE.CapsuleGeometry(0.035, 1.52, 4, 8); const fretBars = new THREE.InstancedMesh(fretGeometry, fretMetal, 24); const fretMatrix = new THREE.Matrix4(); for (let fret = 1; fret <= 24; fret += 1) { fretMatrix.makeRotationZ(Math.PI / 2); fretMatrix.setPosition(0, 0.42, FRET_Z(fret)); fretBars.setMatrixAt(fret - 1, fretMatrix); } fretBars.instanceMatrix.needsUpdate = true; guitar.add(fretBars);
+    const inlayFrets = [3, 5, 7, 9, 15, 17, 19, 21]; const inlayGeometry = new THREE.CylinderGeometry(0.1, 0.1, 0.025, 16); const inlays = new THREE.InstancedMesh(inlayGeometry, binding, inlayFrets.length); inlayFrets.forEach((fret, index) => { fretMatrix.makeRotationX(Math.PI / 2); fretMatrix.setPosition(0, 0.39, (FRET_Z(fret) + FRET_Z(fret + 1)) / 2); inlays.setMatrixAt(index, fretMatrix); }); inlays.instanceMatrix.needsUpdate = true; guitar.add(inlays);
+    const dotGeometry = new THREE.CylinderGeometry(0.075, 0.075, 0.025, 14); const dots = new THREE.InstancedMesh(dotGeometry, binding, 4); let dotIndex = 0; [12, 24].forEach((fret) => [-0.36, 0.36].forEach((x) => { fretMatrix.makeRotationX(Math.PI / 2); fretMatrix.setPosition(x, 0.4, (FRET_Z(fret) + FRET_Z(fret + 1)) / 2); dots.setMatrixAt(dotIndex, fretMatrix); dotIndex += 1; })); dots.instanceMatrix.needsUpdate = true; guitar.add(dots);
+    const rosette = new THREE.Group(); rosette.position.set(0, 0.42, 5.78); guitar.add(rosette); [0.79, 0.87, 0.95].forEach((radius, index) => { const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, index === 1 ? 0.045 : 0.025, 8, 48), index === 1 ? binding : darkWood); ring.rotation.x = Math.PI / 2; rosette.add(ring); }); const hole = new THREE.Mesh(new THREE.CylinderGeometry(0.72, 0.72, 0.16, 48), ebony); hole.rotation.x = Math.PI / 2; hole.position.set(0, 0.28, 5.78); guitar.add(hole); const holeInner = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.02, 48), new THREE.MeshStandardMaterial({ color: 0x050607, roughness: 1 })); holeInner.rotation.x = Math.PI / 2; holeInner.position.set(0, 0.39, 5.78); guitar.add(holeInner);
+    for (let string = 0; string < 6; string += 1) guitar.add(rod(new THREE.CylinderGeometry(0.011 + string * 0.002, 0.011 + string * 0.002, 1, 6), stringMetal, new THREE.Vector3(STRING_X(string), 0.53, STRING_START), new THREE.Vector3(STRING_X(string), 0.54, STRING_END))); const pinGeometry = new THREE.SphereGeometry(0.075, 10, 8); const pins = new THREE.InstancedMesh(pinGeometry, binding, 6); for (let string = 0; string < 6; string += 1) { fretMatrix.makeScale(1, 1, 0.55); fretMatrix.setPosition(STRING_X(string), 0.62, 6.99); pins.setMatrixAt(string, fretMatrix); } pins.instanceMatrix.needsUpdate = true; guitar.add(pins);
+    const contact = new THREE.Mesh(new THREE.CircleGeometry(5, 64), new THREE.MeshStandardMaterial({ color: 0x07090b, roughness: 0.92 })); contact.rotation.x = -Math.PI / 2; contact.position.y = -0.65; contact.position.z = 2.4; scene.add(contact); scene.add(guitar);
+    const shared = { segment: sharedSegment, joint: sharedJoint, nailGeometry: sharedNail, skin, skinLight, nail, accent, pick: pickMaterial }; const left = makeHand("left", shared); left.group.position.set(-1.58, 0.82, 0); left.group.rotation.y = -0.08; left.group.visible = initialModeRef.current === "left-hand" || initialModeRef.current === "both"; left.group.scale.x = initialHandednessRef.current === "left" ? -1 : 1; scene.add(left.group); const right = makeHand("right", { ...shared, accent: cyan }); right.group.position.set(0, 0.72, 6.45); right.group.rotation.y = Math.PI; right.group.scale.x = initialHandednessRef.current === "left" ? -1 : 1; right.group.visible = initialModeRef.current === "right-hand" || initialModeRef.current === "both"; scene.add(right.group); handsRef.current = { left, right };
+    const markers = Array.from({ length: 6 }, () => { const marker = new THREE.Mesh(new THREE.SphereGeometry(0.065, 10, 8), accent); marker.visible = false; scene.add(marker); return marker; }); const targetMarker = new THREE.Mesh(new THREE.TorusGeometry(0.17, 0.035, 8, 24), accent); targetMarker.rotation.x = Math.PI / 2; scene.add(targetMarker); const motion: { current: { started: number; duration: number; direction: "up" | "down" | "neutral" } | null } = { current: null }; const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false; let inViewport = true; let documentVisible = document.visibilityState === "visible"; let disposed = false; let resumeAnimation: (() => void) | null = null;
+    const render = () => { if (!disposed && inViewport && documentVisible) renderer.render(scene, camera); };
+    const updateLeft = () => { const targets = chordToLeftHandTargets(chordRef.current); const byFinger = new Map<number, typeof targets>(); targets.forEach((item) => byFinger.set(item.finger, [...(byFinger.get(item.finger) ?? []), item])); left.fingers.forEach((finger, index) => { const fingerTargets = byFinger.get(index + 1) ?? []; const target = fingerTargets.length ? { string: fingerTargets.reduce((sum, item) => sum + item.string, 0) / fingerTargets.length, fret: fingerTargets.reduce((sum, item) => sum + item.fret, 0) / fingerTargets.length } : null; const anchor = new THREE.Vector3(-0.42 + index * 0.28, 0.56 + Math.abs(index - 1.5) * 0.06, -0.62 + index * 0.04); const end = new THREE.Vector3(target ? STRING_X(target.string) : -0.58 + index * 0.28, target ? 0.52 : 0.36, target ? FRET_Z(target.fret) : -2.2 + index * 0.12); const p1 = new THREE.Vector3().lerpVectors(anchor, end, 0.32); p1.y += 0.32; const p2 = new THREE.Vector3().lerpVectors(anchor, end, 0.66); p2.y += 0.18; const points = [anchor, p1, p2, end]; finger.segments.forEach((segment, segmentIndex) => setSegment(segment, points[segmentIndex], points[segmentIndex + 1], 1 - segmentIndex * 0.1)); finger.accent.position.copy(end); finger.accent.visible = Boolean(target); }); const thumbPoints = [new THREE.Vector3(-0.52, 0.44, -0.82), new THREE.Vector3(-0.1, 0.34, -1.22), new THREE.Vector3(0.42, 0.42, -1.35)]; left.thumb.forEach((segment, index) => setSegment(segment, thumbPoints[index], thumbPoints[index + 1], 1.05 - index * 0.1)); markers.forEach((marker, string) => { const fret = chordRef.current.frets[string]; marker.visible = fret > 0; marker.position.set(STRING_X(string), 0.58, FRET_Z(fret)); }); targetMarker.position.set(STRING_X(targetRef.current.string), 0.62, FRET_Z(targetRef.current.fret)); targetMarker.visible = configRef.current.mode !== "right-hand"; };
+    const updateRight = (progress = 0) => { const plan = techniqueToMotionPlan(configRef.current.technique, configRef.current.activePatternStep, configRef.current.activeStrings); const active = motion.current; const phase = active ? Math.min(1, progress) : 0; right.group.position.x = active && plan.kind !== "fingerpick" ? (plan.direction === "up" ? 0.34 - phase * 0.68 : -0.34 + phase * 0.68) : 0; right.fingers.forEach((finger, index) => { const string = plan.strings[index % Math.max(1, plan.strings.length)] ?? index; const isActive = plan.kind === "fingerpick" ? plan.strings.includes(string) : index === 0; const anchor = new THREE.Vector3(-0.46 + index * 0.3, 0.52 + index * 0.03, 0.26 + index * 0.04); const end = new THREE.Vector3(STRING_X(string), 0.58 - (active && isActive ? Math.sin(Math.PI * phase) * (plan.kind === "fingerpick" ? 0.4 : 0.16) : 0), -0.25 + (string % 2) * 0.08); const p1 = new THREE.Vector3().lerpVectors(anchor, end, 0.34); p1.y += 0.2; const p2 = new THREE.Vector3().lerpVectors(anchor, end, 0.67); p2.y += 0.1; const points = [anchor, p1, p2, end]; finger.segments.forEach((segment, segmentIndex) => setSegment(segment, points[segmentIndex], points[segmentIndex + 1], 1 - segmentIndex * 0.1)); finger.accent.position.copy(end); finger.accent.visible = isActive && Boolean(active); }); const thumbPoints = [new THREE.Vector3(0.48, 0.5, 0.34), new THREE.Vector3(0.42, 0.58, 0.04), new THREE.Vector3(0.2, 0.62, -0.2)]; right.thumb.forEach((segment, index) => setSegment(segment, thumbPoints[index], thumbPoints[index + 1], 1.05 - index * 0.1)); if (right.pick) { right.pick.visible = configRef.current.technique === "plectrum"; right.pick.position.set(0, 0.45, -0.13); right.pick.rotation.z = active ? (plan.direction === "up" ? -0.3 : 0.3) : 0; } };
+    const refresh = () => { updateLeft(); updateRight(); render(); }; const animate = () => { if (disposed || !motion.current || !inViewport || !documentVisible) { rafRef.current = null; return; } const active = motion.current; const progress = reducedMotion ? 1 : Math.min(1, (performance.now() - active.started) / active.duration); updateRight(progress); render(); if (progress < 1) rafRef.current = requestAnimationFrame(animate); else { rafRef.current = null; motion.current = null; updateRight(); render(); } }; resumeAnimation = animate; gestureRef.current = () => { const plan = techniqueToMotionPlan(configRef.current.technique, configRef.current.activePatternStep, configRef.current.activeStrings); motion.current = { started: performance.now(), duration: plan.durationMs, direction: plan.direction }; if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } animate(); onGestureRef.current?.(configRef.current.technique); }; refreshRef.current = refresh;
+    const resize = () => { if (disposed) return; const width = Math.max(280, host.clientWidth); const height = Math.max(260, Math.min(520, host.clientHeight || width * 0.58)); renderer.setSize(width, height, false); camera.aspect = width / height; camera.updateProjectionMatrix(); render(); }; const resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); const intersection = new IntersectionObserver(([entry]) => { inViewport = Boolean(entry?.isIntersecting); if (!inViewport && rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } else if (inViewport && documentVisible) { if (motion.current) resumeAnimation?.(); else render(); } }); intersection.observe(host); const onVisibility = () => { documentVisible = document.visibilityState === "visible"; if (!documentVisible && rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } else if (documentVisible && inViewport) { if (motion.current) resumeAnimation?.(); else render(); } }; document.addEventListener("visibilitychange", onVisibility);
+    let controls: import("three/examples/jsm/controls/ArcballControls.js").ArcballControls | null = null; let controlsDisposed = false;
+    const applyCameraPreset = (name: PresetName) => { const view = GUITAR_CAMERA_PRESETS[name] ?? GUITAR_CAMERA_PRESETS.overview; camera.position.set(...view.position); camera.lookAt(...view.target); if (controls) { (controls as unknown as { target: THREE.Vector3 }).target.set(...view.target); controls.update(); } render(); };
+    cameraPresetRef.current = (name) => { requestedPresetRef.current = name; applyCameraPreset(name); };
+    const setupControls = async () => { try { const controlsModule = await import("three/examples/jsm/controls/ArcballControls.js"); if (disposed) return; controls = new controlsModule.ArcballControls(camera, canvas, scene); (controls as unknown as { target: THREE.Vector3 }).target.set(...GUITAR_CAMERA_PRESETS.overview.target); controls.enableAnimations = false; controls.enablePan = true; controls.enableRotate = true; controls.enableZoom = true; controls.enableFocus = false; controls.adjustNearFar = true; controls.minDistance = 4.2; controls.maxDistance = 19; controls.setGizmosVisible(false); controls.setMouseAction("PAN", 0, "SHIFT"); controls.addEventListener("change", render); applyCameraPreset(requestedPresetRef.current); render(); } catch { render(); } }; void setupControls(); refresh(); resize();
+    return () => { disposed = true; if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; } resizeObserver.disconnect(); intersection.disconnect(); document.removeEventListener("visibilitychange", onVisibility); if (controls && !controlsDisposed) { controlsDisposed = true; controls.removeEventListener("change", render); controls.dispose(); } cameraPresetRef.current = () => {}; resumeAnimation = null; refreshRef.current = null; gestureRef.current = null; handsRef.current = { left: null, right: null }; disposeScene(scene, renderer); };
   }, []);
-
-  const playGesture = () => {
-    const config = configRef.current;
-    const plan = techniqueToMotionPlan(config.technique, config.activePatternStep, config.activeStrings);
-    motionRef.current = { started: performance.now(), duration: plan.durationMs, direction: plan.direction };
-    if (rafRef.current) cancelAnimationFrame(rafRef.current);
-    animateRef.current?.();
-    onGesture?.(config.technique);
-  };
-  useEffect(() => {
-    if (!autoPlay || gestureKey === undefined || lastGestureKeyRef.current === gestureKey) return;
-    lastGestureKeyRef.current = gestureKey;
-    if (mode === "right-hand" || mode === "both") playGesture();
-  }, [autoPlay, gestureKey, mode]);
-  const cycleFret = () => {
-    const next = { string: target.string, fret: target.fret >= 5 ? 0 : target.fret + 1 };
-    targetRef.current = next;
-    setTarget(next);
-    refreshRef.current?.();
-    onTargetChange?.(next);
-  };
-
-  const updateTarget = (string: number, fret: number) => {
-    const next = { string, fret };
-    targetRef.current = next;
-    setTarget(next);
-    refreshRef.current?.();
-    onTargetChange?.(next);
-  };
-
+  useEffect(() => { if (autoPlay && gestureKey !== undefined && lastGestureKeyRef.current !== gestureKey) { lastGestureKeyRef.current = gestureKey; if (mode === "right-hand" || mode === "both") gestureRef.current?.(); } }, [autoPlay, gestureKey, mode]);
+  const updateTarget = (string: number, fret: number) => { const next = { string, fret }; targetRef.current = next; setTarget(next); refreshRef.current?.(); onTargetChange?.(next); }; const cycleFret = () => updateTarget(target.string, target.fret >= 5 ? 0 : target.fret + 1); const selectPreset = (name: PresetName) => { setPreset(name); requestedPresetRef.current = name; cameraPresetRef.current(name); };
   if (fallback) return <div className={className} role="status">3D guitar preview is unavailable in this browser. The technique controls remain available.</div>;
-  return (
-    <section className={className ?? "guitar-technique-3d"} aria-label="Interactive 3D guitar technique lesson">
-      <div className="guitar-technique-3d__stage" ref={hostRef}>
-        <canvas ref={canvasRef} aria-label="Interactive 3D guitar, fretboard, sound hole, frets, and hands" tabIndex={0} />
-      </div>
-      {labels && <p className="guitar-technique-3d__status" aria-live="polite">Target: string {target.string + 1}, {target.fret === 0 ? "open" : `fret ${target.fret}`} · {technique}</p>}
-      <div className="guitar-technique-3d__controls" aria-label="3D guitar controls">
-        {(mode === "left-hand" || mode === "both") && <>
-          <label>Target string<select aria-label="Target string" value={target.string} onChange={(event) => updateTarget(Number(event.target.value), target.fret)}>{Array.from({ length: 6 }, (_, string) => <option key={string} value={string}>String {string + 1}</option>)}</select></label>
-          <label>Target fret<select aria-label="Target fret" value={target.fret} onChange={(event) => updateTarget(target.string, Number(event.target.value))}>{Array.from({ length: 6 }, (_, fret) => <option key={fret} value={fret}>{fret === 0 ? "Open" : `Fret ${fret}`}</option>)}</select></label>
-          <button type="button" onClick={cycleFret}>Choose next fret</button>
-        </>}
-        {(mode === "right-hand" || mode === "both") && <button type="button" onClick={playGesture}>Play {technique === "fingerpicking" ? "fingerpick" : technique === "plectrum" ? "pick" : "strum"}</button>}
-      </div>
-    </section>
-  );
+  return <section className={className ?? "guitar-technique-3d"} aria-label="Interactive 3D guitar technique lesson"><div className="guitar-technique-3d__stage" ref={hostRef}><canvas ref={canvasRef} aria-label="Interactive high-resolution 3D guitar, fretboard, sound hole, frets, and hands" tabIndex={0} /><p className="guitar-technique-3d__hint">Drag to orbit · Shift-drag to pan · wheel or pinch to zoom</p></div>{labels && <p className="guitar-technique-3d__status" aria-live="polite">Target: string {target.string + 1}, {target.fret === 0 ? "open" : `fret ${target.fret}`} · {technique}</p>}<div className="guitar-technique-3d__controls" aria-label="3D guitar controls"><div className="guitar-technique-3d__camera" aria-label="Camera views"><button type="button" aria-pressed={preset === "overview"} onClick={() => selectPreset("overview")}>Overview</button><button type="button" aria-pressed={preset === "fretting"} onClick={() => selectPreset("fretting")}>Fretting hand</button><button type="button" aria-pressed={preset === "picking"} onClick={() => selectPreset("picking")}>Picking hand</button><button type="button" onClick={() => selectPreset("overview")}>Reset camera</button></div>{(mode === "left-hand" || mode === "both") && <><label>Target string<select aria-label="Target string" value={target.string} onChange={(event) => updateTarget(Number(event.target.value), target.fret)}>{Array.from({ length: 6 }, (_, string) => <option key={string} value={string}>String {string + 1}</option>)}</select></label><label>Target fret<select aria-label="Target fret" value={target.fret} onChange={(event) => updateTarget(target.string, Number(event.target.value))}>{Array.from({ length: 6 }, (_, fret) => <option key={fret} value={fret}>{fret === 0 ? "Open" : `Fret ${fret}`}</option>)}</select></label><button type="button" onClick={cycleFret}>Choose next fret</button></>}{(mode === "right-hand" || mode === "both") && <button type="button" onClick={() => gestureRef.current?.()}>Play {technique === "fingerpicking" ? "fingerpick" : technique === "plectrum" ? "pick" : "strum"}</button>}</div></section>;
 }

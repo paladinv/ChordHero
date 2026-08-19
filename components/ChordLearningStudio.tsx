@@ -166,9 +166,9 @@ export default function ChordLearningStudio({
         <span className="muted">Role first, voicing second. Progress stays on this device.</span>
       </div>
 
-      <div className="learning-studio-grid">
+      <div className="learning-studio-grid learning-foundation-grid">
         <section className="learning-panel learning-curriculum">
-          <div className="learning-panel-heading"><div><span className="label">Key path</span><h4>{curriculum.title}</h4></div><label>Key<select value={learningKey} onChange={(event) => { const key = event.target.value as HarmonyNote; updateState({ learningKey: key }); onKeyChange(key); }}><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option><option value="G">G</option><option value="A">A</option><option value="B">B</option></select></label></div>
+          <div className="learning-panel-heading"><div><span className="label">Key path</span><h4>{curriculum.title}</h4></div><label className="learning-panel-control">Key<select value={learningKey} onChange={(event) => { const key = event.target.value as HarmonyNote; updateState({ learningKey: key }); onKeyChange(key); }}><option value="C">C</option><option value="D">D</option><option value="E">E</option><option value="F">F</option><option value="G">G</option><option value="A">A</option><option value="B">B</option></select></label></div>
           <div className="learning-progress-track" aria-label={`${progress.completedStepIds.length} of ${curriculum.steps.length} steps complete`}><span style={{ width: `${curriculum.steps.length ? progress.completedStepIds.length / curriculum.steps.length * 100 : 0}%` }} /></div>
           <p className="learning-progress-copy">{progress.completedStepIds.length}/{curriculum.steps.length} functions unlocked. {nextTask ? `Next: ${nextTask.title}. ${nextTask.description}` : "Key path complete. Review a weak voicing or choose another key."}</p>
           {nextTask ? <div className="learning-next-task"><strong>{nextTask.role}</strong><span>{nextTask.practiceSeconds / 60} minute focus</span><button className="btn primary" type="button" onClick={() => { const id = nextTask.representativeIds[0]; if (id) onSelectEntry(id); completeCurriculumStep(); }}>Practice next</button></div> : null}
@@ -177,8 +177,10 @@ export default function ChordLearningStudio({
 
         <section className="learning-panel learning-preferences">
           <div className="learning-panel-heading"><div><span className="label">Personalization</span><h4>Make shapes fit your hand</h4></div></div>
-          <label>Hand span: {learningPreferences.handSpanCm.toFixed(1)} cm<input type="range" min="14" max="25" step="0.5" value={learningPreferences.handSpanCm} onChange={(event) => updateState({ handPreference: { ...learningPreferences, handSpanCm: Number(event.target.value) } })} /></label>
-          <label>Target skill<select value={learningPreferences.targetSkill} onChange={(event) => updateState({ handPreference: { ...learningPreferences, targetSkill: event.target.value as LearningSkill } })}><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label>
+          <div className="learning-preference-controls">
+            <label>Hand span: {learningPreferences.handSpanCm.toFixed(1)} cm<input type="range" min="14" max="25" step="0.5" value={learningPreferences.handSpanCm} onChange={(event) => updateState({ handPreference: { ...learningPreferences, handSpanCm: Number(event.target.value) } })} /></label>
+            <label>Target skill<select value={learningPreferences.targetSkill} onChange={(event) => updateState({ handPreference: { ...learningPreferences, targetSkill: event.target.value as LearningSkill } })}><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label>
+          </div>
           <p className="muted">Recommendations use hand span, difficulty tags, shared fingers, fret movement, string changes, and barre load. Existing instrument settings are unchanged.</p>
           <div className="learning-ranked-list">{rankedVoicings.map(({ entry, reason }) => <button key={entry.id} type="button" onClick={() => onSelectEntry(entry.id)}><span><strong>{entry.chord.name}</strong><small>{entry.position}</small></span><small>{reason}</small></button>)}</div>
         </section>
@@ -190,7 +192,7 @@ export default function ChordLearningStudio({
         <div className="learning-ranked-list learning-transition-list">{rankedVoicings.slice(0, 3).map(({ entry, cost }) => <div key={entry.id}><span><strong>{entry.chord.name}</strong><small>{cost ? `${cost.score}/100 transition cost` : entry.position}</small></span><button className="btn" type="button" onClick={() => void playTransition(entry)}>Play change</button></div>)}</div>
       </section>
 
-      <div className="learning-studio-grid">
+      <div className="learning-studio-grid learning-review-grid">
         <section className="learning-panel learning-goals">
           <div className="learning-panel-heading"><div><span className="label">Spaced practice</span><h4>Goals and streaks</h4></div>{!activeGoal ? <button className="btn primary" type="button" onClick={createGoal}>Create V to I goal</button> : null}</div>
           {activeGoal ? <><strong>{activeGoal.title}</strong><p>{activeGoal.completedKeys.length}/{activeGoal.keys.length} keys complete · {activeGoal.streak} day streak{activeGoal.nextReviewAt ? ` · review ${new Date(activeGoal.nextReviewAt).toLocaleDateString()}` : ""}</p><div className="chip-row">{activeGoal.keys.map((key) => <button key={key} type="button" className={`chip ${activeGoal.completedKeys.includes(key) ? "active" : ""}`} onClick={() => completeGoalKey(key)}>{key} {activeGoal.completedKeys.includes(key) ? "done" : "mark done"}</button>)}</div><p className="muted">{goalComplete ? "Goal complete. Keep the streak alive with the scheduled review." : "Mark a key after a clean, focused review."}</p></> : <p className="muted">Create a goal to keep V to I work moving across five keys with lightweight local scheduling.</p>}
@@ -198,15 +200,17 @@ export default function ChordLearningStudio({
 
         <section className="learning-panel learning-glossary">
           <div className="learning-panel-heading"><div><span className="label">Theory snapshot</span><h4>{glossary.label}</h4></div><button className="btn" type="button" onClick={() => selectedEntry && void onPlayChord(selectedEntry.chord, "arpeggio", selectedEntry.id)}>Preview quality</button></div>
-          <p>{glossary.sound}</p><div className="interval-visual" aria-label={`${glossary.label} interval visualization`}>{glossary.intervals.map((interval) => <span key={interval.degree} className={`interval-${interval.color}`} style={{ left: `${interval.semitones / 14 * 100}%` }}><b>{interval.degree}</b><small>{interval.semitones} st</small></span>)}</div>
+          <p>{glossary.sound}</p><div className="interval-visual" aria-label={`${glossary.label} interval visualization`}>{glossary.intervals.map((interval) => <span key={interval.degree} className={`interval-${interval.color}`} style={{ left: `${8 + interval.semitones / 14 * 84}%` }}><b>{interval.degree}</b><small>{interval.semitones} st</small></span>)}</div>
           <p className="muted">Intervals: {glossary.intervals.map((interval) => `${interval.degree} (${interval.semitones} semitones)`).join(" · ")}</p>
         </section>
       </div>
 
       <section className="learning-panel learning-composer">
         <div className="learning-panel-heading"><div><span className="label">Real-time composer</span><h4>Build the next move</h4></div><span className="muted">Start: {composerStart}</span></div>
-        <div className="chip-row"><span className="label">Progression</span>{learningComposerRoles.length ? learningComposerRoles.map((role, index) => <button key={`${role}-${index}`} type="button" className="chip active" onClick={() => updateState({ composerRoles: learningComposerRoles.filter((_, currentIndex) => currentIndex !== index) })}>{role} ×</button>) : <span className="muted">No roles added yet.</span>}</div>
-        <div className="chip-row"><span className="label">Next roles</span>{composerSuggestions.map((role) => <button key={role} type="button" className="chip" onClick={() => addComposerRole(role)}>{role}</button>)}<button className="btn ghost" type="button" onClick={() => updateState({ composerRoles: [] })}>Clear</button></div>
+        <div className="learning-composer-rows">
+          <div className="learning-composer-row"><span className="learning-chip-label">Progression</span><div className="chip-row">{learningComposerRoles.length ? learningComposerRoles.map((role, index) => <button key={`${role}-${index}`} type="button" className="chip active" onClick={() => updateState({ composerRoles: learningComposerRoles.filter((_, currentIndex) => currentIndex !== index) })}>{role} ×</button>) : <span className="muted">No roles added yet.</span>}</div></div>
+          <div className="learning-composer-row"><span className="learning-chip-label">Next roles</span><div className="chip-row">{composerSuggestions.map((role) => <button key={role} type="button" className="chip" onClick={() => addComposerRole(role)}>{role}</button>)}<button className="btn ghost" type="button" onClick={() => updateState({ composerRoles: [] })}>Clear</button></div></div>
+        </div>
         {selectedFunction ? <p className="library-harmony-explanation">{selectedFunction.explanation} Suggested resolution: {selectedFunction.suggestedResolution}</p> : null}
       </section>
 
@@ -218,12 +222,12 @@ export default function ChordLearningStudio({
       <section className="learning-panel learning-map">
         <div className="learning-panel-heading"><div><span className="label">Fretboard map</span><h4>{learningKey} {MODE_LABELS[mode]} targets</h4></div><button className="btn primary" type="button" onClick={() => window.print()}>Print map</button></div>
         <p className="muted">Compact six-string view, frets 0–12. Tonic, chord tones, and tendency/resolution targets are highlighted; alternate tuning diagrams remain separate.</p>
-        <div className={`fretboard-map ${displaySettings.handedness === "left" ? "left-handed" : ""} ${displaySettings.highContrast ? "high-contrast" : ""} ${displaySettings.largeCharts ? "large" : ""}`} aria-label={`${learningKey} ${mode} six string fretboard map`}>{mapCells.map((cell) => <span key={`${cell.stringIndex}-${cell.fret}`} className={`fretboard-map-cell ${cell.kind}`} title={`${cell.note}, string ${cell.stringIndex + 1}, fret ${cell.fret}`}>{cell.fret === 0 ? "O" : cell.note}</span>)}</div>
+        <div className="learning-map-scroll"><div className={`fretboard-map ${displaySettings.handedness === "left" ? "left-handed" : ""} ${displaySettings.highContrast ? "high-contrast" : ""} ${displaySettings.largeCharts ? "large" : ""}`} aria-label={`${learningKey} ${mode} six string fretboard map`}>{mapCells.map((cell) => <span key={`${cell.stringIndex}-${cell.fret}`} className={`fretboard-map-cell ${cell.kind}`} title={`${cell.note}, string ${cell.stringIndex + 1}, fret ${cell.fret}`}>{cell.fret === 0 ? "O" : cell.note}</span>)}</div></div>
       </section>
 
       <section className="learning-panel learning-sharing">
         <div className="learning-panel-heading"><div><span className="label">Teacher handoff</span><h4>Share this practice pack</h4></div><span className="muted">Local-first JSON, ready for future authenticated cloud sync.</span></div>
-        <div className="chip-row"><button className="btn" type="button" onClick={exportPack}>Export learning pack</button><label className="btn ghost" htmlFor="learning-pack-import">Import learning pack</label><input id="learning-pack-import" type="file" accept="application/json,.json" className="visually-hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) importPack(file); event.currentTarget.value = ""; }} /></div>
+        <div className="learning-handoff-actions"><button className="btn" type="button" onClick={exportPack}>Export learning pack</button><label className="btn ghost" htmlFor="learning-pack-import">Import learning pack</label><input id="learning-pack-import" type="file" accept="application/json,.json" className="visually-hidden" onChange={(event) => { const file = event.target.files?.[0]; if (file) importPack(file); event.currentTarget.value = ""; }} /></div>
         {importStatus ? <p className="muted" role="status">{importStatus}</p> : null}
       </section>
     </section>

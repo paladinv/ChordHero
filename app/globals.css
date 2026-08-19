@@ -6068,10 +6068,15 @@ html[data-handedness="left"] .licensed-demo video { transform: scaleX(-1); }
 /* Chord chart advanced workflows: local-only, bounded UI enhancements. */
 .chart-local-builder,.chart-performance-panel,.chart-advanced-settings,.chart-advanced-workflows{margin-top:16px}.chart-local-badge{font-size:.78rem;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:5px 9px}.chart-performance-controls{display:flex;align-items:end;gap:9px;flex-wrap:wrap}.chart-performance-controls label{display:grid;gap:4px}.chart-beat{min-height:44px;display:inline-flex;align-items:center;padding:0 12px;border:1px solid var(--line);border-radius:9px;font-weight:700}.chart-stage-card{display:grid;gap:4px;border:1px solid var(--accent);border-radius:12px;padding:16px;margin-top:12px;background:color-mix(in srgb,var(--surface) 86%,var(--accent) 14%)}.chart-stage-card strong{font-size:clamp(2rem,7vw,4.5rem);line-height:1}.chart-confidence-list,.chart-setlist{display:grid;gap:8px;margin:12px 0}.chart-confidence-list>div,.chart-setlist>div{display:flex;align-items:center;gap:8px;flex-wrap:wrap;border:1px solid var(--line);border-radius:9px;padding:8px}.chart-confidence-list>div>span,.chart-setlist>div>span{flex:1;min-width:120px}.chart-instrument-warning{border:1px dashed var(--accent);border-radius:10px;padding:18px;min-height:160px;background:color-mix(in srgb,var(--surface) 90%,var(--accent) 10%)}.chart-instrument-warning p{margin:6px 0}.chart-media-list{margin:10px 0;padding-left:20px}.chart-stage-mode{background:#111;color:#f8f4e8;min-height:100vh}.chart-stage-mode .chart-screen-results,.chart-stage-mode .chart-practice-strip{background:#171717}.chart-stage-mode .chart-card{background:#202020;color:#f8f4e8;border-color:#555}.chart-stage-mode .chart-card h3{font-size:clamp(2rem,6vw,5rem)}.chart-stage-mode .chart-builder-controls,.chart-stage-mode .chart-intelligence-grid,.chart-stage-mode .chart-advanced-workflows,.chart-stage-mode .chart-advanced-settings{max-width:1100px;margin-inline:auto}.chart-stage-mode .chart-stage-card{background:#252525}.chart-stage-mode .chart-results-grid{grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}.chart-stage-mode .btn{min-height:48px}.chart-progression-line{border-left:3px solid var(--accent);padding-left:10px}.chart-local-builder input,.chart-local-builder select,.chart-performance-panel input{min-height:44px}.chart-advanced-workflows .btn,.chart-setlist button,.chart-confidence-list button{min-height:44px}@media (max-width:700px){.chart-performance-controls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.chart-performance-controls .chart-beat{grid-column:1/-1}.chart-stage-mode{padding:10px}.chart-stage-mode .chart-builder-controls,.chart-stage-mode .chart-intelligence-grid,.chart-stage-mode .chart-advanced-workflows,.chart-stage-mode .chart-advanced-settings{display:none}}
 .guitar-technique-3d { display: grid; gap: 8px; margin: 12px 0; }
-.guitar-technique-3d__stage { min-height: 260px; overflow: hidden; border: 1px solid rgba(24,45,48,.14); border-radius: 12px; background: #f2ecdf; }
-.guitar-technique-3d__stage canvas { display: block; width: 100%; height: 100%; min-height: 260px; cursor: pointer; }
+.guitar-technique-3d__stage { position: relative; min-height: 320px; overflow: hidden; border: 1px solid rgba(121,176,174,.34); border-radius: 14px; background: #101316; box-shadow: 0 16px 36px rgba(10,17,18,.2); }
+.guitar-technique-3d__stage canvas { display: block; width: 100%; height: 100%; min-height: 320px; cursor: grab; touch-action: none; }
+.guitar-technique-3d__stage canvas:active { cursor: grabbing; }
+.guitar-technique-3d__hint { position: absolute; left: 12px; bottom: 10px; margin: 0; padding: 5px 8px; border-radius: 999px; background: rgba(7,12,14,.72); color: rgba(244,241,232,.82); font-size: .67rem; pointer-events: none; }
 .guitar-technique-3d__status { margin: 0; color: var(--teal); font-size: .78rem; font-weight: 700; }
 .guitar-technique-3d__controls { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.guitar-technique-3d__camera { display: flex; flex-wrap: wrap; gap: 5px; width: 100%; }
+.guitar-technique-3d__camera button { min-height: 30px; padding: 5px 8px; border: 1px solid rgba(31,122,116,.3); border-radius: 999px; background: rgba(31,122,116,.08); color: var(--teal); font: inherit; font-size: .7rem; cursor: pointer; }
+.guitar-technique-3d__camera button[aria-pressed="true"] { background: var(--teal); color: white; }
 .guitar-technique-3d__controls label { display: grid; gap: 3px; color: var(--teal); font-size: .7rem; font-weight: 700; }
 .guitar-technique-3d__controls select, .guitar-technique-3d__controls button { min-height: 32px; padding: 6px 9px; border: 1px solid rgba(24,45,48,.18); border-radius: 7px; background: white; color: var(--teal); font: inherit; font-size: .75rem; }
 .guitar-technique-3d__controls button { background: var(--teal); color: white; cursor: pointer; }
@@ -6447,5 +6452,437 @@ html[data-handedness="left"] .licensed-demo video { transform: scaleX(-1); }
   .library-optional-section .learning-ranked-list button,
   .library-optional-section .learning-ranked-list > div {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Learning studio: keep each teaching tool structured without affecting other screens. */
+.library-optional-section .learning-studio {
+  gap: 16px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.library-optional-section .learning-studio-grid {
+  align-items: stretch;
+  gap: 16px;
+}
+
+.library-optional-section .learning-panel {
+  align-content: start;
+  gap: 12px;
+  min-width: 0;
+  overflow: hidden;
+  padding: 16px;
+  border-radius: 12px;
+}
+
+.library-optional-section .learning-panel-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 12px;
+  margin: 0;
+}
+
+.library-optional-section .learning-panel-heading > div:first-child {
+  min-width: 0;
+}
+
+.library-optional-section .learning-panel-heading h4 {
+  overflow-wrap: anywhere;
+}
+
+.library-optional-section .learning-panel-heading > .muted {
+  max-width: 280px;
+  margin: 2px 0 0;
+  text-align: right;
+}
+
+.library-optional-section .learning-panel-control {
+  display: grid;
+  width: 92px;
+  gap: 4px;
+  align-content: start;
+  color: rgba(0, 0, 0, 0.62);
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.library-optional-section .learning-panel-control select {
+  min-height: 36px;
+}
+
+.library-optional-section .learning-preference-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(120px, 0.75fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.library-optional-section .learning-preference-controls label {
+  min-width: 0;
+}
+
+.library-optional-section .learning-preference-controls input[type="range"] {
+  margin: 5px 0 1px;
+}
+
+.library-optional-section .learning-progress-copy,
+.library-optional-section .learning-panel > p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.library-optional-section .learning-next-task {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 10px 12px;
+  border-left: 3px solid var(--teal);
+  border-radius: 8px;
+  background: rgba(31, 122, 116, 0.08);
+}
+
+.library-optional-section .learning-next-task > * {
+  min-width: 0;
+}
+
+.library-optional-section .learning-next-task span {
+  color: rgba(0, 0, 0, 0.58);
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.library-optional-section .learning-step-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.library-optional-section .learning-step-list button {
+  min-height: 58px;
+  align-content: center;
+  gap: 5px;
+  overflow-wrap: anywhere;
+}
+
+.library-optional-section .learning-step-list button span {
+  color: rgba(0, 0, 0, 0.56);
+  font-size: 0.7rem;
+  line-height: 1.25;
+}
+
+.library-optional-section .learning-ranked-list {
+  gap: 8px;
+}
+
+.library-optional-section .learning-ranked-list button,
+.library-optional-section .learning-ranked-list > div {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr);
+  min-height: 48px;
+  gap: 10px;
+  padding: 9px 10px;
+}
+
+.library-optional-section .learning-ranked-list button > span,
+.library-optional-section .learning-ranked-list button > small,
+.library-optional-section .learning-ranked-list > div > span,
+.library-optional-section .learning-ranked-list > div > button {
+  min-width: 0;
+}
+
+.library-optional-section .learning-ranked-list button > span,
+.library-optional-section .learning-ranked-list > div > span {
+  display: grid;
+  gap: 3px;
+}
+
+.library-optional-section .learning-ranked-list button > small,
+.library-optional-section .learning-ranked-list > div > span small {
+  overflow-wrap: anywhere;
+}
+
+.library-optional-section .learning-transition-list > div {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.library-optional-section .learning-transition-list button {
+  display: inline-flex;
+  width: max-content;
+  max-width: 100%;
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.library-optional-section .learning-goals .chip-row {
+  align-items: flex-start;
+}
+
+.library-optional-section .learning-glossary .learning-panel-heading button {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.library-optional-section .interval-visual {
+  position: relative;
+  min-height: 76px;
+  overflow: hidden;
+  margin: 2px 0;
+  border: 1px solid rgba(31, 122, 116, 0.2);
+  border-radius: 10px;
+  background: linear-gradient(180deg, rgba(31, 122, 116, 0.08), rgba(255, 255, 255, 0.55));
+}
+
+.library-optional-section .interval-visual::before {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  left: 14px;
+  height: 1px;
+  content: "";
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.library-optional-section .interval-visual > span {
+  position: absolute;
+  top: 50%;
+  z-index: 1;
+  display: grid;
+  width: 42px;
+  min-height: 42px;
+  place-items: center;
+  transform: translate(-50%, -50%);
+  border: 2px solid var(--teal);
+  border-radius: 50%;
+  background: var(--cream);
+  color: var(--ink);
+  text-align: center;
+}
+
+.library-optional-section .interval-visual > span b {
+  font-size: 0.78rem;
+  line-height: 1;
+}
+
+.library-optional-section .interval-visual > span small {
+  color: rgba(0, 0, 0, 0.56);
+  font-size: 0.58rem;
+  line-height: 1;
+}
+
+.library-optional-section .learning-composer-rows {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+
+.library-optional-section .learning-composer-row {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  align-items: start;
+  gap: 12px;
+  min-width: 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+}
+
+.library-optional-section .learning-composer-row:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.library-optional-section .learning-chip-label {
+  padding-top: 7px;
+  color: var(--teal);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.library-optional-section .learning-composer-row .chip-row {
+  min-width: 0;
+  align-items: center;
+}
+
+.library-optional-section .learning-composer-row .chip,
+.library-optional-section .learning-composer-row .btn {
+  max-width: 100%;
+}
+
+.library-optional-section .learning-songs .learning-panel-heading {
+  align-items: end;
+}
+
+.library-optional-section .learning-inline-controls {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(120px, 1fr));
+  gap: 8px;
+  justify-self: end;
+}
+
+.library-optional-section .learning-inline-controls label {
+  min-width: 0;
+}
+
+.library-optional-section .song-reference-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.library-optional-section .song-reference-grid article {
+  min-height: 150px;
+  align-content: start;
+  padding: 12px;
+  overflow-wrap: anywhere;
+}
+
+.library-optional-section .song-reference-grid article > span {
+  display: block;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: rgba(31, 122, 116, 0.08);
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
+.library-optional-section .learning-map-scroll {
+  min-width: 0;
+  max-width: 100%;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
+.library-optional-section .learning-map-scroll .fretboard-map {
+  display: grid;
+  grid-template-columns: repeat(13, minmax(42px, 1fr));
+  width: max-content;
+  min-width: 690px;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 9px;
+  background: rgba(239, 227, 210, 0.48);
+}
+
+.library-optional-section .fretboard-map-cell {
+  display: grid;
+  min-height: 34px;
+  place-items: center;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.65);
+  color: rgba(0, 0, 0, 0.55);
+  font-size: 0.66rem;
+  font-weight: 700;
+}
+
+.library-optional-section .fretboard-map-cell.tonic,
+.library-optional-section .fretboard-map-cell.resolution {
+  border-color: var(--teal);
+  background: var(--teal);
+  color: white;
+}
+
+.library-optional-section .fretboard-map-cell.chord-tone {
+  border-color: rgba(201, 96, 69, 0.55);
+  background: rgba(201, 96, 69, 0.16);
+  color: var(--ink);
+}
+
+.library-optional-section .fretboard-map-cell.scale {
+  background: rgba(31, 122, 116, 0.1);
+  color: var(--ink);
+}
+
+.library-optional-section .learning-handoff-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.library-optional-section .learning-handoff-actions .btn {
+  margin: 0;
+}
+
+@media (max-width: 900px) {
+  .library-optional-section .learning-preference-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .library-optional-section .learning-songs .learning-panel-heading {
+    align-items: start;
+  }
+}
+
+@media (max-width: 640px) {
+  .library-optional-section .learning-panel-heading {
+    grid-template-columns: 1fr;
+  }
+
+  .library-optional-section .learning-panel-heading > .muted,
+  .library-optional-section .learning-glossary .learning-panel-heading button,
+  .library-optional-section .learning-inline-controls {
+    justify-self: start;
+    max-width: none;
+    text-align: left;
+  }
+
+  .library-optional-section .learning-panel-control {
+    width: 100%;
+  }
+
+  .library-optional-section .learning-next-task {
+    grid-template-columns: 1fr auto;
+  }
+
+  .library-optional-section .learning-next-task .btn {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+
+  .library-optional-section .learning-composer-row {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+
+  .library-optional-section .learning-chip-label {
+    padding-top: 0;
+  }
+
+  .library-optional-section .learning-inline-controls {
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .library-optional-section .learning-transition-list > div,
+  .library-optional-section .learning-ranked-list button,
+  .library-optional-section .learning-ranked-list > div {
+    grid-template-columns: 1fr;
+  }
+
+  .library-optional-section .learning-transition-list button {
+    justify-self: start;
+  }
+}
+
+@media (max-width: 460px) {
+  .library-optional-section .learning-inline-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .library-optional-section .learning-handoff-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .library-optional-section .learning-handoff-actions .btn {
+    width: 100%;
   }
 }
