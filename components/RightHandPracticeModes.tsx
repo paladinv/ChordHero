@@ -1,8 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { RIGHT_HAND_EXERCISES, type RightHandDifficulty, type RightHandExercise, type RightHandTechnique } from "../lib/rightHandExercises";
 import type { ExerciseProgress } from "../lib/rightHandPracticeRuntime";
+import type { AnticipationMode, CoachingFocus, DynamicsProfile } from "./RightHandCoachingStudio";
+
+const RightHandCoachingStudio = dynamic(() => import("./RightHandCoachingStudio"), {
+  ssr: false,
+  loading: () => <div className="recording-coach-loading" role="status">Loading the coaching studio…</div>
+});
 
 export type RightHandTargetSound = "acoustic-strum" | "muted-funk" | "fingerstyle" | "clean-electric";
 export type PracticeModeSettings = {
@@ -13,22 +20,29 @@ export type PracticeModeSettings = {
   guitarMix: number;
   contextMix: number;
   performanceMode: boolean;
+  focus: CoachingFocus;
+  dynamics: DynamicsProfile;
+  ghostStrum: boolean;
+  anticipation: AnticipationMode;
 };
 
 type Props = {
   status: "idle" | "countin" | "running" | "paused" | "complete";
   bpm: number;
   elapsedSeconds: number;
+  activeStep: number;
   loopsCompleted: number;
   exercise: RightHandExercise;
   technique: RightHandTechnique;
   difficulty: RightHandDifficulty;
   progress: Record<string, ExerciseProgress>;
+  chordProgression: string[];
   onSettingsChange: (settings: PracticeModeSettings) => void;
   onSetBpm: (bpm: number) => void;
   onSelectExercise: (exercise: RightHandExercise) => void;
   onPreparePerformance: () => void;
   onStartRound: () => void;
+  onSetRoundSeconds: (seconds: number) => void;
 };
 
 type Playlist = { id: string; name: string; exerciseIds: string[] };
@@ -46,7 +60,7 @@ type ChallengePack = {
 const SETTINGS_KEY = "chord-hero:right-hand:practice-modes:v1";
 const LIBRARY_KEY = "chord-hero:right-hand:personal-library:v1";
 const PACKS_KEY = "chord-hero:right-hand:challenge-packs:v1";
-const DEFAULT_SETTINGS: PracticeModeSettings = { targetSound: "clean-electric", demoSpeed: 1, noLook: false, clickMix: 80, guitarMix: 75, contextMix: 45, performanceMode: false };
+const DEFAULT_SETTINGS: PracticeModeSettings = { targetSound: "clean-electric", demoSpeed: 1, noLook: false, clickMix: 80, guitarMix: 75, contextMix: 45, performanceMode: false, focus: "rhythm", dynamics: "even", ghostStrum: false, anticipation: "adaptive" };
 const TARGET_SOUNDS: Array<{ id: RightHandTargetSound; label: string; help: string }> = [
   { id: "acoustic-strum", label: "Acoustic strum", help: "Open, rounded sample voicing" },
   { id: "muted-funk", label: "Muted funk", help: "Short, dry attack reference" },
@@ -103,6 +117,7 @@ export default function RightHandPracticeModes(props: Props) {
   const [fatiguePrompt, setFatiguePrompt] = useState(false);
   const [recoveryMisses, setRecoveryMisses] = useState(0);
   const [simulationScore, setSimulationScore] = useState<{ score: number; loops: number; listenScore?: number } | null>(null);
+  const [showCoachingStudio, setShowCoachingStudio] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const frameRef = useRef<number | null>(null);
@@ -121,7 +136,11 @@ export default function RightHandPracticeModes(props: Props) {
       demoSpeed: [1, 0.75, 0.5].includes(saved.demoSpeed ?? 0) ? saved.demoSpeed! : 1,
       noLook: Boolean(saved.noLook), clickMix: Math.max(0, Math.min(100, Number(saved.clickMix ?? 80))),
       guitarMix: Math.max(0, Math.min(100, Number(saved.guitarMix ?? 75))), contextMix: Math.max(0, Math.min(100, Number(saved.contextMix ?? 45))),
-      performanceMode: false
+      performanceMode: false,
+      focus: ["rhythm", "strings", "muting"].includes(saved.focus ?? "") ? saved.focus! : DEFAULT_SETTINGS.focus,
+      dynamics: ["even", "accent-map", "backbeat", "crescendo"].includes(saved.dynamics ?? "") ? saved.dynamics! : DEFAULT_SETTINGS.dynamics,
+      ghostStrum: Boolean(saved.ghostStrum),
+      anticipation: ["full", "adaptive", "hidden"].includes(saved.anticipation ?? "") ? saved.anticipation! : DEFAULT_SETTINGS.anticipation
     };
     setSettings(hydrated); onSettingsChange(hydrated);
     setLibrary(boundedLibrary(readJson(LIBRARY_KEY, {})));
@@ -257,6 +276,9 @@ export default function RightHandPracticeModes(props: Props) {
         <div><span className="label">Common mistake</span><p>{cue.mistake}</p></div>
         <div><span className="label">Fix it now</span><p>{cue.correction}</p></div>
       </div>
+
+      <section className="coaching-studio-launch"><div><span className="label">3D & focused coaching</span><strong>Hand motion, string routes, dynamics, rehearsal, setup and hands-free control</strong><p>Loaded only when opened; the Three.js renderer starts only after you open its 3D coach.</p></div><button type="button" aria-expanded={showCoachingStudio} onClick={() => setShowCoachingStudio((value) => !value)}>{showCoachingStudio ? "Close coaching studio" : "Open coaching studio"}</button></section>
+      {showCoachingStudio ? <RightHandCoachingStudio status={props.status} bpm={props.bpm} elapsedSeconds={props.elapsedSeconds} activeStep={props.activeStep} loopsCompleted={props.loopsCompleted} exercise={props.exercise} progress={props.progress} playlists={library.playlists} chordProgression={props.chordProgression} focus={settings.focus} dynamics={settings.dynamics} ghostStrum={settings.ghostStrum} anticipation={settings.anticipation} onModeChange={updateSettings} onSetRoundSeconds={props.onSetRoundSeconds} onSelectExercise={props.onSelectExercise} onToggleRound={props.onStartRound} /> : null}
 
       <details open><summary>Sound, demo & no-look</summary><div className="practice-mode-grid">
         <label>Target sound<select value={settings.targetSound} onChange={(event) => updateSettings({ targetSound: event.target.value as RightHandTargetSound })}>{TARGET_SOUNDS.map((sound) => <option key={sound.id} value={sound.id}>{sound.label}</option>)}</select><small>{TARGET_SOUNDS.find((sound) => sound.id === settings.targetSound)?.help}; no extra sample download.</small></label>

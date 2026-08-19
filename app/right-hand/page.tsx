@@ -18,11 +18,10 @@ import {
 import type { RecordingAnalysis } from "../../lib/songRecordingAnalysis";
 import { RIGHT_HAND_GUIDED_PATHS as GUIDED_PATHS, RIGHT_HAND_PROGRESSIONS as PROGRESSIONS, RIGHT_HAND_ROUND_OPTIONS as ROUND_OPTIONS } from "../../lib/rightHandPracticePresets";
 import type { PracticeModeSettings, RightHandChallengeMode, RightHandStylePreset } from "../../components/RightHandAdvancedTools";
-import { DEFAULT_RIGHT_HAND_MODE_SETTINGS, describeRightHandStep as describeStep, formatPracticeTime as formatTime, readPracticeAudioPreferences, rememberedRightHandTempo as rememberedTempo, rightHandCountLabel as countLabel, rightHandExerciseById as exerciseById, rightHandSubdivisionsPerBeat as subdivisionsPerBeat, saveRightHandPracticeResult as savePracticeResult, shouldPlayStyleBacking, validCustomProgression, type ExerciseProgress } from "../../lib/rightHandPracticeRuntime";
+import { DEFAULT_RIGHT_HAND_MODE_SETTINGS, describeRightHandStep as describeStep, formatPracticeTime as formatTime, readPracticeAudioPreferences, rememberedRightHandTempo as rememberedTempo, rightHandCountLabel as countLabel, rightHandDynamicsLevel as dynamicsLevel, rightHandExerciseById as exerciseById, rightHandSubdivisionsPerBeat as subdivisionsPerBeat, saveRightHandPracticeResult as savePracticeResult, shouldPlayStyleBacking, validCustomProgression, type ExerciseProgress } from "../../lib/rightHandPracticeRuntime";
 const RightHandRecordingCoach = dynamic(() => import("../../components/RightHandRecordingCoach"), { ssr: false, loading: () => <div className="recording-coach-loading">Loading coach…</div> });
-const LicensedDemo = dynamic(() => import("../../components/LicensedDemo"), { ssr: false, loading: () => <div className="licensed-demo-loading">Loading demonstration slot…</div> });
+const LicensedDemo = dynamic(() => import("../../components/LicensedDemo"), { ssr: false, loading: () => <p>Loading demo…</p> });
 const RightHandAdvancedTools = dynamic(() => import("../../components/RightHandAdvancedTools"), { ssr: false, loading: () => <div className="recording-coach-loading">Loading controls…</div> });
-const RH3D = dynamic(() => import("../../components/RightHandTechnique3D"), { ssr: false });
 type PracticeStatus = "idle" | "countin" | "running" | "paused" | "complete";
 type SoundMode = "click" | "guitar" | "both" | "silent";
 type Rating = "clean" | "mistakes" | "fast";
@@ -208,16 +207,17 @@ export default function RightHandPage() {
           ? isBeat && beatNumber % 4 % 2 === 1
           : accentMode === "downbeat" ? isBeat && beatNumber % 4 === 0 : step.accent || isBeat;
         const metronomeAccent = challengeMode === "random" ? (beatNumber * 11 + stepOrdinal * 5 + patternIndexes.length) % 7 < 2 : regularAccent;
+        const level = dynamicsLevel(modes.dynamics, stepOrdinal, patternIndexes.length, beatNumber, step.accent);
         const when = nextStepTime;
         if (!step.rest && !isSilentGap && masterVolume > 0 && (soundMode === "click" || soundMode === "both")) {
           void playRecordedClick(context, { accent: metronomeAccent, volume: 0.13 * masterVolume * modes.clickMix / 100, when });
         }
-        if (!step.rest && masterVolume > 0 && (soundMode === "guitar" || soundMode === "both")) {
+        if (!step.rest && !(modes.ghostStrum && exercise.technique === "strumming" && !metronomeAccent && subdivisionIndex > 0) && masterVolume > 0 && (soundMode === "guitar" || soundMode === "both")) {
           void playRecordedGuitarStep(context, {
             token: rawStep,
             technique: exercise.technique,
-            accent: step.accent,
-            volume: (soundMode === "both" ? 0.15 : 0.22) * masterVolume * modes.guitarMix / 100,
+            accent: level >= .85,
+            volume: (soundMode === "both" ? 0.15 : 0.22) * masterVolume * modes.guitarMix / 100 * level,
             targetSound: modes.targetSound,
             when
           });
@@ -709,7 +709,6 @@ export default function RightHandPage() {
             <span className="exercise-position">{selectedIndex + 1} / {exercises.length}</span>
           </header>
           <div className={`follow-along ${status === "running" ? "playing" : ""}`}>
-            <RH3D technique={selectedExercise.technique} step={activeStep} strings={currentStep.strings} run={status === "running"} id={selectedExercise.id} loop={loopsCompleted} />
             <div className={`motion-demo technique-${technique} demo-speed-${modes.demoSpeed * 100}`} style={motionStyle}>
               {status === "countin" ? (
                 <div className="count-in-display"><span>Get ready</span><strong>{countIn}</strong></div>
@@ -808,13 +807,13 @@ export default function RightHandPage() {
             ladderStage={exerciseProgress?.ladderStage ?? 0} cleanStreak={exerciseProgress?.cleanStreak ?? 0} stylePreset={stylePreset}
             exerciseId={selectedExercise.id} technique={selectedExercise.technique} patternLength={selectedExercise.pattern.length} subdivisionsPerBeat={subdivisionsPerBeat(selectedExercise.subdivision)} challengeMode={challengeMode}
             goalTimingScore={goalTimingScore} goalPracticeMinutes={goalPracticeMinutes} practisedMinutes={(exerciseProgress?.totalSeconds ?? 0) / 60}
-            status={status} bpm={bpm} elapsedSeconds={elapsedSeconds} difficulty={difficulty} exercise={selectedExercise} progress={progress}
+            status={status} bpm={bpm} elapsedSeconds={elapsedSeconds} difficulty={difficulty} exercise={selectedExercise} progress={progress} chordProgression={chordProgression}
             onAutoRampChange={setAutoRamp} onRampAmountChange={setRampAmount} onLadderRequiredRoundsChange={setLadderRequiredRounds}
             onResetSpeedLadder={resetSpeedLadder} onEnableMidi={() => void enableMidi()} onEnableVoice={enableVoiceControl}
             onClickFeelChange={setClickFeel} onAccentModeChange={setAccentMode} onSilentEveryChange={setSilentEvery}
             onSetTroubleLoop={loopTroubleStep} onClearTroubleLoop={() => { setTroubleLoop(null); resetSession(); }} onUpdateGoal={updateGoal} onApplyStylePreset={applyStylePreset}
             onChallengeChange={applyChallenge} onPlayInContext={playInContext}
-            onModeSettingsChange={setModes} onSetBpm={setBpm} onSelectExercise={selectExercise} onPreparePerformance={() => { if (!chordProgression.length) setProgressionId("pop-g"); setRoundSeconds(60); }} onStartRound={() => togglePlaybackRef.current()}
+            onModeSettingsChange={setModes} onSetBpm={setBpm} onSelectExercise={selectExercise} onPreparePerformance={() => { if (!chordProgression.length) setProgressionId("pop-g"); setRoundSeconds(60); }} onStartRound={() => togglePlaybackRef.current()} onSetRoundSeconds={setRoundSeconds}
           /> : null}
           <section className="microphone-coach-launch">
             <div><span className="label">Microphone feedback</span><h3>Compare a short take with the target pulse.</h3><p>Permission is requested only when you start recording. The latest take stays in this browser.</p></div>

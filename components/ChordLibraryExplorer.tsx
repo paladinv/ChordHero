@@ -3,7 +3,6 @@
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import ChordDiagram, { Chord } from "./ChordDiagram";
-import ChordLearningStudio from "./ChordLearningStudio";
 import {
   CHORD_DIFFICULTY_TAGS,
   CHORD_FUNCTION_KEYS,
@@ -53,6 +52,10 @@ import sharedSettings from "../shared/content/v1/settings.json";
 const ChordPracticePlanner = dynamic(() => import("./ChordPracticePlanner"), {
   ssr: false,
   loading: () => <section className="chord-practice-planner planner-loading" aria-label="Loading practice planner"><span className="label">Practice planner</span><strong>Loading local planning tools...</strong></section>
+});
+const ChordLearningStudio = dynamic(() => import("./ChordLearningStudio"), {
+  ssr: false,
+  loading: () => <section className="learning-studio learning-studio-loading" aria-label="Loading learning studio"><span className="label">Optional learning studio</span><strong>Loading guided practice tools...</strong></section>
 });
 const GuitarTechnique3D = dynamic(() => import("./GuitarTechnique3D"), {
   ssr: false,
@@ -162,7 +165,7 @@ type EarTarget = {
   referenceRoles: string[];
 };
 type SyncStatus = "local" | "syncing" | "synced" | "offline" | "error";
-type DisplaySettings = { handedness: "right" | "left"; highContrast: boolean; largeCharts: boolean };
+type DisplaySettings = { handedness: "right" | "left"; highContrast: boolean; largeCharts: boolean; simplifiedCharts: boolean };
 type HeatmapNote = {
   key: string;
   stringIndex: number;
@@ -360,7 +363,8 @@ export default function ChordLibraryExplorer() {
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("local");
   const [syncMessage, setSyncMessage] = useState("Local-only profile storage");
   const [storageHydrated, setStorageHydrated] = useState(false);
-  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>({ handedness: "right", highContrast: false, largeCharts: false });
+  const [displaySettings, setDisplaySettings] = useState<DisplaySettings>({ handedness: "right", highContrast: false, largeCharts: false, simplifiedCharts: false });
+  const [sightReadingMode, setSightReadingMode] = useState(false);
   const [midiStatus, setMidiStatus] = useState("MIDI not connected");
   const [midiHeldNotes, setMidiHeldNotes] = useState<number[]>([]);
   const [fretFilter, setFretFilter] = useState<"all" | "4" | "8" | "12">("all");
@@ -1436,75 +1440,90 @@ export default function ChordLibraryExplorer() {
           </div>
         </section>
 
-        <ChordLearningStudio
-          activeKey={activeHarmonyKey}
-          mode={libraryMode}
-          state={learningState}
-          onStateChange={setLearningState}
-          selectedEntry={selectedLibraryEntry}
-          selectedFunction={selectedFunction}
-          filteredEntries={filteredLibraryEntries}
-          practiceStats={practiceStats}
-          displaySettings={displaySettings}
-          onRoleChange={(role) => setLibraryFunctionRole(role)}
-          onKeyChange={(key) => setLibraryFunctionKey(key)}
-          onSelectEntry={(id) => setSelectedLibraryId(id)}
-          onLogPractice={addPracticeRep}
-          onPlayChord={(chord, mode = "strum", voicingId) => playChordPreview(chord, mode, voicingId)}
-        />
-
-        <ChordPracticePlanner
-          entries={filteredLibraryEntries}
-          selectedEntry={selectedLibraryEntry}
-          practiceStats={practiceStats}
-          assignments={teacherAssignments}
-          stringMistakes={stringMistakes}
-          activeStudentId={activeStudentId}
-          onSelectEntry={(id) => jumpToChord(id)}
-        />
-
-        <div className="library-findbar library-secondary-filters">
-          <div className="library-search">
-            <label className="label" htmlFor="library-search">Shape or chord-name search</label>
-            <input id="library-search" type="search" value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} placeholder="Try Dm7, G/B, Fmaj7..." />
+        <section className="library-secondary-search" aria-labelledby="library-shape-search-title">
+          <div className="library-subsection-heading">
+            <div><span className="label">Shape search</span><h3 id="library-shape-search-title">Find a voicing by name</h3></div>
+            <span className="muted">Optional shortcut when you already know the chord or shape.</span>
           </div>
-          <details className="library-more-filters">
-            <summary>Shape filters</summary>
-            <div className="library-filter-popover">
-              <label htmlFor="library-root">Root identity</label>
-              <select id="library-root" value={libraryRoot} onChange={(event) => setLibraryRoot(event.target.value)}>{(availableRoots.length ? availableRoots : CHORD_LIBRARY_ROOTS).map((root) => <option key={root} value={root}>{root === "any" ? "Any root" : root}</option>)}</select>
-              <label htmlFor="library-quality">Chord type</label>
-              <select id="library-quality" value={libraryQuality} onChange={(event) => setLibraryQuality(event.target.value)}>{availableLibraryQualities.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
-              <label htmlFor="library-inversion">Position / shape</label>
-              <select id="library-inversion" value={libraryInversion} onChange={(event) => setLibraryInversion(event.target.value)}>{availableInversionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
-              <label htmlFor="library-tag">Difficulty</label>
-              <select id="library-tag" value={libraryTag} onChange={(event) => setLibraryTag(event.target.value as "all" | DifficultyTag)}><option value="all">All difficulties</option>{CHORD_DIFFICULTY_TAGS.map((tag) => <option key={tag} value={tag}>{tag}</option>)}</select>
-              <label htmlFor="library-fret-range">Fret range</label>
-              <select id="library-fret-range" value={fretFilter} onChange={(event) => setFretFilter(event.target.value as typeof fretFilter)}><option value="all">Any fret</option><option value="4">Open to fret 4</option><option value="8">Open to fret 8</option><option value="12">Open to fret 12</option></select>
-              <label htmlFor="library-string-set">String set</label>
-              <select id="library-string-set" value={stringFilter} onChange={(event) => setStringFilter(event.target.value as typeof stringFilter)}><option value="all">Any string set</option><option value="open">Includes open strings</option><option value="partial">Partial chords</option><option value="full">Five or more ringing strings</option></select>
-              <button className="btn ghost" type="button" onClick={() => { setLibraryRoot("any"); setLibraryQuality("any"); setLibraryInversion("all"); setLibraryTag("all"); setFretFilter("all"); setStringFilter("all"); }}>Reset shape filters</button>
+          <div className="library-findbar library-secondary-filters">
+            <div className="library-search">
+              <label className="label" htmlFor="library-search">Chord name or voicing</label>
+              <input id="library-search" type="search" value={librarySearch} onChange={(event) => setLibrarySearch(event.target.value)} placeholder="Try Dm7, G/B, Fmaj7..." />
             </div>
-          </details>
-        </div>
+            <details className="library-more-filters">
+              <summary>Shape filters</summary>
+              <div className="library-filter-popover">
+                <label htmlFor="library-root">Root identity</label>
+                <select id="library-root" value={libraryRoot} onChange={(event) => setLibraryRoot(event.target.value)}>{(availableRoots.length ? availableRoots : CHORD_LIBRARY_ROOTS).map((root) => <option key={root} value={root}>{root === "any" ? "Any root" : root}</option>)}</select>
+                <label htmlFor="library-quality">Chord type</label>
+                <select id="library-quality" value={libraryQuality} onChange={(event) => setLibraryQuality(event.target.value)}>{availableLibraryQualities.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+                <label htmlFor="library-inversion">Position / shape</label>
+                <select id="library-inversion" value={libraryInversion} onChange={(event) => setLibraryInversion(event.target.value)}>{availableInversionOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
+                <label htmlFor="library-tag">Difficulty</label>
+                <select id="library-tag" value={libraryTag} onChange={(event) => setLibraryTag(event.target.value as "all" | DifficultyTag)}><option value="all">All difficulties</option>{CHORD_DIFFICULTY_TAGS.map((tag) => <option key={tag} value={tag}>{tag}</option>)}</select>
+                <label htmlFor="library-fret-range">Fret range</label>
+                <select id="library-fret-range" value={fretFilter} onChange={(event) => setFretFilter(event.target.value as typeof fretFilter)}><option value="all">Any fret</option><option value="4">Open to fret 4</option><option value="8">Open to fret 8</option><option value="12">Open to fret 12</option></select>
+                <label htmlFor="library-string-set">String set</label>
+                <select id="library-string-set" value={stringFilter} onChange={(event) => setStringFilter(event.target.value as typeof stringFilter)}><option value="all">Any string set</option><option value="open">Includes open strings</option><option value="partial">Partial chords</option><option value="full">Five or more ringing strings</option></select>
+                <button className="btn ghost" type="button" onClick={() => { setLibraryRoot("any"); setLibraryQuality("any"); setLibraryInversion("all"); setLibraryTag("all"); setFretFilter("all"); setStringFilter("all"); }}>Reset shape filters</button>
+              </div>
+            </details>
+          </div>
 
-        {searchMatches.length > 0 ? (
-          <div className="library-jump-results">
-            <span className="label">Quick results</span>
-            <div className="variant-list">
-              {searchMatches.map((entry) => (
-                <button key={entry.id} type="button" className="chip" onClick={() => jumpToChord(entry.id)}>
-                  {entry.chord.name} · {entry.position}
-                </button>
-              ))}
+          {searchMatches.length > 0 ? (
+            <div className="library-jump-results">
+              <span className="label">Quick results</span>
+              <div className="variant-list">
+                {searchMatches.map((entry) => (
+                  <button key={entry.id} type="button" className="chip" onClick={() => jumpToChord(entry.id)}>
+                    {entry.chord.name} · {entry.position}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        ) : null}
-        {deferredLibrarySearch && searchMatches.length === 0 ? (
-          <div className="history-empty library-no-results" role="status">
-            No chord shape matches <strong>{librarySearch.trim()}</strong>. The library is still ready for theory, planner, and audio actions; clear the search or choose another function.
-          </div>
-        ) : null}
+          ) : null}
+          {deferredLibrarySearch && searchMatches.length === 0 ? (
+            <div className="history-empty library-no-results" role="status">
+              No chord shape matches <strong>{librarySearch.trim()}</strong>. The library is still ready for theory, planner, and audio actions; clear the search or choose another function.
+            </div>
+          ) : null}
+        </section>
+
+        <section className="library-optional-section library-learning-section" aria-labelledby="library-learning-stage-title">
+          <div className="library-stage-kicker"><span className="label">Optional learning studio</span><strong id="library-learning-stage-title">Build a guided path from the selected function</strong><span className="muted">Open-ended exploration stays below the primary search.</span></div>
+          <ChordLearningStudio
+            activeKey={activeHarmonyKey}
+            mode={libraryMode}
+            state={learningState}
+            onStateChange={setLearningState}
+            selectedEntry={selectedLibraryEntry}
+            selectedFunction={selectedFunction}
+            filteredEntries={filteredLibraryEntries}
+            practiceStats={practiceStats}
+            displaySettings={displaySettings}
+            onRoleChange={(role) => setLibraryFunctionRole(role)}
+            onKeyChange={(key) => setLibraryFunctionKey(key)}
+            onSelectEntry={(id) => setSelectedLibraryId(id)}
+            onLogPractice={addPracticeRep}
+            onPlayChord={(chord, mode = "strum", voicingId) => playChordPreview(chord, mode, voicingId)}
+          />
+        </section>
+
+        <section className="library-optional-section library-planner-section" aria-labelledby="library-planner-stage-title">
+          <div className="library-stage-kicker"><span className="label">Practice planner</span><strong id="library-planner-stage-title">Turn a selected voicing into a focused session</strong><span className="muted">Planning tools stay lazy and do not affect the browse path.</span></div>
+          <ChordPracticePlanner
+            entries={filteredLibraryEntries}
+            selectedEntry={selectedLibraryEntry}
+            practiceStats={practiceStats}
+            assignments={teacherAssignments}
+            stringMistakes={stringMistakes}
+            activeStudentId={activeStudentId}
+            onSelectEntry={(id) => jumpToChord(id)}
+            onPlayChord={(chord, mode = "strum") => playChordPreview(chord, mode)}
+            sightReadingMode={sightReadingMode}
+            onSightReadingModeChange={setSightReadingMode}
+          />
+        </section>
 
         <nav className="library-workspace-tabs" aria-label="Library tools">
           {([
@@ -1579,7 +1598,7 @@ export default function ChordLibraryExplorer() {
               {workspace === "browse" ? (
                 <div className="library-browse-view">
                   <div className="library-primary-diagram">
-                    <ChordDiagram chord={selectedLibraryEntry.chord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} />
+                    {sightReadingMode ? <div className="library-chart-hidden" role="status">Chart hidden until you answer in sight-reading mode.</div> : <ChordDiagram chord={selectedLibraryEntry.chord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} simplifiedChart={displaySettings.simplifiedCharts} />}
                   </div>
                   <div className="library-primary-copy">
                     <div className="library-tag-row">
@@ -1724,7 +1743,7 @@ export default function ChordLibraryExplorer() {
                       <article key={entry.id} className={index === 0 ? "active" : ""}>
                         <span className="label">{index === 0 ? "Primary" : `Option ${index + 1}`}</span>
                         <h4>{entry.chord.name}</h4>
-                        <ChordDiagram chord={entry.chord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} />
+                        <ChordDiagram chord={entry.chord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} simplifiedChart={displaySettings.simplifiedCharts} />
                         <p>{entry.summary}</p>
                         <div className="chip-row"><button className="btn" type="button" onClick={() => playChordPreview(entry.chord, "strum")}>Play</button>{index > 0 ? <button className="btn ghost" type="button" onClick={() => jumpToChord(entry.id)}>Make primary</button> : null}</div>
                       </article>
@@ -1766,7 +1785,7 @@ export default function ChordLibraryExplorer() {
                           </button>
                         ))}
                       </div>
-                      <div className="custom-fretboard-preview"><ChordDiagram chord={customChord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} /><button className="btn" type="button" onClick={() => playChordPreview(customChord, "strum", "custom")}>Play custom shape</button></div>
+                      <div className="custom-fretboard-preview"><ChordDiagram chord={customChord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} simplifiedChart={displaySettings.simplifiedCharts} /><button className="btn" type="button" onClick={() => playChordPreview(customChord, "strum", "custom")}>Play custom shape</button></div>
                     </div>
                   </section>
                   <section>
@@ -1801,6 +1820,7 @@ export default function ChordLibraryExplorer() {
                       <label><input type="checkbox" checked={displaySettings.handedness === "left"} onChange={(event) => setDisplaySettings((previous) => ({ ...previous, handedness: event.target.checked ? "left" : "right" }))} /> Left-handed</label>
                       <label><input type="checkbox" checked={displaySettings.highContrast} onChange={(event) => setDisplaySettings((previous) => ({ ...previous, highContrast: event.target.checked }))} /> High contrast</label>
                       <label><input type="checkbox" checked={displaySettings.largeCharts} onChange={(event) => setDisplaySettings((previous) => ({ ...previous, largeCharts: event.target.checked }))} /> Larger charts</label>
+                      <label><input type="checkbox" checked={displaySettings.simplifiedCharts} onChange={(event) => setDisplaySettings((previous) => ({ ...previous, simplifiedCharts: event.target.checked }))} /> Simplified charts</label>
                     </div>
                   </section>
                   <section>
@@ -1838,7 +1858,7 @@ export default function ChordLibraryExplorer() {
                         {teacherSheetEntries.map((entry) => (
                           <article key={`teacher-${entry.id}`} className="teacher-sheet-card">
                             <h3>{entry.chord.name}</h3>
-                            <ChordDiagram chord={entry.chord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} />
+                            <ChordDiagram chord={entry.chord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} simplifiedChart={displaySettings.simplifiedCharts} />
                             <p>{entry.position}</p>
                             <p className="muted">{entry.practiceFocus}</p>
                           </article>
@@ -1851,7 +1871,7 @@ export default function ChordLibraryExplorer() {
 
               <div className="print-compare-sheet">
                 {[selectedLibraryEntry, compareEntry, thirdCompareEntry].filter((entry): entry is ChordLibraryItem => Boolean(entry)).map((entry) => (
-                  <article key={`print-${entry.id}`} className="print-compare-card"><h3>{entry.chord.name}</h3><p>{entry.position}</p><ChordDiagram chord={entry.chord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts}/><p>{entry.recommendedVariant}</p></article>
+                  <article key={`print-${entry.id}`} className="print-compare-card"><h3>{entry.chord.name}</h3><p>{entry.position}</p><ChordDiagram chord={entry.chord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} simplifiedChart={displaySettings.simplifiedCharts}/><p>{entry.recommendedVariant}</p></article>
                 ))}
               </div>
             </div>

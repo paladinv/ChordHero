@@ -25,6 +25,7 @@ type ChordDiagramProps = {
   orientation?: "right" | "left";
   highContrast?: boolean;
   largeChart?: boolean;
+  simplifiedChart?: boolean;
 };
 
 const STRING_COUNT = 6;
@@ -40,7 +41,7 @@ function getBaseFret(chord: Chord) {
   return chord.barre?.fret ?? minFret;
 }
 
-export default function ChordDiagram({ chord, orientation = "right", highContrast = false, largeChart = false }: ChordDiagramProps) {
+export default function ChordDiagram({ chord, orientation = "right", highContrast = false, largeChart = false, simplifiedChart = false }: ChordDiagramProps) {
   const chart = normalizeChord(chord);
   const width = 200;
   const height = 230;
@@ -57,7 +58,7 @@ export default function ChordDiagram({ chord, orientation = "right", highContras
       width={width}
       height={height}
       viewBox={`0 0 ${width} ${height}`}
-      className={`diagram ${orientation === "left" ? "diagram-left-handed" : ""} ${highContrast ? "diagram-high-contrast" : ""} ${largeChart ? "diagram-large" : ""}`}
+      className={`diagram ${orientation === "left" ? "diagram-left-handed" : ""} ${highContrast ? "diagram-high-contrast" : ""} ${largeChart ? "diagram-large" : ""} ${simplifiedChart ? "diagram-simplified" : ""}`}
       role="img"
       aria-label={`Chord diagram for ${chart.name}. ${orientation === "left" ? "Left-handed mirrored chart. " : ""}X means muted, O means open, and numbers show fingerings.`}
     >
@@ -81,6 +82,7 @@ export default function ChordDiagram({ chord, orientation = "right", highContras
       })}
 
       {Array.from({ length: FRET_COUNT }).map((_, index) => {
+        if (simplifiedChart && index > 0) return null;
         const y = paddingY + index * fretGap;
         return (
           <line
@@ -136,7 +138,7 @@ export default function ChordDiagram({ chord, orientation = "right", highContras
         return (
           <g key={`dot-${stringIndex}`}>
             <circle cx={x} cy={y} r={11} className="diagram-dot" />
-            {finger ? (
+            {finger && !simplifiedChart ? (
               <text x={x} y={y + 4} className="diagram-finger">
                 {finger}
               </text>

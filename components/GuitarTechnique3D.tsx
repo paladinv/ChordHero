@@ -246,10 +246,15 @@ export default function GuitarTechnique3D({
     };
     const updateLeftHand = () => {
       const targets = chordToLeftHandTargets(chordRef.current);
-      const byFinger = new Map<number, (typeof targets)[number]>();
-      targets.forEach((item) => { if (!byFinger.has(item.finger)) byFinger.set(item.finger, item); });
+      const byFinger = new Map<number, (typeof targets)[number][]>();
+      targets.forEach((item) => { byFinger.set(item.finger, [...(byFinger.get(item.finger) ?? []), item]); });
       leftFingersRef.current.forEach((finger, index) => {
-        const target = byFinger.get(index + 1);
+        const fingerTargets = byFinger.get(index + 1) ?? [];
+        const target = fingerTargets.length ? {
+          ...fingerTargets[0],
+          string: fingerTargets.reduce((sum, item) => sum + item.string, 0) / fingerTargets.length,
+          fret: fingerTargets.reduce((sum, item) => sum + item.fret, 0) / fingerTargets.length
+        } : null;
         const from = new THREE.Vector3(-1.65 + index * 0.12, 0.92, -0.8 + index * 0.08);
         const to = target ? new THREE.Vector3(STRING_X(target.string), 0.32, FRET_Z(target.fret)) : new THREE.Vector3(-0.7 + index * 0.18, 0.33, -1.8);
         setSegment(finger.segment, from, to);

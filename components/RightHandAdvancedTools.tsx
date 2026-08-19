@@ -59,6 +59,7 @@ type Props = {
   difficulty: RightHandDifficulty;
   exercise: RightHandExercise;
   progress: Record<string, ExerciseProgress>;
+  chordProgression: string[];
   onAutoRampChange: (value: boolean) => void;
   onRampAmountChange: (value: number) => void;
   onLadderRequiredRoundsChange: (value: number) => void;
@@ -79,6 +80,7 @@ type Props = {
   onSelectExercise: (exercise: RightHandExercise) => void;
   onPreparePerformance: () => void;
   onStartRound: () => void;
+  onSetRoundSeconds: (seconds: number) => void;
 };
 
 const SETUP_KEY = "chord-hero:right-hand:setup-checklist:v1";
@@ -165,7 +167,7 @@ export default function RightHandAdvancedTools(props: Props) {
         <div><span className="label">Cool down · 60 sec</span><strong>Open-hand reset</strong><p>Stop for sharp pain, numbness, or persistent tension. Shake out gently; never stretch into pain.</p></div>
       </section>
 
-      <RightHandPracticeModes status={props.status} bpm={props.bpm} elapsedSeconds={props.elapsedSeconds} loopsCompleted={props.loopsCompleted} exercise={props.exercise} technique={props.technique} difficulty={props.difficulty} progress={props.progress} onSettingsChange={props.onModeSettingsChange} onSetBpm={props.onSetBpm} onSelectExercise={props.onSelectExercise} onPreparePerformance={props.onPreparePerformance} onStartRound={props.onStartRound} />
+      <RightHandPracticeModes status={props.status} bpm={props.bpm} elapsedSeconds={props.elapsedSeconds} activeStep={props.activeStep} loopsCompleted={props.loopsCompleted} exercise={props.exercise} technique={props.technique} difficulty={props.difficulty} progress={props.progress} chordProgression={props.chordProgression} onSettingsChange={props.onModeSettingsChange} onSetBpm={props.onSetBpm} onSelectExercise={props.onSelectExercise} onPreparePerformance={props.onPreparePerformance} onStartRound={props.onStartRound} onSetRoundSeconds={props.onSetRoundSeconds} />
     </section>
   );
 }

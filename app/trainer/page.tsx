@@ -1,5 +1,6 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ChordDiagram, { Chord } from "../../components/ChordDiagram";
 import { CHORD_LIBRARY, CHORD_LOOKUP, LEVELS } from "../../lib/chords";
@@ -27,6 +28,21 @@ type ChecklistKey = "tuning" | "capo" | "warmUp" | "songOrder" | "difficultTrans
 type RehearsalSection = "verse" | "chorus" | "bridge" | "turnaround";
 type RecoveryMethod = "rest" | "slowerPace" | "focusedDrill";
 type VoicingLock = "any" | "open" | "closed";
+type InstrumentProfile = "acoustic" | "electric" | "classical" | "reducedString";
+type CurriculumId = "firstChords" | "rhythmBuilder" | "barreReady" | "performanceReady";
+type VocabularyPrompt = "name" | "diagram" | "function" | "sound";
+
+type TransitionRecipe = {
+  id: string;
+  name: string;
+  from: string;
+  to: string;
+  pace: Pace;
+  tuning: string;
+  capo: number;
+  strum: StrummingPrompt;
+  notes: string;
+};
 
 type TransitionRecord = {
   clean: number;
@@ -61,7 +77,7 @@ type AchievementSettings = { enabled: boolean; cleanRound: boolean; mastery: boo
 type TransitionMastery = { key: string; streak: number; mastered: boolean };
 
 type TrainerPersistence = {
-  version: 5;
+  version: 6;
   transitions: Record<string, TransitionRecord>;
   chords: Record<string, ChordRecord>;
   stats: TrainerStats;
@@ -80,6 +96,9 @@ type TrainerPersistence = {
   recoveryHistory: RecoveryEntry[];
   achievementSettings: AchievementSettings;
   mastery: TransitionMastery;
+  recipes: TransitionRecipe[];
+  instrumentProfile: InstrumentProfile;
+  cloudBackupConsent: boolean;
 };
 
 type RoundConfig = {
@@ -100,7 +119,7 @@ const DEFAULT_STATS: TrainerStats = {
   recoveries: 0
 };
 const DEFAULT_PERSISTENCE: TrainerPersistence = {
-  version: 5,
+  version: 6,
   transitions: {},
   chords: {},
   stats: DEFAULT_STATS,
@@ -118,7 +137,29 @@ const DEFAULT_PERSISTENCE: TrainerPersistence = {
   rehearsalNotes: [],
   recoveryHistory: [],
   achievementSettings: { enabled: true, cleanRound: true, mastery: true, streak: true },
-  mastery: { key: "", streak: 0, mastered: false }
+  mastery: { key: "", streak: 0, mastered: false },
+  recipes: [],
+  instrumentProfile: "acoustic",
+  cloudBackupConsent: false
+};
+
+const LazyGuitarTechnique3D = dynamic(() => import("../../components/GuitarTechnique3D"), {
+  ssr: false,
+  loading: () => <div className="trainer-3d-loading" role="status">Loading the local 3D hand engine…</div>
+});
+
+const INSTRUMENT_PROFILES: Record<InstrumentProfile, { label: string; detail: string; strings: number }> = {
+  acoustic: { label: "Acoustic guitar", detail: "Balanced open-chord movement and medium string spacing.", strings: 6 },
+  electric: { label: "Electric guitar", detail: "Lighter pressure cues and compact closed-position shapes.", strings: 6 },
+  classical: { label: "Classical guitar", detail: "Wider-neck spacing with thumb and wrist alignment reminders.", strings: 6 },
+  reducedString: { label: "Reduced-string guitar", detail: "Focuses prompts on the first four available strings.", strings: 4 }
+};
+
+const CURRICULA: Record<CurriculumId, { label: string; steps: string[]; preset: { drill: DrillMode; pace: Pace; length: number } }> = {
+  firstChords: { label: "First open chords", steps: ["Clear single shapes", "Two-chord changes", "Steady four-beat loop"], preset: { drill: "pair", pace: 8, length: 5 } },
+  rhythmBuilder: { label: "Rhythm builder", steps: ["Down-strum pulse", "Down-up control", "Progression without stopping"], preset: { drill: "rhythmOnly", pace: 4, length: 10 } },
+  barreReady: { label: "Barre foundation", steps: ["Relaxed index placement", "Partial barre", "Barre transitions"], preset: { drill: "barre", pace: 6, length: 5 } },
+  performanceReady: { label: "Performance ready", steps: ["Targeted weak changes", "Song-section run", "No-prompt graduation"], preset: { drill: "song", pace: 3, length: 20 } }
 };
 const INTENSITY_PRESETS = {
   1: { label: "Gentle", pace: 8, length: 5, feedback: "Pause and notice one comfortable movement." },
@@ -373,7 +414,18 @@ function parsePersistence(raw: string | null): TrainerPersistence {
       streak: clampNumber(masterySource.streak, 0, 3, 0),
       mastered: masterySource.mastered === true
     };
-    return { version: 5, transitions, chords, stats, history, notes, rotation, reflections, realWorldGoal, mistakePatterns, readiness, sessions, speedLadder, milestones, performanceChecklist, rehearsalNotes, recoveryHistory, achievementSettings, mastery };
+    const recipes = Array.isArray(source.recipes) ? source.recipes.slice(0, 20).flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return [];
+      const item = entry as Partial<TransitionRecipe>;
+      if (typeof item.id !== "string" || typeof item.name !== "string" || typeof item.from !== "string" || typeof item.to !== "string" || typeof item.tuning !== "string" || typeof item.notes !== "string") return [];
+      const recipePace: Pace = item.pace === "manual" ? "manual" : clampNumber(item.pace, 2, 8, 3);
+      const recipeStrum = Object.prototype.hasOwnProperty.call(STRUMMING_PROMPTS, String(item.strum)) ? item.strum as StrummingPrompt : "none";
+      return [{ id: item.id.slice(0, 80), name: item.name.trim().slice(0, 60), from: item.from.slice(0, 24), to: item.to.slice(0, 24), pace: recipePace, tuning: item.tuning.slice(0, 60), capo: clampNumber(item.capo, 0, 12, 0), strum: recipeStrum, notes: item.notes.slice(0, 300) }];
+    }) : [];
+    const instrumentIds: InstrumentProfile[] = ["acoustic", "electric", "classical", "reducedString"];
+    const instrumentProfile = instrumentIds.includes(source.instrumentProfile as InstrumentProfile) ? source.instrumentProfile as InstrumentProfile : "acoustic";
+    const cloudBackupConsent = source.cloudBackupConsent === true;
+    return { version: 6, transitions, chords, stats, history, notes, rotation, reflections, realWorldGoal, mistakePatterns, readiness, sessions, speedLadder, milestones, performanceChecklist, rehearsalNotes, recoveryHistory, achievementSettings, mastery, recipes, instrumentProfile, cloudBackupConsent };
   } catch {
     return DEFAULT_PERSISTENCE;
   }
@@ -691,6 +743,7 @@ export default function TrainerPage() {
   const [sessionTension, setSessionTension] = useState("");
   const [sessionSaved, setSessionSaved] = useState(false);
   const [guideVisible, setGuideVisible] = useState(false);
+  const [threeDHandVisible, setThreeDHandVisible] = useState(false);
   const [captureKind, setCaptureKind] = useState<CaptureKind>("audio");
   const [recording, setRecording] = useState(false);
   const [captureMessage, setCaptureMessage] = useState("Nothing is recorded until you choose Start recording and approve browser permission.");
@@ -900,7 +953,7 @@ export default function TrainerPage() {
   const savePersistence = useCallback((next: TrainerPersistence) => {
     const bounded: TrainerPersistence = {
       ...next,
-      version: 5,
+      version: 6,
       transitions: Object.fromEntries(Object.entries(next.transitions).slice(-500)),
       chords: Object.fromEntries(Object.entries(next.chords).slice(-250)),
       history: next.history.slice(0, 60),
@@ -911,6 +964,18 @@ export default function TrainerPage() {
       milestones: next.milestones.slice(0, 3).filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index),
       rehearsalNotes: next.rehearsalNotes.slice(0, 40),
       recoveryHistory: next.recoveryHistory.slice(0, 30),
+      recipes: next.recipes.slice(0, 20).map((recipe) => ({
+        ...recipe,
+        id: recipe.id.slice(0, 80),
+        name: recipe.name.trim().slice(0, 60),
+        from: recipe.from.slice(0, 24),
+        to: recipe.to.slice(0, 24),
+        tuning: recipe.tuning.slice(0, 60),
+        capo: clampNumber(recipe.capo, 0, 12, 0),
+        notes: recipe.notes.slice(0, 300)
+      })),
+      instrumentProfile: Object.prototype.hasOwnProperty.call(INSTRUMENT_PROFILES, next.instrumentProfile) ? next.instrumentProfile : "acoustic",
+      cloudBackupConsent: next.cloudBackupConsent === true,
       performanceChecklist: {
         tuning: next.performanceChecklist.tuning === true,
         capo: next.performanceChecklist.capo === true,
@@ -1276,6 +1341,7 @@ export default function TrainerPage() {
     setPostConfidence(3);
     setRecallRevealed(false);
     setGuideVisible(false);
+    setThreeDHandVisible(false);
     setSessionSaved(false);
     setSelectedHistoryIndex(null);
     setSecondsLeft(0);
@@ -1420,7 +1486,7 @@ export default function TrainerPage() {
     };
     const nextPersistence: TrainerPersistence = {
       ...loaded,
-      version: 5,
+      version: 6,
       transitions: { ...loaded.transitions, [key]: nextRecord },
       chords: { ...loaded.chords, [currentChord.name]: nextChordRecord },
       stats: {
@@ -2065,9 +2131,10 @@ export default function TrainerPage() {
           <div><span className="label">Shape cue</span><p>{technique.shapeTip}</p></div>
           <div><span className="label">Transition cue</span><p>{technique.pivotTip}</p></div>
           <div><span className="label">Technique focus</span><p>{technique.focus}</p>{technique.alternative && <small>Compare: {technique.alternative.label} — {technique.alternative.description}</small>}</div>
-          <div><span className="label">Finger-placement animation</span><p>Use the short overlay only when the shape needs a closer look.</p><button className="btn" type="button" onClick={() => setGuideVisible((visible) => !visible)}>{guideVisible ? "Hide guide" : "Show animated guide"}</button></div>
+          <div><span className="label">Finger-placement animation</span><p>Open either guide only when the shape needs a closer look.</p><div className="trainer-inline-actions"><button className="btn" type="button" onClick={() => setGuideVisible((visible) => !visible)}>{guideVisible ? "Hide guide" : "Show animated guide"}</button><button className="btn" type="button" aria-expanded={threeDHandVisible} onClick={() => setThreeDHandVisible((visible) => !visible)}>{threeDHandVisible ? "Hide 3D hand" : "Show 3D hand"}</button></div></div>
         </div>}
         {currentChord && guideVisible && status === "running" && <FingerPlacementGuide chord={currentChord} orientation={handedness} />}
+        {currentChord && threeDHandVisible && status === "running" && <div className="trainer-3d-hand-panel"><div><span className="label">3D left-hand fretting</span><p>Rotate your attention between the fingertip landing points and the relaxed thumb position. The engine loads only after this panel is opened.</p></div><LazyGuitarTechnique3D chord={currentChord} handedness={handedness} mode="left-hand" labels={false} className="guitar-technique-3d trainer-3d-hand" /></div>}
 
         {currentChord && status !== "preview" && status !== "countIn" && (
           <div className="trainer-feedback" role="group" aria-label={`Rate ${currentChord.name}`}>

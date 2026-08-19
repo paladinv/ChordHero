@@ -102,7 +102,7 @@ export default function RightHandRecordingCoach({ bpm, subdivisionsPerBeat, expe
           const room = calibration?.profile === profile ? calibration : null;
           const next = await analyzePracticeRecording(blob, { referenceBpm: bpm, subdivisionsPerBeat, expectedSteps, expectedChordProgression, calibrationNoiseFloor: room?.noiseFloor, instrumentProfile: profile, pitchScoringMode: scoringMode, targetSignatures: chordProfile?.signatures });
           if (privacy === "device") await retainOnDevice(blob, next);
-          setAnalysis(next); onAnalysis(next); setStatus("ready");
+          setAnalysis(next); onAnalysis(next); window.dispatchEvent(new CustomEvent("chord-hero:right-hand-analysis", { detail: { exerciseId, analysis: next } })); setStatus("ready");
           setMessage(privacy === "device" ? "Take scored and retained on this device." : privacy === "manual" ? "Take scored in memory only. Export it now if you want to keep it." : "Take scored in memory only. Teacher-share metadata is ready; audio is not uploaded.");
         } catch { setStatus("error"); setMessage("This take could not be decoded. Try again in a quieter room."); }
       };

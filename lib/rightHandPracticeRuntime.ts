@@ -7,7 +7,7 @@ export type ExerciseProgress = {
 };
 
 const PRACTICE_STORAGE_KEY = "chord-hero:practice-platform:v1";
-export const DEFAULT_RIGHT_HAND_MODE_SETTINGS = { targetSound: "clean-electric", demoSpeed: 1, noLook: false, clickMix: 80, guitarMix: 75, contextMix: 45, performanceMode: false } as const;
+export const DEFAULT_RIGHT_HAND_MODE_SETTINGS = { targetSound: "clean-electric", demoSpeed: 1, noLook: false, clickMix: 80, guitarMix: 75, contextMix: 45, performanceMode: false, focus: "rhythm", dynamics: "even", ghostStrum: false, anticipation: "adaptive" } as const;
 
 export function readPracticeAudioPreferences() {
   try {
@@ -64,4 +64,11 @@ export function shouldPlayStyleBacking(style: string, beat: number, subdivision:
   if (style === "bluegrass") return subdivision === 0 && beatInBar % 2 === 0;
   if (style === "travis") return subdivision === 0;
   return subdivision === 0;
+}
+
+export function rightHandDynamicsLevel(profile: "even" | "accent-map" | "backbeat" | "crescendo", step: number, length: number, beat: number, accented: boolean) {
+  if (profile === "crescendo") return .4 + .6 * (step % length) / Math.max(1, length - 1);
+  if (profile === "backbeat") return beat % 4 % 2 === 1 ? 1 : .5;
+  if (profile === "accent-map") return accented ? 1 : .58;
+  return 1;
 }

@@ -1,5 +1,5 @@
 import { CHORD_LIBRARY, type ChordLibraryItem } from "./chords";
-import { HARMONY_NOTES, getScale, scoreTransition, type HarmonyNote, type TransitionCost } from "./harmony";
+import { HARMONY_NOTES, getScale, scoreTransition, type HarmonicRole, type HarmonyNote, type TransitionCost } from "./harmony";
 import type { PracticeStats, TeacherAssignment } from "./studentProfile";
 import type { Chord } from "../components/ChordDiagram";
 import type { RecordingAnalysis } from "./songRecordingAnalysis";
@@ -197,6 +197,47 @@ export type ProgressSnapshot = {
   summary: string;
 };
 
+export type VoicingConfidence = {
+  score: number;
+  label: "ready" | "usable" | "learn next";
+  completeness: number;
+  practicality: number;
+  factors: string[];
+  explanation: string;
+};
+
+export type EasierNextStep = {
+  id: string;
+  label: string;
+  type: "easier" | "partial" | "capo";
+  description: string;
+};
+
+export type KeyChangeVoicing = {
+  role: string;
+  entry: ChordLibraryItem | null;
+  reason: string;
+};
+
+export type FocusedDrill = {
+  id: "f-barre" | "bm" | "clean-muting" | "fast-iv-v";
+  title: string;
+  targetName: string;
+  steps: string[];
+  success: string;
+};
+
+export type RepertoireMilestone = {
+  id: string;
+  family: AchievementFamily;
+  title: string;
+  song: string;
+  required: number;
+  completed: number;
+  unlocked: boolean;
+  detail: string;
+};
+
 const SHARP_NOTES = [...HARMONY_NOTES];
 const FLAT_NOTES: HarmonyNote[] = ["C", "Db" as HarmonyNote, "D", "Eb", "E", "F", "Gb" as HarmonyNote, "G", "Ab", "A", "Bb", "B"];
 const NOTE_INDEX = new Map(SHARP_NOTES.map((note, index) => [note, index]));
@@ -213,7 +254,78 @@ export const GENRE_PRACTICE_PATHS: GenrePracticePath[] = [
   { id: "worship", label: "Worship", focus: "Wide open voicings, dynamics, and supportive transitions.", roles: ["I", "V", "vi", "IV"], bpm: 72, countIn: 4, steps: ["Choose ringing shapes", "Practice dynamic swells", "Move through the progression without gaps"] }
 ];
 
+export const FOCUSED_FIVE_MINUTE_DRILLS: FocusedDrill[] = [
+  { id: "f-barre", title: "F barre reset", targetName: "F", steps: ["Place the index barre alone", "Add the remaining fingers one at a time", "Strum only after every intended string rings"], success: "Three clean F attacks at a relaxed tempo." },
+  { id: "bm", title: "Bm shape ladder", targetName: "Bm", steps: ["Start with the top four strings", "Add the bass note without squeezing", "Alternate two slow changes with one rest"], success: "Five Bm changes without a muted target string." },
+  { id: "clean-muting", title: "Clean muting check", targetName: "", steps: ["Fret the shape lightly", "Pluck each muted string separately", "Repeat the strum and stop immediately on noise"], success: "Two quiet passes with no accidental bass or treble." },
+  { id: "fast-iv-v", title: "Fast IV-V change", targetName: "", steps: ["Loop the IV shape for four beats", "Move only the fingers that change", "Raise tempo only after three clean loops"], success: "Three consecutive IV-V loops on the beat." }
+];
+
 const clamp = (value: number, low: number, high: number) => Math.max(low, Math.min(high, value));
+
+export function scoreVoicingConfidence(entry: ChordLibraryItem | null): VoicingConfidence {
+  if (!entry) {
+    return { score: 0, label: "learn next", completeness: 0, practicality: 0, factors: ["Choose a voicing to score."], explanation: "The library has no selected voicing yet." };
+  }
+  const frets = entry.chord.frets;
+  const ringing = frets.filter((fret) => fret >= 0).length;
+  const fretted = frets.filter((fret) => fret > 0).length;
+  const completeness = Math.round(ringing / Math.max(1, frets.length) * 100);
+  const difficultyPenalty = (entry.difficultyTags.includes("barre") ? 16 : 0) + (entry.difficultyTags.includes("stretch") ? 12 : 0);
+  const practicality = clamp(100 - difficultyPenalty - Math.max(0, fretted - 4) * 3 + (entry.difficultyTags.includes("fast-change friendly") ? 10 : 0), 0, 100);
+  const score = clamp(Math.round(completeness * 0.45 + practicality * 0.55), 0, 100);
+  const label = score >= 78 ? "ready" : score >= 55 ? "usable" : "learn next";
+  const factors = [
+    `${ringing}/${frets.length} strings available`,
+    entry.difficultyTags.includes("barre") ? "barre pressure raises the setup cost" : "no full barre required",
+    entry.difficultyTags.includes("fast-change friendly") ? "friendly for quick changes" : "allow extra setup time"
+  ];
+  return {
+    score,
+    label,
+    completeness,
+    practicality,
+    factors,
+    explanation: `${completeness}% of the strings are playable; practicality is ${practicality}% after difficulty and transition-friendly adjustments.`
+  };
+}
+
+export function getEasierNextSteps(entry: ChordLibraryItem | null, entries: ChordLibraryItem[]): EasierNextStep[] {
+  if (!entry) return [];
+  const lookup = new Map(entries.map((candidate) => [candidate.id, candidate]));
+  const steps: EasierNextStep[] = [];
+  entry.nearbyAlternatives.forEach((alternative) => {
+    if (!alternative.targetId || !lookup.has(alternative.targetId)) return;
+    if (alternative.type !== "easier" && alternative.type !== "partial" && alternative.type !== "capo") return;
+    steps.push({ id: alternative.targetId, label: alternative.label, type: alternative.type, description: alternative.description });
+  });
+  if (entry.difficultyTags.includes("barre")) {
+    entries
+      .filter((candidate) => candidate.id !== entry.id && candidate.root === entry.root && (candidate.difficultyTags.includes("partial") || candidate.nearbyAlternatives.some((alternative) => alternative.type === "capo")))
+      .sort((left, right) => scoreVoicingConfidence(right).score - scoreVoicingConfidence(left).score)
+      .slice(0, 2)
+      .forEach((candidate) => steps.push({
+        id: candidate.id,
+        label: candidate.difficultyTags.includes("partial") ? `${candidate.chord.name} partial` : `${candidate.chord.name} capo route`,
+        type: candidate.difficultyTags.includes("partial") ? "partial" : "capo",
+        description: candidate.difficultyTags.includes("partial") ? "Keep only the essential chord tones while the full barre develops." : "Use this shape with a capo to keep the sounding function and reduce fret pressure."
+      }));
+  }
+  return steps.filter((step, index, list) => list.findIndex((candidate) => candidate.id === step.id) === index).slice(0, 3);
+}
+
+export function simulateKeyChange(roles: string[], targetKey: HarmonyNote, entries: ChordLibraryItem[]): KeyChangeVoicing[] {
+  const normalizedKey = normalizeNote(targetKey);
+  return roles.map((role) => {
+    const candidates = entries.filter((entry) => entry.functionContexts.some((context) => context.key === normalizedKey && context.roles.includes(role as HarmonicRole)));
+    const entry = [...candidates].sort((left, right) => scoreVoicingConfidence(right).score - scoreVoicingConfidence(left).score || left.id.localeCompare(right.id))[0] ?? null;
+    return {
+      role,
+      entry,
+      reason: entry ? `${entry.chord.name} keeps the ${role} role in ${normalizedKey} while choosing the most practical available shape.` : `No stored ${role} shape is tagged for ${normalizedKey}; keep the function and add a voicing from the full library.`
+    };
+  });
+}
 
 function normalizeNote(note: string): HarmonyNote {
   const aliases: Record<string, HarmonyNote> = { Db: "C#", "D#": "Eb", Gb: "F#", "G#": "Ab", "A#": "Bb" };
@@ -520,4 +632,29 @@ export function buildProgressSnapshot(entries: ChordLibraryItem[], stats: Practi
     nextGoal,
     summary: `${dueCount} review${dueCount === 1 ? "" : "s"} due; strongest focus is ${familyOrder[0]?.[0] ?? "open chords"} in ${keyOrder[0]?.[0] ?? "G"}.`
   };
+}
+
+export function buildRepertoireMilestones(entries: ChordLibraryItem[], stats: PracticeStats): RepertoireMilestone[] {
+  const songs: Array<{ family: AchievementFamily; title: string; song: string }> = [
+    { family: "open chords", title: "Open-chord foundation", song: "Amazing Grace" },
+    { family: "barre chords", title: "Movable-shape launch", song: "12-bar blues" },
+    { family: "inversions", title: "Walking-bass colors", song: "Hymn progression" },
+    { family: "jazz colors", title: "Guide-tone entry", song: "Autumn Leaves" }
+  ];
+  return songs.map(({ family, title, song }) => {
+    const familyEntries = entries.filter((entry) => familyFor(entry) === family);
+    const completed = familyEntries.filter((entry) => (stats[entry.id]?.reps ?? 0) >= 3).length;
+    const required = Math.min(3, familyEntries.length);
+    const unlocked = required > 0 && completed >= required;
+    return {
+      id: `repertoire-${family.replace(/\s+/g, "-")}`,
+      family,
+      title,
+      song,
+      required,
+      completed,
+      unlocked,
+      detail: required === 0 ? "No matching shapes in the current filtered set." : unlocked ? `Unlocked: apply the family in ${song}.` : `${required - completed} more mastered voicing${required - completed === 1 ? "" : "s"} to unlock ${song}.`
+    };
+  });
 }
