@@ -19,6 +19,8 @@ function applyPreferences(preferences: AccessibilityPreferences) {
   const root = document.documentElement;
   root.dataset.motion = preferences.reducedMotion ? "reduced" : "full";
   root.dataset.contrast = preferences.highContrast ? "high" : "standard";
+  root.dataset.colorblind = preferences.colorBlindSafe ? "safe" : "standard";
+  root.dataset.spacing = preferences.dyslexiaSpacing ? "wide" : "standard";
   root.dataset.handedness = preferences.handedness;
   root.style.setProperty("--diagram-scale", String(preferences.diagramScale));
   root.style.setProperty("--audio-volume", String(preferences.audioMuted ? 0 : preferences.audioVolume));
@@ -50,6 +52,8 @@ export default function AccessibilityPanel({ offlineReady, installPrompt, onInst
       <header><strong>Make Chord Hero yours</strong><button type="button" onClick={onClose} aria-label="Close accessibility controls">×</button></header>
       <label><span>Reduced motion</span><input type="checkbox" checked={preferences.reducedMotion} onChange={(event) => update({ reducedMotion: event.target.checked })} /></label>
       <label><span>High contrast</span><input type="checkbox" checked={preferences.highContrast} onChange={(event) => update({ highContrast: event.target.checked })} /></label>
+      <label><span>Color-blind-safe heatmaps</span><input type="checkbox" checked={preferences.colorBlindSafe} onChange={(event) => update({ colorBlindSafe: event.target.checked })} /></label>
+      <label><span>Dyslexia-friendly spacing</span><input type="checkbox" checked={preferences.dyslexiaSpacing} onChange={(event) => update({ dyslexiaSpacing: event.target.checked })} /></label>
       <label><span>Left-handed demos</span><input type="checkbox" checked={preferences.handedness === "left"} onChange={(event) => update({ handedness: event.target.checked ? "left" : "right" })} /></label>
       <label className="stacked"><span>Diagram size · {Math.round(preferences.diagramScale * 100)}%</span><input type="range" min="0.85" max="1.35" step="0.05" value={preferences.diagramScale} onChange={(event) => update({ diagramScale: Number(event.target.value) })} /></label>
       <label className="stacked"><span>Audio · {preferences.audioMuted ? "Muted" : `${Math.round(preferences.audioVolume * 100)}%`}</span><input type="range" min="0" max="1" step="0.05" value={preferences.audioVolume} disabled={preferences.audioMuted} onChange={(event) => update({ audioVolume: Number(event.target.value) })} /></label>

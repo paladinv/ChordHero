@@ -1,7 +1,9 @@
 "use client";
 
 import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import ChordDiagram, { Chord } from "./ChordDiagram";
+import ChordLearningStudio from "./ChordLearningStudio";
 import {
   CHORD_DIFFICULTY_TAGS,
   CHORD_FUNCTION_KEYS,
@@ -30,13 +32,16 @@ import {
 } from "../lib/harmony";
 import { loadRecordedAudio } from "../lib/recordedAudio";
 import { loadGuitarSampleManifest, selectGuitarSamplePaths, type GuitarSampleManifest, type GuitarSampleVoice } from "../lib/guitarSampleManifest";
+import { matchesLibrarySearch, resolveSelectedLibraryEntry, searchLibraryEntries } from "../lib/librarySearchSafety";
+import { DEFAULT_LEARNING_STATE, normalizeLearningState, type HandPreference, type LearningState, type PracticeGoal } from "../lib/chordLearning";
 import { createStudentProfileSyncClient } from "../lib/profileSyncClient";
 import {
   DEFAULT_INSTRUMENT_PROFILE,
-  createStudentProfile,
+  DEFAULT_LEARNING_PREFERENCES,
   mergeStudentCloudStates,
   normalizeStudentCloudState,
   normalizeStudentProfile,
+  normalizeTeacherAssignment,
   type InstrumentProfile,
   type PracticeStats,
   type StudentCloudState,
@@ -44,6 +49,15 @@ import {
   type TeacherAssignment
 } from "../lib/studentProfile";
 import sharedSettings from "../shared/content/v1/settings.json";
+
+const ChordPracticePlanner = dynamic(() => import("./ChordPracticePlanner"), {
+  ssr: false,
+  loading: () => <section className="chord-practice-planner planner-loading" aria-label="Loading practice planner"><span className="label">Practice planner</span><strong>Loading local planning tools...</strong></section>
+});
+const GuitarTechnique3D = dynamic(() => import("./GuitarTechnique3D"), {
+  ssr: false,
+  loading: () => <div className="guitar-technique-3d-loading" role="status">Loading 3D fretboard…</div>
+});
 
 const RECENTS_STORAGE_KEY = "chord-hero-library-recents";
 const FAVORITES_STORAGE_KEY = "chord-hero-library-favorites";
@@ -55,17 +69,15 @@ const EAR_MISSES_STORAGE_KEY = "chord-hero-library-ear-misses";
 const STUDENT_PROFILES_STORAGE_KEY = "chord-hero-library-student-profiles";
 const TEACHER_ASSIGNMENTS_STORAGE_KEY = "chord-hero-library-teacher-assignments";
 const DISPLAY_SETTINGS_STORAGE_KEY = "chord-hero-library-display-settings";
+const LEARNING_PREFERENCES_STORAGE_KEY = "chord-hero-library-learning-preferences";
+const LEARNING_GOALS_STORAGE_KEY = "chord-hero-library-learning-goals";
+const LEARNING_COMPOSER_STORAGE_KEY = "chord-hero-library-learning-composer";
+const LEARNING_STATE_STORAGE_KEY = "chord-hero-library-learning-state";
 const SAMPLE_BASE_PATH = "/samples/guitar";
 const RECORDED_GUITAR_ROOTS = [37, 40, 42, 45, 48, 51, 54, 57, 60, 63, 66, 69, 72, 75, 78, 81, 84, 86];
 const OPEN_STRING_FREQUENCIES = [82.41, 110, 146.83, 196, 246.94, 329.63];
 const STANDARD_STRING_NOTES = ["E", "A", "D", "G", "B", "E"];
 const DEFAULT_LIBRARY_ITEM = CHORD_LIBRARY[0] ?? null;
-const CHORD_SEARCH_INDEX = CHORD_LIBRARY.map((entry) => ({
-  entry,
-  text: [entry.chord.name, entry.root, entry.qualityLabel, entry.position, entry.summary]
-    .join(" ")
-    .toLowerCase()
-}));
 const MAX_VISIBLE_VOICINGS = 80;
 const NOTES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"];
 const NOTE_INDEX = new Map(NOTES.map((note, index) => [note, index]));
@@ -274,8 +286,17 @@ const getVoiceLeadingNotes = (from: ChordLibraryItem, to: ChordLibraryItem) => {
 const snapshotProfile = (
   id: string,
   name: string,
-  values: Pick<StudentProfile, "favorites" | "recents" | "practiceStats" | "userNotes" | "stringMistakes" | "instrumentProfile">
-): StudentProfile => ({ ...values, id, name, updatedAt: new Date().toISOString() });
+  values: Pick<StudentProfile, "favorites" | "recents" | "practiceStats" | "userNotes" | "stringMistakes" | "instrumentProfile"> & { learningState: LearningState }
+): StudentProfile => ({
+  ...values,
+  id,
+  name,
+  learningState: values.learningState,
+  learningPreferences: values.learningState.handPreference,
+  learningGoals: values.learningState.goals,
+  learningComposerRoles: values.learningState.composerRoles,
+  updatedAt: new Date().toISOString()
+});
 
 const getPitchClasses = (chord: Chord, tuning: (typeof TUNINGS)[number]) =>
   new Set(getChordNoteNames(chord, tuning).map((note) => NOTE_INDEX.get(note)).filter((note): note is number => typeof note === "number"));
@@ -332,7 +353,10 @@ export default function ChordLibraryExplorer() {
   const [teacherAssignments, setTeacherAssignments] = useState<TeacherAssignment[]>([]);
   const [newAssignmentTitle, setNewAssignmentTitle] = useState("");
   const [newAssignmentDueAt, setNewAssignmentDueAt] = useState("");
+  const [newAssignmentComment, setNewAssignmentComment] = useState("");
+  const [feedbackDrafts, setFeedbackDrafts] = useState<Record<string, string>>({});
   const [instrumentProfile, setInstrumentProfile] = useState<InstrumentProfile>({ ...DEFAULT_INSTRUMENT_PROFILE });
+  const [learningState, setLearningState] = useState<LearningState>({ ...DEFAULT_LEARNING_STATE, handPreference: { ...DEFAULT_LEARNING_STATE.handPreference } });
   const [syncStatus, setSyncStatus] = useState<SyncStatus>("local");
   const [syncMessage, setSyncMessage] = useState("Local-only profile storage");
   const [storageHydrated, setStorageHydrated] = useState(false);
@@ -373,9 +397,9 @@ export default function ChordLibraryExplorer() {
   }), []);
   const syncCloudState = useMemo<StudentCloudState>(() => {
     const activeName = studentProfiles.find((profile) => profile.id === activeStudentId)?.name ?? "Current device profile";
-    const activeProfile = snapshotProfile(activeStudentId, activeName, { favorites: favoriteIds, recents: recentIds, practiceStats, userNotes, stringMistakes, instrumentProfile });
+    const activeProfile = snapshotProfile(activeStudentId, activeName, { favorites: favoriteIds, recents: recentIds, practiceStats, userNotes, stringMistakes, instrumentProfile, learningState });
     return { profiles: [...studentProfiles.filter((profile) => profile.id !== activeStudentId), activeProfile], assignments: teacherAssignments };
-  }, [activeStudentId, favoriteIds, instrumentProfile, practiceStats, recentIds, stringMistakes, studentProfiles, teacherAssignments, userNotes]);
+  }, [activeStudentId, favoriteIds, instrumentProfile, learningState, practiceStats, recentIds, stringMistakes, studentProfiles, teacherAssignments, userNotes]);
   const syncCloudSignature = useMemo(() => JSON.stringify(syncCloudState), [syncCloudState]);
   syncCloudStateRef.current = syncCloudState;
   syncCloudSignatureRef.current = syncCloudSignature;
@@ -458,16 +482,7 @@ export default function ChordLibraryExplorer() {
         }
 
         if (deferredLibrarySearch.length > 0) {
-          const searchableText = [
-            entry.chord.name,
-            entry.position,
-            entry.summary,
-            entry.qualityLabel,
-            entry.practiceFocus
-          ]
-            .join(" ")
-            .toLowerCase();
-          if (!searchableText.includes(deferredLibrarySearch)) return false;
+          if (!matchesLibrarySearch(entry, deferredLibrarySearch)) return false;
         }
 
         return true;
@@ -490,15 +505,10 @@ export default function ChordLibraryExplorer() {
 
   const searchMatches = useMemo(() => {
     if (!deferredLibrarySearch) return [];
-    return CHORD_SEARCH_INDEX.filter((item) => item.text.includes(deferredLibrarySearch))
-      .map((item) => item.entry)
-      .slice(0, 8);
+    return searchLibraryEntries(CHORD_LIBRARY, deferredLibrarySearch).slice(0, 8);
   }, [deferredLibrarySearch]);
 
-  const selectedLibraryEntry =
-    filteredLibraryEntries.find((entry) => entry.id === selectedLibraryId) ??
-    filteredLibraryEntries[0] ??
-    null;
+  const selectedLibraryEntry = resolveSelectedLibraryEntry(filteredLibraryEntries, selectedLibraryId);
   const compareEntry =
     (compareChordId ? CHORD_ITEM_LOOKUP.get(compareChordId) : null) ?? null;
   const thirdCompareEntry =
@@ -800,7 +810,8 @@ export default function ChordLibraryExplorer() {
     practiceStats,
     userNotes,
     stringMistakes,
-    instrumentProfile
+    instrumentProfile,
+    learningState
   });
 
   const saveStudentProfile = () => {
@@ -827,6 +838,11 @@ export default function ChordLibraryExplorer() {
     setStringMistakes(next.stringMistakes ?? {});
     setInstrumentProfile({ ...DEFAULT_INSTRUMENT_PROFILE, ...next.instrumentProfile });
     setTuningId((next.instrumentProfile?.tuningId ?? "standard") as TuningId);
+    setLearningState(normalizeLearningState(next.learningState ?? {
+      handPreference: next.learningPreferences,
+      goals: next.learningGoals,
+      composerRoles: next.learningComposerRoles
+    }));
   };
 
   const updateInstrumentProfile = (patch: Partial<InstrumentProfile>) => {
@@ -839,9 +855,10 @@ export default function ChordLibraryExplorer() {
     if (!title) return;
     const chordIds = selectedPack?.chordIds ?? teacherSheetEntries.map((entry) => entry.id);
     const now = new Date().toISOString();
-    setTeacherAssignments((previous) => [{ id: `assignment-${Date.now()}`, studentId: activeStudentId, title, description: `${chordIds.length} chord voicings from the current library filter.`, chordIds, dueAt: newAssignmentDueAt ? new Date(`${newAssignmentDueAt}T23:59:59`).toISOString() : undefined, updatedAt: now }, ...previous]);
+    setTeacherAssignments((previous) => [{ id: `assignment-${Date.now()}`, studentId: activeStudentId, title, description: `${chordIds.length} chord voicings from the current library filter.`, chordIds, dueAt: newAssignmentDueAt ? new Date(`${newAssignmentDueAt}T23:59:59`).toISOString() : undefined, teacherComments: newAssignmentComment.trim() || undefined, feedbackHistory: [], updatedAt: now }, ...previous]);
     setNewAssignmentTitle("");
     setNewAssignmentDueAt("");
+    setNewAssignmentComment("");
   };
 
   const toggleAssignment = (assignment: TeacherAssignment) => {
@@ -851,6 +868,19 @@ export default function ChordLibraryExplorer() {
 
   const deleteAssignment = (id: string) => {
     setTeacherAssignments((previous) => previous.filter((assignment) => assignment.id !== id));
+  };
+
+  const updateAssignmentComment = (assignment: TeacherAssignment, teacherComments: string) => {
+    const now = new Date().toISOString();
+    setTeacherAssignments((previous) => previous.map((item) => item.id === assignment.id ? { ...item, teacherComments: teacherComments.slice(0, 1000), updatedAt: now } : item));
+  };
+
+  const addAssignmentFeedback = (assignment: TeacherAssignment) => {
+    const body = feedbackDrafts[assignment.id]?.trim();
+    if (!body) return;
+    const now = new Date().toISOString();
+    setTeacherAssignments((previous) => previous.map((item) => item.id === assignment.id ? { ...item, feedbackHistory: [...(item.feedbackHistory ?? []), { id: `feedback-${Date.now()}`, body: body.slice(0, 500), author: "Current teacher", createdAt: now }].slice(-20), updatedAt: now } : item));
+    setFeedbackDrafts((previous) => ({ ...previous, [assignment.id]: "" }));
   };
 
   const exportTeacherPacks = () => {
@@ -1031,6 +1061,7 @@ export default function ChordLibraryExplorer() {
       const storedProfiles = window.localStorage.getItem(STUDENT_PROFILES_STORAGE_KEY);
       const storedAssignments = window.localStorage.getItem(TEACHER_ASSIGNMENTS_STORAGE_KEY);
       const storedDisplaySettings = window.localStorage.getItem(DISPLAY_SETTINGS_STORAGE_KEY);
+      const storedLearningState = window.localStorage.getItem(LEARNING_STATE_STORAGE_KEY);
       if (storedFavorites) {
         setFavoriteIds(JSON.parse(storedFavorites));
       }
@@ -1055,11 +1086,13 @@ export default function ChordLibraryExplorer() {
         setStudentProfiles(parsed.filter((profile): profile is Partial<StudentProfile> & Pick<StudentProfile, "id"> => Boolean(profile?.id)).map((profile) => normalizeStudentProfile(profile)));
       }
       if (storedAssignments) {
-        setTeacherAssignments(JSON.parse(storedAssignments));
+        const parsed = JSON.parse(storedAssignments) as unknown;
+        setTeacherAssignments(Array.isArray(parsed) ? parsed.map(normalizeTeacherAssignment).filter((assignment): assignment is TeacherAssignment => Boolean(assignment)) : []);
       }
       if (storedDisplaySettings) {
         setDisplaySettings({ handedness: "right", highContrast: false, largeCharts: false, ...JSON.parse(storedDisplaySettings) });
       }
+      if (storedLearningState) setLearningState(normalizeLearningState(JSON.parse(storedLearningState)));
     } catch {
       // Ignore storage failures and keep the UI usable.
     } finally {
@@ -1132,6 +1165,11 @@ export default function ChordLibraryExplorer() {
 
   useEffect(() => {
     if (!storageHydrated) return;
+    try { window.localStorage.setItem(LEARNING_STATE_STORAGE_KEY, JSON.stringify(learningState)); } catch { /* Keep guided practice usable when storage is unavailable. */ }
+  }, [learningState, storageHydrated]);
+
+  useEffect(() => {
+    if (!storageHydrated) return;
     try { window.localStorage.setItem(EAR_MISSES_STORAGE_KEY, JSON.stringify(earMisses)); } catch { /* Keep ear training usable when storage is unavailable. */ }
   }, [earMisses, storageHydrated]);
 
@@ -1164,6 +1202,11 @@ export default function ChordLibraryExplorer() {
     setStringMistakes(active.stringMistakes);
     setInstrumentProfile(active.instrumentProfile);
     setTuningId(active.instrumentProfile.tuningId as TuningId);
+    setLearningState(normalizeLearningState(active.learningState ?? {
+      handPreference: active.learningPreferences,
+      goals: active.learningGoals,
+      composerRoles: active.learningComposerRoles
+    }));
   };
   applyCloudStateRef.current = applyCloudState;
 
@@ -1280,7 +1323,10 @@ export default function ChordLibraryExplorer() {
   }, [availableInversionOptions, libraryInversion]);
 
   useEffect(() => {
-    if (!filteredLibraryEntries.length) return;
+    if (!filteredLibraryEntries.length) {
+      if (selectedLibraryId) setSelectedLibraryId("");
+      return;
+    }
     if (!filteredLibraryEntries.some((entry) => entry.id === selectedLibraryId)) {
       setSelectedLibraryId(filteredLibraryEntries[0]?.id ?? "");
     }
@@ -1390,6 +1436,33 @@ export default function ChordLibraryExplorer() {
           </div>
         </section>
 
+        <ChordLearningStudio
+          activeKey={activeHarmonyKey}
+          mode={libraryMode}
+          state={learningState}
+          onStateChange={setLearningState}
+          selectedEntry={selectedLibraryEntry}
+          selectedFunction={selectedFunction}
+          filteredEntries={filteredLibraryEntries}
+          practiceStats={practiceStats}
+          displaySettings={displaySettings}
+          onRoleChange={(role) => setLibraryFunctionRole(role)}
+          onKeyChange={(key) => setLibraryFunctionKey(key)}
+          onSelectEntry={(id) => setSelectedLibraryId(id)}
+          onLogPractice={addPracticeRep}
+          onPlayChord={(chord, mode = "strum", voicingId) => playChordPreview(chord, mode, voicingId)}
+        />
+
+        <ChordPracticePlanner
+          entries={filteredLibraryEntries}
+          selectedEntry={selectedLibraryEntry}
+          practiceStats={practiceStats}
+          assignments={teacherAssignments}
+          stringMistakes={stringMistakes}
+          activeStudentId={activeStudentId}
+          onSelectEntry={(id) => jumpToChord(id)}
+        />
+
         <div className="library-findbar library-secondary-filters">
           <div className="library-search">
             <label className="label" htmlFor="library-search">Shape or chord-name search</label>
@@ -1425,6 +1498,11 @@ export default function ChordLibraryExplorer() {
                 </button>
               ))}
             </div>
+          </div>
+        ) : null}
+        {deferredLibrarySearch && searchMatches.length === 0 ? (
+          <div className="history-empty library-no-results" role="status">
+            No chord shape matches <strong>{librarySearch.trim()}</strong>. The library is still ready for theory, planner, and audio actions; clear the search or choose another function.
           </div>
         ) : null}
 
@@ -1565,6 +1643,7 @@ export default function ChordLibraryExplorer() {
               {workspace === "practice" ? (
                 <div className="library-task-layout">
                   <section className="library-task-primary">
+                    <GuitarTechnique3D chord={selectedLibraryEntry.chord} handedness={displaySettings.handedness} mode="left-hand" labels />
                     <div className="practice-metric">
                       <span className="label">Focused practice</span>
                       <strong>{Math.floor(selectedPracticeStats.seconds / 60)}:{String(selectedPracticeStats.seconds % 60).padStart(2, "0")}</strong>
@@ -1736,6 +1815,9 @@ export default function ChordLibraryExplorer() {
                         <article key={assignment.id} className={`assignment-card ${assignment.completedAt ? "complete" : ""}`}>
                           <label><input type="checkbox" checked={Boolean(assignment.completedAt)} onChange={() => toggleAssignment(assignment)} /><strong>{assignment.title}</strong></label>
                           <small>{assignment.description}{assignment.dueAt ? ` · Due ${new Date(assignment.dueAt).toLocaleDateString()}` : ""}</small>
+                          <label>Teacher comment<textarea value={assignment.teacherComments ?? ""} onChange={(event) => updateAssignmentComment(assignment, event.target.value)} placeholder="Helpful practice direction" /></label>
+                          <div className="assignment-feedback"><label>Feedback<input value={feedbackDrafts[assignment.id] ?? ""} onChange={(event) => setFeedbackDrafts((previous) => ({ ...previous, [assignment.id]: event.target.value }))} placeholder="Add feedback" /></label><button className="btn ghost" type="button" onClick={() => addAssignmentFeedback(assignment)}>Post feedback</button></div>
+                          {assignment.feedbackHistory?.length ? <ul className="assignment-feedback-history">{assignment.feedbackHistory.map((feedback) => <li key={feedback.id}><strong>{feedback.author}</strong> <time dateTime={feedback.createdAt}>{new Date(feedback.createdAt).toLocaleDateString()}</time><p>{feedback.body}</p></li>)}</ul> : null}
                           <button className="text-button" type="button" onClick={() => deleteAssignment(assignment.id)}>Remove</button>
                         </article>
                       )) : <p className="muted">No assignments for this student yet.</p>}

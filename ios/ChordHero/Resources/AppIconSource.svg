@@ -1,20 +1,32 @@
 <svg width="1024" height="1024" viewBox="0 0 1024 1024" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>Chord Hero app icon</title>
   <defs>
-    <linearGradient id="background" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#102B3F"/>
-      <stop offset="100%" stop-color="#071724"/>
+    <linearGradient id="pick" x1="38" y1="22" x2="154" y2="174" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#238C83"/>
+      <stop offset="1" stop-color="#07534F"/>
     </linearGradient>
-    <linearGradient id="pick" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#F4B350"/>
-      <stop offset="100%" stop-color="#D4573B"/>
+    <linearGradient id="strum" x1="42" y1="134" x2="151" y2="62" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4B350"/>
+      <stop offset="1" stop-color="#FFD482"/>
     </linearGradient>
+    <filter id="shadow" x="16" y="14" width="160" height="170" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#0B322F" flood-opacity="0.2"/>
+    </filter>
   </defs>
-  <rect width="1024" height="1024" fill="url(#background)"/>
-  <rect x="112" y="204" width="800" height="616" rx="308" fill="url(#pick)"/>
-  <rect x="196" y="288" width="632" height="448" rx="224" fill="#FFFAF1"/>
-  <circle cx="394" cy="496" r="48" fill="#1F7A74"/>
-  <circle cx="630" cy="496" r="48" fill="#1F7A74"/>
-  <path d="M392 620C442 674 582 674 632 620" stroke="#1B1A17" stroke-width="28" stroke-linecap="round"/>
-  <path d="M512 330L566 452H458L512 330Z" fill="#1F7A74"/>
-  <path d="M512 440L594 558H430L512 440Z" fill="#1F7A74"/>
+  <rect width="1024" height="1024" fill="#F7F1E8"/>
+  <g transform="translate(70 70) scale(4.6)">
+    <g filter="url(#shadow)">
+      <path d="M96 18C119.2 18 145.7 27.1 157 47.4C171.9 74.1 156 121.7 110.2 166.6C102.3 174.4 89.7 174.4 81.8 166.6C36 121.7 20.1 74.1 35 47.4C46.3 27.1 72.8 18 96 18Z" fill="url(#pick)"/>
+      <path d="M96 25C117.1 25 140.8 33.1 150.9 51.2C163.5 73.8 149.8 116.1 105.3 159.8C100.1 164.9 91.9 164.9 86.7 159.8C42.2 116.1 28.5 73.8 41.1 51.2C51.2 33.1 74.9 25 96 25Z" stroke="#FFF9ED" stroke-opacity="0.26" stroke-width="2"/>
+    </g>
+    <g opacity="0.9" stroke="#FFF9ED" stroke-linecap="round">
+      <path d="M68 57V127" stroke-width="2"/><path d="M79.2 53V133" stroke-width="1.8"/><path d="M90.4 51V139" stroke-width="1.5"/><path d="M101.6 51V139" stroke-width="1.5"/><path d="M112.8 53V133" stroke-width="1.8"/><path d="M124 57V127" stroke-width="2"/>
+    </g>
+    <g opacity="0.42" stroke="#FFF9ED" stroke-width="2" stroke-linecap="round">
+      <path d="M62 70H130"/><path d="M60 88H132"/><path d="M61 106H131"/><path d="M64 124H128"/>
+    </g>
+    <circle cx="79" cy="79" r="6.5" fill="#F8C56B" stroke="#FFF9ED" stroke-width="2"/><circle cx="102" cy="97" r="6.5" fill="#F8C56B" stroke="#FFF9ED" stroke-width="2"/><circle cx="113" cy="115" r="6.5" fill="#F8C56B" stroke="#FFF9ED" stroke-width="2"/>
+    <path d="M43 130C69 144 119 140 147 105" stroke="#073F3C" stroke-opacity="0.34" stroke-width="10" stroke-linecap="round"/><path d="M42 125C69 141 121 136 150 99" stroke="url(#strum)" stroke-width="6" stroke-linecap="round"/><path d="M144 98L155 94L151 105" fill="#FFD482"/>
+    <path d="M139 46L142.3 54.7L151 58L142.3 61.3L139 70L135.7 61.3L127 58L135.7 54.7L139 46Z" fill="#FFF9ED"/>
+  </g>
 </svg>

@@ -1,5 +1,5 @@
 import { mergeLibraryStates, type SongSyncEnvelope } from "./songSync";
-import type { SongLibraryState } from "./songLibrary";
+import { prepareSongLibraryForSync, type SongLibraryState } from "./songLibrary";
 
 export type RevisionSyncEnvelope<T> = { accountId: string; revision: number; updatedAt: string; state: T };
 export type RevisionSyncClient<T> = { push: (state: T, revision: number) => Promise<RevisionSyncEnvelope<T>>; pull: () => Promise<RevisionSyncEnvelope<T>>; subscribe: (onUpdate: (envelope: RevisionSyncEnvelope<T>) => void) => () => void };
@@ -16,7 +16,8 @@ export function createRevisionSyncClient<T>(baseURL: string, libraryID: string, 
 export type SongSyncClient = RevisionSyncClient<SongLibraryState>;
 
 export function createSongSyncClient(baseURL: string, libraryID: string, accountID: string): SongSyncClient {
-  return createRevisionSyncClient<SongLibraryState>(baseURL, libraryID, accountID);
+  const client = createRevisionSyncClient<SongLibraryState>(baseURL, libraryID, accountID);
+  return { ...client, push: (state, revision) => client.push(prepareSongLibraryForSync(state), revision) };
 }
 
 export function resolveSyncConflict(local: SongLibraryState, remote: SongSyncEnvelope): SongLibraryState {

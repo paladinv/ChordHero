@@ -24,12 +24,16 @@ export default function RootLayout({
           <Link href="/" className="brand-link">
             <Image
               src="/chord-hero-logo.svg"
-              alt="Chord Hero logo"
+              alt=""
               className="logo"
-              width={92}
-              height={92}
+              width={64}
+              height={64}
+              priority
             />
-            <span>Chord Hero</span>
+            <span className="brand-copy">
+              <strong className="brand-name">Chord <em>Hero</em></strong>
+              <small>Practice Studio</small>
+            </span>
           </Link>
           <nav className="site-nav">
             <Link href="/">Home</Link>

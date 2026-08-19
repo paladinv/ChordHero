@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import ChordDiagram from "../../components/ChordDiagram";
 import {
   CHORD_DIFFICULTY_TAGS,
@@ -8,43 +8,76 @@ import {
   CHORD_LIBRARY,
   CHORD_LIBRARY_ROOTS,
   CHORD_QUALITY_OPTIONS,
-  HARMONIC_FUNCTION_OPTIONS,
   LEVELS,
   PROGRESSION_PACKS,
-  type ChordLibraryItem,
-  type HarmonicRole
+  type ChordLibraryItem
 } from "../../lib/chords";
+import { scoreTransition, type HarmonicRole, type HarmonyMode } from "../../lib/harmony";
 
 type Orientation = "right" | "left";
 type Layout = "compact" | "full";
 type PrintColumns = 2 | 3;
-type Tuning = "standard" | "drop-d" | "dadgad" | "half-step";
+type NamedTuning = "standard" | "drop-d" | "dadgad" | "half-step";
+type Tuning = NamedTuning | "custom";
+type SkillLevel = "beginner" | "intermediate" | "advanced";
+type PaperSize = "letter" | "a4";
+type PrintMargin = "narrow" | "normal" | "wide";
+type FlashcardMode = "off" | "front" | "back";
+type TemplateKind = "lesson" | "gig" | "jam" | "songwriting";
+type InstrumentProfile = "guitar" | "ukulele" | "baritone-guitar" | "seven-string";
+type CollaborationRole = "owner" | "lead" | "rhythm" | "bass" | "teacher";
+type SetlistItem = { id: string; chartId: string; label: string; position: number };
+type MediaAttachment = { id: string; name: string; type: string; size: number; duration?: number };
+type ConfidenceRecord = { reps: number; hits: number; misses: number; lastPracticed?: string; recordedPractice?: number };
 
+type ChartAnnotations = { student: string; dueDate: string; notes: string };
+type CardAnnotation = { pivot: string; troublesome: string; substitute: string };
+type ChartHistory = {
+  savedAt: string; selectedIds: string[]; annotations: ChartAnnotations; cardAnnotations: Record<string, CardAnnotation>;
+  practiceBpm: number; rhythmPattern: string; flashcards: FlashcardMode;
+};
 type SavedChart = {
+  version: 3;
   id: string;
   name: string;
   selectedIds: string[];
-  filters: {
-    root: string;
-    difficulty: string;
-    quality: string;
-    position: string;
-    characteristic: string;
-    key: string;
-    role: string;
-  };
+  filters: { root: string; difficulty: string; quality: string; position: string; characteristic: string; key: string; role: string };
   settings: {
-    orientation: Orientation;
-    highContrast: boolean;
-    capo: number;
-    tuning: Tuning;
-    layout: Layout;
-    columns: PrintColumns;
+    orientation: Orientation; highContrast: boolean; capo: number; tuning: Tuning; customTuning: string[];
+    layout: Layout; columns: PrintColumns; skill: SkillLevel; nashville: boolean; paperSize: PaperSize; printMargin: PrintMargin;
+    practiceBpm: number; rhythmPattern: string; flashcards: FlashcardMode; template: TemplateKind | "custom";
   };
+  annotations: ChartAnnotations;
+  cardAnnotations: Record<string, CardAnnotation>;
+  recognitionMisses: Record<string, number>;
+  history: ChartHistory[];
 };
+
+type SongSection = { title: string; chords: string[] };
+type SongSummary = { id: string; title: string; artist: string; key: string; bpm: number; timeSignature: string; pattern: string; chords: string[]; sections: SongSection[] };
+type ProgressionStep = { role: string; played: string; sounded: string; fallback?: string };
+type MidiMessage = { data: Uint8Array };
+type MidiInputLike = { onmidimessage: ((event: MidiMessage) => void) | null };
+type MidiAccessLike = { inputs: { values: () => IterableIterator<MidiInputLike> }; onstatechange: (() => void) | null };
+
+const INSTRUMENT_LABELS: Record<InstrumentProfile, string> = {
+  guitar: "Six-string guitar",
+  ukulele: "Ukulele",
+  "baritone-guitar": "Baritone guitar",
+  "seven-string": "Seven-string guitar"
+};
+const INSTRUMENT_GUIDANCE: Record<InstrumentProfile, string> = {
+  guitar: "Library diagrams are compatible with standard six-string guitar shapes.",
+  ukulele: "Ukulele mode shows chord-name and pitch guidance only; six-string guitar diagrams are hidden.",
+  "baritone-guitar": "Baritone guitar mode keeps chord identity but does not assume a guitar voicing shape or tuning.",
+  "seven-string": "Seven-string mode keeps the six-string shape as a reference and flags the extra low string for your own voicing choice."
+};
+const CHART_META_STORAGE_KEY = "chord-hero:chart-builder:advanced-v1";
+const ChartInstrumentContext = createContext<InstrumentProfile>("guitar");
 
 const STORAGE_KEY = "chord-hero:chart-builder:v1";
 const PAGE_SIZE = 36;
+const EMPTY_CARD_ANNOTATION: CardAnnotation = { pivot: "", troublesome: "", substitute: "" };
 const STRINGS = ["low E", "A", "D", "G", "B", "high E"];
 const NOTE_NAMES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
 const NOTE_NAMES_FLAT = ["C", "Db", "D", "Eb", "E", "F", "Gb", "G", "Ab", "A", "Bb", "B"];
@@ -53,427 +86,450 @@ const NOTE_INDEX: Record<string, number> = {
   "E#": 5, F: 5, "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11, Cb: 11
 };
 const QUALITY_INTERVALS: Record<string, number[]> = {
-  major: [0, 4, 7], minor: [0, 3, 7], dominant7: [0, 4, 7, 10], major7: [0, 4, 7, 11],
-  minor7: [0, 3, 7, 10], sus2: [0, 2, 7], sus4: [0, 5, 7], add9: [0, 4, 7, 14]
+  major: [0, 4, 7], minor: [0, 3, 7], diminished: [0, 3, 6], dominant7: [0, 4, 7, 10],
+  major7: [0, 4, 7, 11], minor7: [0, 3, 7, 10], sus2: [0, 2, 7], sus4: [0, 5, 7], add9: [0, 4, 7, 14]
+};
+const TUNING_NOTES: Record<NamedTuning, string[]> = {
+  standard: ["E", "A", "D", "G", "B", "E"], "drop-d": ["D", "A", "D", "G", "B", "E"],
+  dadgad: ["D", "A", "D", "G", "A", "D"], "half-step": ["Eb", "Ab", "Db", "Gb", "Bb", "Eb"]
 };
 const TUNING_LABELS: Record<Tuning, string> = {
-  standard: "Standard · E A D G B E",
-  "drop-d": "Drop D · D A D G B E",
-  dadgad: "DADGAD · D A D G A D",
-  "half-step": "Half-step down · Eb Ab Db Gb Bb Eb"
+  standard: "Standard · E A D G B E", "drop-d": "Drop D · D A D G B E", dadgad: "DADGAD · D A D G A D",
+  "half-step": "Half-step down · Eb Ab Db Gb Bb Eb", custom: "Custom six-string tuning"
+};
+const THEORY_PRESETS: Array<{ id: string; label: string; mode: HarmonyMode; roles: HarmonicRole[] }> = [
+  { id: "major-seven", label: "Major I–vii°", mode: "major", roles: ["I", "ii", "iii", "IV", "V", "vi", "vii°"] },
+  { id: "minor-seven", label: "Natural minor i–VII", mode: "minor", roles: ["i", "ii°", "III", "iv", "v", "VI", "VII"] },
+  { id: "secondary", label: "Secondary dominants", mode: "major", roles: ["V/ii", "V/iii", "V/IV", "V/V", "V/vi"] },
+  { id: "borrowed", label: "Borrowed from minor", mode: "major", roles: ["i", "bIII", "iv", "bVI", "bVII"] }
+];
+const GENRE_PRESETS: Record<string, string[]> = {
+  Folk: ["I", "IV", "V", "vi"], Blues: ["I", "IV", "V"], Pop: ["I", "V", "vi", "IV"],
+  Jazz: ["ii", "V", "I"], Worship: ["I", "V", "vi", "IV"]
+};
+const CHART_TEMPLATES: Record<TemplateKind, { label: string; rhythm: string; bpm: number; notes: string }> = {
+  lesson: { label: "Lesson", rhythm: "D D U U D U", bpm: 72, notes: "Goal: clean changes first, then add rhythm." },
+  gig: { label: "Gig", rhythm: "Song arrangement", bpm: 100, notes: "Set order and performance cues." },
+  jam: { label: "Jam", rhythm: "D U D U", bpm: 96, notes: "Leave space, listen, and loop the form." },
+  songwriting: { label: "Songwriting", rhythm: "Free time", bpm: 80, notes: "Capture substitutions and section ideas." }
 };
 
-const signature = (entry: ChordLibraryItem) =>
-  `${entry.chord.frets.join(",")}|${entry.chord.barre ? `${entry.chord.barre.fret}-${entry.chord.barre.from}-${entry.chord.barre.to}` : "none"}`;
+let chartAudioContext: AudioContext | null = null;
+const CHORD_BY_ID = new Map(CHORD_LIBRARY.map((entry) => [entry.id, entry]));
 
+const summarizeSongs = (songs: unknown): SongSummary[] => (Array.isArray(songs) ? songs : [] as unknown[]).flatMap((candidate) => {
+  if (!candidate || typeof candidate !== "object") return [];
+  const song = candidate as {
+  id: string; title: string; artist: string; key: string; bpm?: number; timeSignature?: string;
+  sections: Array<{ title?: string; blocks: Array<{ type: string; chords?: string[] }> }>;
+  variations?: Array<{ pattern?: string }>;
+  };
+  if (typeof song.id !== "string" || typeof song.title !== "string" || typeof song.artist !== "string" || typeof song.key !== "string" || !Array.isArray(song.sections)) return [];
+  const sections = song.sections.flatMap((section, index) => { const chords = Array.isArray(section.blocks) ? section.blocks.flatMap((block) => block.type === "chords" && Array.isArray(block.chords) ? block.chords.filter((chord): chord is string => typeof chord === "string") : []) : []; return chords.length ? [{ title: typeof section.title === "string" ? section.title : `Section ${index + 1}`, chords }] : []; });
+  return [{ id: song.id, title: song.title, artist: song.artist, key: song.key, bpm: Number.isFinite(Number(song.bpm)) ? Math.max(30, Math.min(240, Number(song.bpm))) : 80,
+    timeSignature: typeof song.timeSignature === "string" ? song.timeSignature : "4/4", pattern: typeof song.variations?.[0]?.pattern === "string" ? song.variations[0].pattern : "D U D U",
+    sections, chords: Array.from(new Set(sections.flatMap((section) => section.chords))) }];
+});
+
+const signature = (entry: ChordLibraryItem) => `${entry.chord.frets.join(",")}|${entry.chord.barre ? `${entry.chord.barre.fret}-${entry.chord.barre.from}-${entry.chord.barre.to}` : "none"}`;
 const uniqueShapes = (entries: ChordLibraryItem[]) => {
   const seen = new Set<string>();
-  return entries.filter((entry) => {
-    const key = signature(entry);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return entries.filter((entry) => { const key = signature(entry); if (seen.has(key)) return false; seen.add(key); return true; });
 };
-
 const rootOf = (name: string) => name.match(/^[A-G](?:#|b)?/)?.[0] ?? name;
-
 const transposeNote = (note: string, semitones: number, preferFlats = note.includes("b")) => {
   const index = NOTE_INDEX[note];
   if (index === undefined) return note;
-  return (preferFlats ? NOTE_NAMES_FLAT : NOTE_NAMES_SHARP)[(index + semitones) % 12];
+  return (preferFlats ? NOTE_NAMES_FLAT : NOTE_NAMES_SHARP)[((index + semitones) % 12 + 12) % 12];
 };
-
-const transposeChordName = (name: string, semitones: number) => {
-  const parts = name.split("/");
-  return parts.map((part) => {
-    const root = rootOf(part);
-    const suffix = part.slice(root.length);
-    return `${transposeNote(root, semitones, root.includes("b"))}${suffix}`;
-  }).join("/");
-};
-
+const transposeChordName = (name: string, semitones: number) => name.split("/").map((part) => {
+  const root = rootOf(part); return `${transposeNote(root, semitones, root.includes("b"))}${part.slice(root.length)}`;
+}).join("/");
 const enharmonicName = (name: string) => {
-  const root = rootOf(name);
-  if (!root.includes("#") && !root.includes("b")) return name;
+  const root = rootOf(name); if (!root.includes("#") && !root.includes("b")) return name;
   const alternative = transposeNote(root, 0, root.includes("#"));
-  if (alternative === root) return name;
-  return `${name} / ${alternative}${name.slice(root.length)}`;
+  return alternative === root ? name : `${name} / ${alternative}${name.slice(root.length)}`;
 };
-
 const chordTones = (entry: ChordLibraryItem) => {
-  const base = NOTE_INDEX[entry.root];
-  const intervals = QUALITY_INTERVALS[entry.quality] ?? [0, 4, 7];
+  const base = NOTE_INDEX[entry.root]; const intervals = QUALITY_INTERVALS[entry.quality] ?? [0, 4, 7];
   if (base === undefined) return "See voicing";
   const names = entry.root.includes("b") ? NOTE_NAMES_FLAT : NOTE_NAMES_SHARP;
   return Array.from(new Set(intervals.map((interval) => names[(base + interval) % 12]))).join(" · ");
 };
-
 const baseFret = (entry: ChordLibraryItem) => {
   const fretted = entry.chord.frets.filter((fret) => fret > 0);
-  if (!fretted.length || Math.max(...fretted) <= 4) return 1;
-  return entry.chord.barre?.fret ?? Math.min(...fretted);
+  return !fretted.length || Math.max(...fretted) <= 4 ? 1 : entry.chord.barre?.fret ?? Math.min(...fretted);
 };
-
 const getFingerText = (entry: ChordLibraryItem) => {
-  const fingers = entry.chord.fingers ?? [];
-  const details = fingers.flatMap((finger, index) => finger ? [`${STRINGS[index]}: ${finger}`] : []);
+  const details = (entry.chord.fingers ?? []).flatMap((finger, index) => finger ? [`${STRINGS[index]}: ${finger}`] : []);
   return details.length ? details.join(" · ") : "Use a relaxed fingering that keeps every marked note clear.";
 };
-
-const entryScore = (entry: ChordLibraryItem) =>
-  (entry.position.toLowerCase().includes("open") ? 0 : 4) +
-  (entry.difficultyTags.includes("beginner") ? 0 : 2) +
-  (entry.difficultyTags.includes("barre") ? 3 : 0) +
-  (entry.inversion === "inverted" ? 2 : 0);
-
-const bestEntry = (items: ChordLibraryItem[]) => [...items].sort((a, b) => entryScore(a) - entryScore(b))[0];
-
-const resolveRoles = (key: string, roles: HarmonicRole[]) => {
-  const keyIndex = NOTE_INDEX[key] ?? 0;
-  const scaleIntervals = [0, 2, 4, 5, 7, 9];
-  const expectedQuality = ["major", "minor", "minor", "major", "major", "minor"];
-  const names = key.includes("b") ? NOTE_NAMES_FLAT : NOTE_NAMES_SHARP;
-  return roles.flatMap((role) => {
-    const contextual = CHORD_LIBRARY.filter((entry) => entry.functionContexts.some((context) => context.key === key && context.roles.includes(role)));
-    if (contextual.length) return [bestEntry(contextual)];
-    const roleIndex = HARMONIC_FUNCTION_OPTIONS.indexOf(role);
-    const expectedRoot = names[(keyIndex + scaleIntervals[roleIndex]) % 12];
-    const fallback = CHORD_LIBRARY.filter((entry) => NOTE_INDEX[entry.root] === NOTE_INDEX[expectedRoot] && entry.quality === expectedQuality[roleIndex]);
-    return fallback.length ? [bestEntry(fallback)] : [];
-  }).filter((entry): entry is ChordLibraryItem => Boolean(entry));
+const skillScore = (entry: ChordLibraryItem, skill: SkillLevel) => {
+  const open = entry.position.toLowerCase().includes("open");
+  const beginner = entry.difficultyTags.includes("beginner");
+  const barre = entry.difficultyTags.includes("barre") || Boolean(entry.chord.barre);
+  const stretch = entry.difficultyTags.includes("stretch");
+  const base = (open ? 0 : 4) + (beginner ? 0 : 2) + (barre ? 4 : 0) + (stretch ? 3 : 0) + (entry.inversion === "inverted" ? 2 : 0);
+  if (skill === "beginner") return base;
+  if (skill === "intermediate") return base - (barre ? 2 : 0) - (stretch ? 1 : 0);
+  return (entry.inversion === "standard" ? 0 : 1) + (open ? 1 : 0);
 };
-
+const bestEntry = (items: ChordLibraryItem[], skill: SkillLevel = "beginner") => [...items].sort((a, b) => skillScore(a, skill) - skillScore(b, skill) || a.id.localeCompare(b.id))[0];
+const qualityOfSymbol = (symbol: string) => {
+  const suffix = symbol.slice(rootOf(symbol).length).toLowerCase();
+  if (suffix.includes("dim") || suffix.includes("°")) return "diminished";
+  if (suffix.includes("maj7")) return "major7";
+  if (suffix.startsWith("m") && !suffix.startsWith("maj")) return suffix.includes("7") ? "minor7" : "minor";
+  if (suffix.includes("7") && !suffix.includes("maj")) return "dominant7";
+  return "major";
+};
+const findShape = (symbol: string, skill: SkillLevel) => {
+  const root = rootOf(symbol); const quality = qualityOfSymbol(symbol);
+  const exactName = CHORD_LIBRARY.filter((entry) => entry.chord.name.toLowerCase() === symbol.toLowerCase());
+  if (exactName.length) return { entry: bestEntry(exactName, skill), fallback: undefined };
+  const exactIdentity = CHORD_LIBRARY.filter((entry) => NOTE_INDEX[entry.root] === NOTE_INDEX[root] && entry.quality === quality);
+  if (exactIdentity.length) return { entry: bestEntry(exactIdentity, skill), fallback: undefined };
+  const rootFallback = CHORD_LIBRARY.filter((entry) => NOTE_INDEX[entry.root] === NOTE_INDEX[root] && (quality === "diminished" ? entry.quality === "minor" : true));
+  return rootFallback.length ? { entry: bestEntry(rootFallback, skill), fallback: `Library has no ${symbol} shape; showing ${bestEntry(rootFallback, skill).chord.name} as a clearly marked practice fallback.` } : null;
+};
+const expectedSymbol = (key: string, mode: HarmonyMode, role: HarmonicRole) => {
+  const tonic = NOTE_INDEX[key] ?? 0;
+  const majorOffsets: Record<string, number> = { I: 0, ii: 2, iii: 4, IV: 5, V: 7, vi: 9, "vii°": 11, i: 0, bIII: 3, iv: 5, bVI: 8, bVII: 10 };
+  const minorOffsets: Record<string, number> = { i: 0, "ii°": 2, III: 3, iv: 5, v: 7, V: 7, VI: 8, VII: 10 };
+  let offset = (mode === "minor" ? minorOffsets : majorOffsets)[role];
+  let suffix = ["ii", "iii", "vi", "i", "iv", "v"].includes(role) ? "m" : role.includes("°") ? "dim" : "";
+  if (role.startsWith("V/")) {
+    const targetRole = role.slice(2); const targetOffset = majorOffsets[targetRole] ?? minorOffsets[targetRole] ?? 0;
+    offset = (targetOffset + 7) % 12; suffix = "7";
+  }
+  const note = (key.includes("b") ? NOTE_NAMES_FLAT : NOTE_NAMES_SHARP)[(tonic + (offset ?? 0)) % 12];
+  return `${note}${suffix}`;
+};
+const resolveTheory = (key: string, mode: HarmonyMode, roles: HarmonicRole[], skill: SkillLevel) => roles.map((role) => {
+  const symbol = expectedSymbol(key, mode, role); const match = findShape(symbol, skill);
+  return { role, symbol, entry: match?.entry, fallback: match?.fallback ?? (!match ? `No library voicing is available for ${symbol}.` : undefined) };
+});
 const levelEntries = (levelIndex: number) => uniqueShapes(LEVELS[levelIndex].chords.flatMap((chord) => {
   const exact = CHORD_LIBRARY.find((entry) => entry.chord.name === chord.name && entry.chord.frets.join(",") === chord.frets.join(","));
   return exact ? [exact] : [];
 }));
 
-const isSavedChart = (value: unknown): value is SavedChart => {
-  if (!value || typeof value !== "object") return false;
-  const item = value as Partial<SavedChart>;
-  return typeof item.id === "string" && typeof item.name === "string" && Array.isArray(item.selectedIds) &&
-    item.selectedIds.every((id) => typeof id === "string") && Boolean(item.filters) && typeof item.filters === "object" &&
-    typeof item.filters.root === "string" && typeof item.filters.difficulty === "string" &&
-    typeof item.filters.quality === "string" && typeof item.filters.position === "string" &&
-    typeof item.filters.characteristic === "string" && typeof item.filters.key === "string" &&
-    typeof item.filters.role === "string" && Boolean(item.settings) && typeof item.settings === "object" &&
-    (item.settings.orientation === "right" || item.settings.orientation === "left") &&
-    typeof item.settings.highContrast === "boolean" && typeof item.settings.capo === "number" &&
-    Boolean(item.settings.tuning && TUNING_LABELS[item.settings.tuning]) &&
-    (item.settings.layout === "compact" || item.settings.layout === "full") &&
-    (item.settings.columns === 2 || item.settings.columns === 3);
+const normalizeTuning = (values: string[]) => values.map((value) => {
+  const trimmed = value.trim(); const formatted = trimmed ? `${trimmed[0].toUpperCase()}${trimmed.slice(1).replace("♯", "#").replace("♭", "b")}` : "";
+  return NOTE_INDEX[formatted] === undefined ? null : formatted;
+});
+const soundedStringNotes = (entry: ChordLibraryItem, tuningNotes: string[], capo = 0) => entry.chord.frets.map((fret, index) => {
+  if (fret < 0) return "×"; const open = NOTE_INDEX[tuningNotes[index]]; return open === undefined ? "?" : NOTE_NAMES_SHARP[(open + fret + capo) % 12];
+});
+const nashvilleFor = (entry: ChordLibraryItem, key: string) => {
+  if (key === "all") return null; const delta = ((NOTE_INDEX[entry.root] ?? 0) - (NOTE_INDEX[key] ?? 0) + 12) % 12;
+  const degree: Record<number, string> = { 0: "1", 1: "♭2", 2: "2", 3: "♭3", 4: "3", 5: "4", 6: "♯4", 7: "5", 8: "♭6", 9: "6", 10: "♭7", 11: "7" };
+  const quality = entry.quality === "minor" || entry.quality === "minor7" ? "m" : entry.quality === "diminished" ? "°" : entry.quality === "dominant7" ? "7" : "";
+  return `${degree[delta]}${quality}`;
 };
 
-function ChartCard({
-  entry, selected, comparing, orientation, highContrast, capo, tuning, layout, onToggle, onCompare, onAlternative, printable = false
-}: {
-  entry: ChordLibraryItem;
-  selected: boolean;
-  comparing: boolean;
-  orientation: Orientation;
-  highContrast: boolean;
-  capo: number;
-  tuning: Tuning;
-  layout: Layout;
-  onToggle?: () => void;
-  onCompare?: () => void;
-  onAlternative?: (id: string) => void;
-  printable?: boolean;
+/* Version-3/L byte-mode QR encoder. Detail links are constrained to its 53-byte payload. */
+const qrBits = (text: string) => {
+  const bytes = Array.from(new TextEncoder().encode(text)).slice(0, 53); const bits: number[] = [];
+  const push = (value: number, count: number) => { for (let index = count - 1; index >= 0; index -= 1) bits.push((value >>> index) & 1); };
+  push(4, 4); push(bytes.length, 8); bytes.forEach((byte) => push(byte, 8));
+  for (let index = 0; index < Math.min(4, 440 - bits.length); index += 1) bits.push(0);
+  while (bits.length % 8) bits.push(0);
+  const data: number[] = []; for (let index = 0; index < bits.length; index += 8) data.push(parseInt(bits.slice(index, index + 8).join(""), 2));
+  for (let index = 0; data.length < 55; index += 1) data.push(index % 2 ? 0x11 : 0xec);
+  const exp = new Array(512).fill(0); const log = new Array(256).fill(0); let value = 1;
+  for (let index = 0; index < 255; index += 1) { exp[index] = value; log[value] = index; value <<= 1; if (value & 0x100) value ^= 0x11d; }
+  for (let index = 255; index < 512; index += 1) exp[index] = exp[index - 255];
+  let generator = [1];
+  for (let power = 0; power < 15; power += 1) { const next = new Array(generator.length + 1).fill(0); generator.forEach((coefficient, index) => { next[index] ^= coefficient; if (coefficient) next[index + 1] ^= exp[log[coefficient] + power]; }); generator = next; }
+  const ecc = new Array(15).fill(0);
+  data.forEach((byte) => { const factor = byte ^ ecc[0]; ecc.shift(); ecc.push(0); if (factor) generator.slice(1).forEach((coefficient, index) => { ecc[index] ^= exp[log[factor] + log[coefficient]]; }); });
+  return [...data, ...ecc].flatMap((byte) => Array.from({ length: 8 }, (_, index) => (byte >>> (7 - index)) & 1));
+};
+const qrMatrix = (text: string) => {
+  const size = 29; const matrix = Array.from({ length: size }, () => new Array<number>(size).fill(0)); const reserved = Array.from({ length: size }, () => new Array<boolean>(size).fill(false));
+  const set = (row: number, col: number, dark: boolean, reserve = true) => { if (row >= 0 && col >= 0 && row < size && col < size) { matrix[row][col] = dark ? 1 : 0; if (reserve) reserved[row][col] = true; } };
+  const finder = (top: number, left: number) => { for (let row = -1; row <= 7; row += 1) for (let col = -1; col <= 7; col += 1) set(top + row, left + col, row >= 0 && row <= 6 && col >= 0 && col <= 6 && (row === 0 || row === 6 || col === 0 || col === 6 || (row >= 2 && row <= 4 && col >= 2 && col <= 4))); };
+  finder(0, 0); finder(0, size - 7); finder(size - 7, 0);
+  for (let index = 8; index < size - 8; index += 1) { set(6, index, index % 2 === 0); set(index, 6, index % 2 === 0); }
+  for (let row = -2; row <= 2; row += 1) for (let col = -2; col <= 2; col += 1) set(22 + row, 22 + col, Math.max(Math.abs(row), Math.abs(col)) !== 1);
+  for (let index = 0; index < 9; index += 1) { if (index !== 6) { set(8, index, false); set(index, 8, false); } }
+  for (let index = 0; index < 8; index += 1) { set(8, size - 1 - index, false); set(size - 1 - index, 8, false); }
+  set(size - 8, 8, true);
+  const payload = qrBits(text); let bit = 0; let upward = true;
+  for (let right = size - 1; right > 0; right -= 2) { if (right === 6) right -= 1; for (let offset = 0; offset < size; offset += 1) { const row = upward ? size - 1 - offset : offset; for (let delta = 0; delta < 2; delta += 1) { const col = right - delta; if (!reserved[row][col]) { const raw = payload[bit++] ?? 0; matrix[row][col] = raw ^ ((row + col) % 2 === 0 ? 1 : 0); } } } upward = !upward; }
+  const format = 0b111011111000100; const first = [[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[7,8],[8,8],[8,7],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0]];
+  const second = [[8,size-1],[8,size-2],[8,size-3],[8,size-4],[8,size-5],[8,size-6],[8,size-7],[8,size-8],[size-7,8],[size-6,8],[size-5,8],[size-4,8],[size-3,8],[size-2,8],[size-1,8]];
+  first.forEach(([row, col], index) => set(row, col, Boolean((format >>> index) & 1))); second.forEach(([row, col], index) => set(row, col, Boolean((format >>> index) & 1)));
+  return matrix;
+};
+function DetailQr({ value }: { value: string }) {
+  const matrix = useMemo(() => qrMatrix(value), [value]);
+  return <svg className="chart-qr" viewBox="0 0 37 37" role="img" aria-label={`QR code for ${value}`} shapeRendering="crispEdges"><rect width="37" height="37" fill="white" />{matrix.flatMap((row, rowIndex) => row.flatMap((dark, colIndex) => dark ? <rect key={`${rowIndex}-${colIndex}`} x={colIndex + 4} y={rowIndex + 4} width="1" height="1" fill="black" /> : []))}</svg>;
+}
+
+const safeRecord = <T,>(value: unknown, guard: (candidate: unknown) => candidate is T): Record<string, T> => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return {};
+  return Object.fromEntries(Object.entries(value).filter(([, candidate]) => guard(candidate)));
+};
+const isCardAnnotation = (value: unknown): value is CardAnnotation => Boolean(value && typeof value === "object" && typeof (value as CardAnnotation).pivot === "string" && typeof (value as CardAnnotation).troublesome === "string" && typeof (value as CardAnnotation).substitute === "string");
+const expectedPitchClasses = (entry: ChordLibraryItem, tuningNotes: string[], capo: number) => new Set<number>(soundedStringNotes(entry, tuningNotes, capo).flatMap((note) => { const pitch = NOTE_INDEX[note]; return pitch === undefined ? [] : [pitch]; }));
+const recognitionReport = (entry: ChordLibraryItem, held: Set<number>, tuningNotes: string[], capo: number) => {
+  const expected = expectedPitchClasses(entry, tuningNotes, capo); const missing = [...expected].filter((pitch) => !held.has(pitch)); const extra = [...held].filter((pitch) => !expected.has(pitch));
+  const expectedStrings = soundedStringNotes(entry, tuningNotes, capo); const likelyStrings = missing.flatMap((pitch) => expectedStrings.flatMap((note, index) => NOTE_INDEX[note] === pitch ? [STRINGS[index]] : []));
+  if (!held.size) return { ok: false, text: "Waiting for MIDI notes…", misses: false };
+  if (!missing.length && !extra.length) return { ok: true, text: `Match: ${entry.chord.name}. All expected pitch classes are present.`, misses: false };
+  return { ok: false, misses: true, text: `Not yet. Missing ${missing.map((pitch) => NOTE_NAMES_SHARP[pitch]).join(", ") || "none"}; extra ${extra.map((pitch) => NOTE_NAMES_SHARP[pitch]).join(", ") || "none"}.${likelyStrings.length ? ` Check likely muted strings: ${Array.from(new Set(likelyStrings)).join(", ")}.` : " Check tuning or an incorrectly fretted string."}` };
+};
+const fretBurden = (entry: ChordLibraryItem) => { const fretted = entry.chord.frets.filter((fret) => fret > 0); const span = fretted.length ? Math.max(...fretted) - Math.min(...fretted) : 0; return (entry.chord.barre ? 4 : 0) + (entry.difficultyTags.includes("stretch") ? 3 : 0) + span + (fretted.length >= 5 ? 1 : 0); };
+const voiceLeading = (from: ChordLibraryItem, to: ChordLibraryItem) => {
+  const retainedStrings = from.chord.frets.flatMap((fret, index) => fret >= 0 && fret === to.chord.frets[index] ? [STRINGS[index]] : []);
+  const retainedFingers = (from.chord.fingers ?? []).flatMap((finger, index) => finger && finger === (to.chord.fingers ?? [])[index] && from.chord.frets[index] === to.chord.frets[index] ? [`finger ${finger} on ${STRINGS[index]}`] : []);
+  const movement = from.chord.frets.reduce((sum, fret, index) => fret < 0 || to.chord.frets[index] < 0 ? sum : sum + Math.abs(fret - to.chord.frets[index]), 0);
+  const fromBass = from.chord.frets.findIndex((fret) => fret >= 0); const toBass = to.chord.frets.findIndex((fret) => fret >= 0);
+  return { retainedStrings, retainedFingers, movement, bass: fromBass === toBass ? `bass stays on ${STRINGS[fromBass] ?? "the same string"}` : `bass moves ${STRINGS[fromBass] ?? "—"} → ${STRINGS[toBass] ?? "—"}` };
+};
+const estimatePitch = (samples: Float32Array, sampleRate: number) => {
+  let rms = 0; for (const sample of samples) rms += sample * sample; rms = Math.sqrt(rms / samples.length); if (rms < 0.015) return { rms, hz: null as number | null };
+  let bestOffset = -1; let best = 0; for (let offset = Math.floor(sampleRate / 1000); offset <= Math.min(Math.floor(sampleRate / 70), samples.length / 2); offset += 1) { let correlation = 0; for (let index = 0; index < samples.length - offset; index += 2) correlation += samples[index] * samples[index + offset]; if (correlation > best) { best = correlation; bestOffset = offset; } }
+  return { rms, hz: bestOffset > 0 ? sampleRate / bestOffset : null };
+};
+
+const localChartRecommendation = (key: string, mode: HarmonyMode, genre: string, skill: SkillLevel, minutes: number, songTitle: string) => {
+  const genreRoles = GENRE_PRESETS[genre] ?? GENRE_PRESETS.Pop;
+  const roles = mode === "minor" ? ["i", "iv", "v", "VI", "VII"] : genreRoles;
+  const resolved = resolveTheory(key, mode, roles as HarmonicRole[], skill);
+  const maxCards = Math.max(3, Math.min(12, Math.round(minutes / 3)));
+  const entries = resolved.flatMap((item) => item.entry ? [item.entry] : []).slice(0, maxCards);
+  return { title: songTitle.trim() ? `Local chart · ${songTitle.trim()}` : `Local ${genre} chart · ${key} ${mode}`, roles, entries, steps: resolved.map((item) => ({ role: item.role, played: item.symbol, sounded: item.symbol, fallback: item.fallback })) };
+};
+
+const parseChordProSymbols = (text: string) => Array.from(new Set(Array.from(text.matchAll(/\[([^\]]+)\]/g), (match) => match[1]?.trim()).filter((symbol): symbol is string => Boolean(symbol && /^[A-G](?:#|b)?(?:m|min|maj7|dim|sus|add|7)?(?:\/[A-G](?:#|b)?)?$/.test(symbol)))));
+const parseMusicXmlSymbols = (text: string) => {
+  try {
+    const doc = new DOMParser().parseFromString(text, "application/xml");
+    if (doc.querySelector("parsererror")) return [];
+    return Array.from(doc.querySelectorAll("harmony")).flatMap((node) => {
+      const step = node.querySelector("root-step")?.textContent?.trim(); const alter = Number(node.querySelector("root-alter")?.textContent ?? 0);
+      if (!step || !/[A-G]/.test(step)) return [];
+      const root = `${step}${alter === 1 ? "#" : alter === -1 ? "b" : ""}`; const kind = node.querySelector("kind")?.getAttribute("text") ?? node.querySelector("kind")?.textContent ?? "";
+      return [`${root}${/minor|minor-seventh|minor-ninth/i.test(kind) ? "m" : /dominant|seventh/i.test(kind) ? "7" : /diminished/i.test(kind) ? "dim" : ""}`];
+    });
+  } catch { return []; }
+};
+
+const migrateSavedChart = (value: unknown): SavedChart | null => {
+  if (!value || typeof value !== "object") return null; const item = value as Partial<SavedChart> & { settings?: Partial<SavedChart["settings"]> };
+  if (typeof item.id !== "string" || typeof item.name !== "string" || !Array.isArray(item.selectedIds) || !item.selectedIds.every((id) => typeof id === "string") || !item.filters || !item.settings) return null;
+  const filters = item.filters as SavedChart["filters"];
+  if ([filters.root, filters.difficulty, filters.quality, filters.position, filters.characteristic, filters.key, filters.role].some((field) => typeof field !== "string")) return null;
+  const orientation = item.settings.orientation === "left" ? "left" : "right"; const layout = item.settings.layout === "compact" ? "compact" : "full";
+  const tuning = item.settings.tuning && TUNING_LABELS[item.settings.tuning] ? item.settings.tuning : "standard";
+  const custom = Array.isArray(item.settings.customTuning) ? normalizeTuning(item.settings.customTuning) : [];
+  const flashcards: FlashcardMode = ["front", "back"].includes(String(item.settings.flashcards)) ? item.settings.flashcards as FlashcardMode : "off";
+  const template = ["lesson", "gig", "jam", "songwriting"].includes(String(item.settings.template)) ? item.settings.template as TemplateKind : "custom";
+  const history = Array.isArray(item.history) ? item.history.slice(-8).flatMap((candidate) => { if (!candidate || typeof candidate !== "object") return []; const snapshot = candidate as Partial<ChartHistory>; if (typeof snapshot.savedAt !== "string" || !Array.isArray(snapshot.selectedIds) || !snapshot.selectedIds.every((id) => typeof id === "string")) return []; return [{ savedAt: snapshot.savedAt, selectedIds: snapshot.selectedIds, annotations: snapshot.annotations && typeof snapshot.annotations.notes === "string" ? snapshot.annotations : { student: "", dueDate: "", notes: "" }, cardAnnotations: safeRecord(snapshot.cardAnnotations, isCardAnnotation), practiceBpm: Math.max(30, Math.min(240, Number(snapshot.practiceBpm) || 80)), rhythmPattern: typeof snapshot.rhythmPattern === "string" ? snapshot.rhythmPattern : "D U D U", flashcards: ["front", "back"].includes(String(snapshot.flashcards)) ? snapshot.flashcards as FlashcardMode : "off" }]; }) : [];
+  return {
+    version: 3, id: item.id, name: item.name, selectedIds: item.selectedIds, filters,
+    settings: { orientation, highContrast: Boolean(item.settings.highContrast), capo: Math.min(7, Math.max(0, Number(item.settings.capo) || 0)), tuning,
+      customTuning: custom.length === 6 && custom.every(Boolean) ? custom as string[] : [...TUNING_NOTES.standard], layout, columns: item.settings.columns === 2 ? 2 : 3,
+      skill: ["beginner", "intermediate", "advanced"].includes(item.settings.skill ?? "") ? item.settings.skill as SkillLevel : "beginner",
+      nashville: Boolean(item.settings.nashville), paperSize: item.settings.paperSize === "a4" ? "a4" : "letter",
+      printMargin: ["narrow", "wide"].includes(item.settings.printMargin ?? "") ? item.settings.printMargin as PrintMargin : "normal",
+      practiceBpm: Math.max(30, Math.min(240, Number(item.settings.practiceBpm) || 80)), rhythmPattern: typeof item.settings.rhythmPattern === "string" ? item.settings.rhythmPattern.slice(0, 80) : "D U D U", flashcards, template },
+    annotations: item.annotations && typeof item.annotations.student === "string" && typeof item.annotations.dueDate === "string" && typeof item.annotations.notes === "string" ? item.annotations : { student: "", dueDate: "", notes: "" },
+    cardAnnotations: safeRecord(item.cardAnnotations, isCardAnnotation), recognitionMisses: safeRecord(item.recognitionMisses, (candidate): candidate is number => typeof candidate === "number" && Number.isFinite(candidate) && candidate >= 0), history
+  };
+};
+
+function ChartCard({ entry, selected, comparing, orientation, highContrast, capo, tuningLabel, tuningNotes, layout, nashville, fallback,
+  cardAnnotation, rhythmPattern, practiceBpm, flashcards, instrument: _instrument = "guitar", onAnnotation, onToggle, onCompare, onAnchor, onAlternative, onRecognitionTarget, printable = false }: {
+  entry: ChordLibraryItem; selected: boolean; comparing: boolean; orientation: Orientation; highContrast: boolean; capo: number;
+  tuningLabel: string; tuningNotes: string[]; layout: Layout; nashville: string | null; fallback?: string; cardAnnotation?: CardAnnotation;
+  rhythmPattern: string; practiceBpm: number; flashcards: FlashcardMode; instrument?: InstrumentProfile; onAnnotation?: (value: CardAnnotation) => void;
+  onToggle?: () => void; onCompare?: () => void; onAnchor?: () => void; onAlternative?: (id: string) => void; onRecognitionTarget?: () => void; printable?: boolean;
 }) {
-  const name = enharmonicName(entry.chord.name);
-  const sounded = capo ? enharmonicName(transposeChordName(entry.chord.name, capo)) : name;
-  const muted = entry.chord.frets.flatMap((fret, index) => fret < 0 ? [STRINGS[index]] : []);
-  return (
-    <article id={`chart-card-${entry.id}`} className={`chart-card ${selected ? "selected" : ""} ${layout === "compact" ? "compact" : "full"}`}>
-      <header className="chart-card-header">
-        <div>
-          <span className="label">{entry.qualityLabel} · {entry.position}</span>
-          <h3>{name}</h3>
-          {capo > 0 ? <p className="chart-sounding">Shape {name} · sounds {sounded} with capo {capo}</p> : null}
-        </div>
-        <span className="chart-difficulty">{entry.difficultyTags[0] ?? "intermediate"}</span>
-      </header>
-      <ChordDiagram chord={entry.chord} orientation={orientation} highContrast={highContrast} />
-      <div className="chart-card-facts">
-        <p><strong>Tones:</strong> {chordTones(entry)}</p>
-        <p><strong>Fingers:</strong> {getFingerText(entry)}</p>
-        <p><strong>Strings:</strong> {muted.length ? `Mute ${muted.join(", ")}` : "Let all six strings ring"} · base fret {baseFret(entry)}</p>
-        <p><strong>Tuning:</strong> {TUNING_LABELS[tuning]}</p>
-        {tuning !== "standard" ? <p className="chart-note">Diagram frets are the library shape; verify pitches for this tuning.</p> : null}
-        {layout === "full" ? <>
-          <p>{entry.mutingNotes[0] ?? entry.summary}</p>
-          <p><strong>Focus:</strong> {entry.practiceFocus}</p>
-        </> : null}
-      </div>
-      {!printable ? <div className="chart-card-actions">
-        <button className="btn primary" type="button" onClick={onToggle}>{selected ? "Remove" : "Select"}</button>
-        <button className={`btn ghost ${comparing ? "active" : ""}`} type="button" onClick={onCompare}>{comparing ? "Comparing" : "Compare"}</button>
-      </div> : null}
-      {entry.nearbyAlternatives.some((alternative) => alternative.targetId) ? <div className="chart-alternatives">
-        <span className="label">Alternatives</span>
-        {entry.nearbyAlternatives.flatMap((alternative) => alternative.targetId ? [
-          printable ? <span key={alternative.targetId}>{alternative.label}</span> :
-          <span key={alternative.targetId} className="chart-alternative">
-            <a href={`#chart-card-${alternative.targetId}`}>{alternative.label}</a>
-            <button type="button" onClick={() => onAlternative?.(alternative.targetId!)}>Add</button>
-          </span>
-        ] : [])}
-      </div> : null}
-      {printable ? <p className="chart-detail-link">Chord Hero detail: /library?chord={entry.id}</p> : null}
-    </article>
-  );
+  const [playing, setPlaying] = useState(false);
+  const instrument = useContext(ChartInstrumentContext);
+  const name = enharmonicName(entry.chord.name); const sounded = capo ? enharmonicName(transposeChordName(entry.chord.name, capo)) : name;
+  const muted = entry.chord.frets.flatMap((fret, index) => fret < 0 ? [STRINGS[index]] : []); const notes = soundedStringNotes(entry, tuningNotes, capo);
+  const play = () => {
+    const AudioContextCtor = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!AudioContextCtor || playing) return; const context = chartAudioContext ?? new AudioContextCtor(); chartAudioContext = context; setPlaying(true);
+    const now = context.currentTime; notes.forEach((note, index) => { const pitch = NOTE_INDEX[note]; if (pitch === undefined) return; const oscillator = context.createOscillator(); const gain = context.createGain();
+      const standardMidi = [40, 45, 50, 55, 59, 64][index]; const standardPitch = NOTE_INDEX[TUNING_NOTES.standard[index]]; const tuningPitch = NOTE_INDEX[tuningNotes[index]];
+      const rawOffset = tuningPitch === undefined ? 0 : tuningPitch - standardPitch; const tuningOffset = rawOffset > 6 ? rawOffset - 12 : rawOffset < -6 ? rawOffset + 12 : rawOffset;
+      const midi = standardMidi + tuningOffset + entry.chord.frets[index] + capo; oscillator.frequency.value = 440 * Math.pow(2, (midi - 69) / 12); oscillator.type = "triangle";
+      gain.gain.setValueAtTime(0, now + index * 0.035); gain.gain.linearRampToValueAtTime(0.055, now + index * 0.035 + 0.02); gain.gain.exponentialRampToValueAtTime(0.001, now + 1.35); oscillator.connect(gain).connect(context.destination); oscillator.start(now + index * 0.035); oscillator.stop(now + 1.4); });
+    window.setTimeout(() => setPlaying(false), 1450);
+  };
+  const note = cardAnnotation ?? EMPTY_CARD_ANNOTATION;
+  return <article id={`chart-card-${entry.id}`} className={`chart-card ${selected ? "selected" : ""} ${layout} chart-flashcard-${flashcards}`} draggable={!printable && selected} onDragStart={(event) => event.dataTransfer.setData("text/chord-id", entry.id)} aria-label={`${entry.chord.name} chord card. ${entry.qualityLabel}, ${entry.position}, ${entry.difficultyTags.join(", ")}.`}>
+    <header className="chart-card-header chart-flash-front"><div><span className="label">{entry.qualityLabel} · {entry.position}{nashville ? ` · Nashville ${nashville}` : ""}</span><h3>{name}</h3>{capo > 0 ? <p className="chart-sounding">Played {name} · sounds {sounded} with capo {capo}</p> : null}</div><span className="chart-difficulty">Difficulty: {entry.difficultyTags[0] ?? "intermediate"}</span></header>
+    <div className="chart-flash-back">
+    {fallback ? <p className="chart-fallback" role="note">Fallback: {fallback}</p> : null}
+    {instrument === "guitar" ? <ChordDiagram chord={entry.chord} orientation={orientation} highContrast={highContrast} /> : <div className="chart-instrument-warning" role="note"><strong>{INSTRUMENT_LABELS[instrument]} guidance</strong><p>{INSTRUMENT_GUIDANCE[instrument]}</p><p><strong>Pitch set:</strong> {chordTones(entry)} · Use an instrument-specific shape reference for this profile.</p></div>}
+    <div className="chart-string-overlay" aria-label={`String notes ${notes.join(" ")}`}><strong>String notes</strong>{notes.map((note, index) => <span key={STRINGS[index]} className={note === "×" ? "muted" : ""}>{note}<small>{note === "×" ? "avoid" : STRINGS[index]}</small></span>)}</div>
+    <div className="chart-card-facts"><p><strong>Tones:</strong> {chordTones(entry)}</p><p><strong>Fingers:</strong> {getFingerText(entry)}</p><p><strong>Avoid:</strong> {entry.avoidStrings.join(" ") || (muted.length ? `Mute ${muted.join(", ")}` : "None")} · base fret {baseFret(entry)}</p><p><strong>Rhythm:</strong> {rhythmPattern} · {practiceBpm} BPM</p><p><strong>Tuning:</strong> {tuningLabel}</p>{layout === "full" ? <><p>{entry.mutingNotes[0] ?? entry.summary}</p><p><strong>Focus:</strong> {entry.practiceFocus}</p></> : null}{note.pivot || note.troublesome || note.substitute ? <p className="chart-note"><strong>My notes:</strong> {[note.pivot && `Pivot: ${note.pivot}`, note.troublesome && `Trouble: ${note.troublesome}`, note.substitute && `Substitute: ${note.substitute}`].filter(Boolean).join(" · ")}</p> : null}</div>
+    </div>
+    {!printable && selected ? <details className="chart-card-annotations"><summary>Diagram notes</summary><label>Finger pivot<input value={note.pivot} maxLength={80} onChange={(event) => onAnnotation?.({ ...note, pivot: event.target.value })} /></label><label>Troublesome strings<input value={note.troublesome} maxLength={80} onChange={(event) => onAnnotation?.({ ...note, troublesome: event.target.value })} /></label><label>Preferred substitute<input value={note.substitute} maxLength={80} onChange={(event) => onAnnotation?.({ ...note, substitute: event.target.value })} /></label></details> : null}
+    {!printable ? <div className="chart-card-actions"><button className="btn primary" type="button" onClick={onToggle}>{selected ? "Remove" : "Select"}</button><button className={`btn ghost ${comparing ? "active" : ""}`} type="button" onClick={onCompare}>{comparing ? "Comparing" : "Compare"}</button><button className="btn ghost" type="button" onClick={onAnchor}>Rank from here</button><button className="btn ghost" type="button" onClick={onRecognitionTarget}>Check this chord</button><button className="btn ghost" type="button" onClick={play} aria-pressed={playing}>{playing ? "Playing…" : "Play"}</button></div> : null}
+    {entry.nearbyAlternatives.some((alternative) => alternative.targetId) ? <div className="chart-alternatives"><span className="label">Alternatives</span>{entry.nearbyAlternatives.flatMap((alternative) => alternative.targetId ? [printable ? <span key={alternative.targetId}>{alternative.label}</span> : <span key={alternative.targetId} className="chart-alternative"><a href={`#chart-card-${alternative.targetId}`}>{alternative.label}</a><button type="button" onClick={() => onAlternative?.(alternative.targetId!)}>Add</button></span>] : [])}</div> : null}
+    {printable ? <div className="chart-qr-row"><DetailQr value={`/library?chord=${entry.id}`} /><p className="chart-detail-link">/library?chord={entry.id}</p></div> : null}
+  </article>;
 }
 
 export default function ChordChartPage() {
-  const [root, setRoot] = useState("all");
-  const [difficulty, setDifficulty] = useState("all");
-  const [quality, setQuality] = useState("all");
-  const [position, setPosition] = useState("all");
-  const [characteristic, setCharacteristic] = useState("all");
-  const [functionKey, setFunctionKey] = useState("all");
-  const [functionRole, setFunctionRole] = useState("all");
-  const [presetIds, setPresetIds] = useState<string[] | null>(() => levelEntries(0).map((entry) => entry.id));
-  const [presetName, setPresetName] = useState(`Level · ${LEVELS[0]?.name ?? "Open Chords"}`);
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [compareIds, setCompareIds] = useState<string[]>([]);
-  const [orientation, setOrientation] = useState<Orientation>("right");
-  const [highContrast, setHighContrast] = useState(false);
-  const [capo, setCapo] = useState(0);
-  const [tuning, setTuning] = useState<Tuning>("standard");
-  const [layout, setLayout] = useState<Layout>("full");
-  const [columns, setColumns] = useState<PrintColumns>(3);
-  const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
-  const [savedCharts, setSavedCharts] = useState<SavedChart[]>([]);
-  const [saveName, setSaveName] = useState("");
-  const [saveStatus, setSaveStatus] = useState("");
-  const [isPrinting, setIsPrinting] = useState(false);
+  const [root, setRoot] = useState("all"); const [difficulty, setDifficulty] = useState("all"); const [quality, setQuality] = useState("all");
+  const [position, setPosition] = useState("all"); const [characteristic, setCharacteristic] = useState("all"); const [functionKey, setFunctionKey] = useState("G"); const [functionRole, setFunctionRole] = useState("all");
+  const [presetIds, setPresetIds] = useState<string[] | null>(() => levelEntries(0).map((entry) => entry.id)); const [presetName, setPresetName] = useState(`Level · ${LEVELS[0]?.name ?? "Open Chords"}`);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]); const [compareIds, setCompareIds] = useState<string[]>([]); const [anchorId, setAnchorId] = useState<string | null>(null);
+  const [orientation, setOrientation] = useState<Orientation>("right"); const [highContrast, setHighContrast] = useState(false); const [capo, setCapo] = useState(0); const [tuning, setTuning] = useState<Tuning>("standard");
+  const [customTuningText, setCustomTuningText] = useState("E A D G B E"); const [layout, setLayout] = useState<Layout>("full"); const [columns, setColumns] = useState<PrintColumns>(3); const [skill, setSkill] = useState<SkillLevel>("beginner");
+  const [nashville, setNashville] = useState(false); const [paperSize, setPaperSize] = useState<PaperSize>("letter"); const [printMargin, setPrintMargin] = useState<PrintMargin>("normal");
+  const [annotations, setAnnotations] = useState<ChartAnnotations>({ student: "", dueDate: "", notes: "" }); const [visibleLimit, setVisibleLimit] = useState(PAGE_SIZE);
+  const [savedCharts, setSavedCharts] = useState<SavedChart[]>([]); const [saveName, setSaveName] = useState(""); const [saveStatus, setSaveStatus] = useState(""); const [isPrinting, setIsPrinting] = useState(false);
+  const [progression, setProgression] = useState<ProgressionStep[]>([]); const [fallbackById, setFallbackById] = useState<Record<string, string>>({}); const [songStatus, setSongStatus] = useState("");
+  const [songCatalog, setSongCatalog] = useState<SongSummary[]>([]); const [songsLoading, setSongsLoading] = useState(false);
+  const [selectedSongId, setSelectedSongId] = useState(""); const [practiceBpm, setPracticeBpm] = useState(80); const [rhythmPattern, setRhythmPattern] = useState("D U D U"); const [flashcards, setFlashcards] = useState<FlashcardMode>("off");
+  const [chartTemplate, setChartTemplate] = useState<TemplateKind | "custom">("custom"); const [cardAnnotations, setCardAnnotations] = useState<Record<string, CardAnnotation>>({}); const [recognitionMisses, setRecognitionMisses] = useState<Record<string, number>>({});
+  const [recognitionTargetId, setRecognitionTargetId] = useState(""); const [midiStatus, setMidiStatus] = useState("MIDI is off. Start it only when you are ready to play."); const [midiEnabled, setMidiEnabled] = useState(false);
+  const [micStatus, setMicStatus] = useState("Microphone is off. It is used only after you press Start microphone evidence."); const [micEnabled, setMicEnabled] = useState(false);
+  const [instrument, setInstrument] = useState<InstrumentProfile>("guitar"); const [transposeAmount, setTransposeAmount] = useState(0);
+  const [builderMode, setBuilderMode] = useState<HarmonyMode>("major"); const [builderGenre, setBuilderGenre] = useState("Pop"); const [builderSong, setBuilderSong] = useState(""); const [builderMinutes, setBuilderMinutes] = useState(15); const [builderStatus, setBuilderStatus] = useState("");
+  const [metronomeRunning, setMetronomeRunning] = useState(false); const [countIn, setCountIn] = useState(2); const [beat, setBeat] = useState(0); const [rehearsalRunning, setRehearsalRunning] = useState(false); const [rehearsalIndex, setRehearsalIndex] = useState(0); const [rehearsalStatus, setRehearsalStatus] = useState("Rehearsal is idle."); const [stageMode, setStageMode] = useState(false);
+  const [confidence, setConfidence] = useState<Record<string, ConfidenceRecord>>({}); const [transitionMisses, setTransitionMisses] = useState<Record<string, number>>({}); const [drillActive, setDrillActive] = useState(false);
+  const [bandRole, setBandRole] = useState<CollaborationRole>("owner"); const [bandPart, setBandPart] = useState("Rhythm guitar"); const [bandNote, setBandNote] = useState(""); const [bandNotes, setBandNotes] = useState<Array<{ id: string; role: CollaborationRole; part: string; note: string; at: string }>>([]); const [bandRevisions, setBandRevisions] = useState<string[]>([]);
+  const [setlist, setSetlist] = useState<SetlistItem[]>([]); const [offlineStatus, setOfflineStatus] = useState("Offline readiness has not been checked."); const [practiceStats, setPracticeStats] = useState({ streak: 0, minutes: 0, weekMinutes: 0 }); const [setlistDragId, setSetlistDragId] = useState("");
+  const [teacherMedia, setTeacherMedia] = useState<MediaAttachment[]>([]); const [advancedStatus, setAdvancedStatus] = useState("");
+  const midiAccessRef = useRef<MidiAccessLike | null>(null); const heldMidiRef = useRef(new Set<number>()); const micStreamRef = useRef<MediaStream | null>(null); const micFrameRef = useRef<number | null>(null); const micContextRef = useRef<AudioContext | null>(null);
+  const recognitionConfigRef = useRef<{ targetId: string; selectedIds: string[]; tuningNotes: string[]; capo: number }>({ targetId: "", selectedIds: [], tuningNotes: TUNING_NOTES.standard, capo: 0 });
+  const metronomeTimerRef = useRef<number | null>(null); const rehearsalTimerRef = useRef<number | null>(null); const mediaInputRef = useRef<HTMLInputElement | null>(null); const importInputRef = useRef<HTMLInputElement | null>(null);
 
-  useEffect(() => {
-    try {
-      const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "[]");
-      if (Array.isArray(parsed)) setSavedCharts(parsed.filter(isSavedChart));
-    } catch { setSavedCharts([]); }
-  }, []);
+  useEffect(() => { try { const parsed: unknown = JSON.parse(window.localStorage.getItem(STORAGE_KEY) ?? "[]"); if (Array.isArray(parsed)) setSavedCharts(parsed.flatMap((value) => { const chart = migrateSavedChart(value); return chart ? [chart] : []; })); } catch { setSavedCharts([]); } }, []);
+  useEffect(() => { const prepare = () => setIsPrinting(true); const finish = () => setIsPrinting(false); window.addEventListener("beforeprint", prepare); window.addEventListener("afterprint", finish); return () => { window.removeEventListener("beforeprint", prepare); window.removeEventListener("afterprint", finish); }; }, []);
+  useEffect(() => { try { const raw = window.localStorage.getItem(CHART_META_STORAGE_KEY); if (raw) { const parsed = JSON.parse(raw) as Partial<{ confidence: Record<string, ConfidenceRecord>; transitionMisses: Record<string, number>; bandNotes: typeof bandNotes; bandRevisions: string[]; setlist: SetlistItem[]; practiceStats: typeof practiceStats }>; if (parsed.confidence) setConfidence(parsed.confidence); if (parsed.transitionMisses) setTransitionMisses(parsed.transitionMisses); if (Array.isArray(parsed.bandNotes)) setBandNotes(parsed.bandNotes.slice(-40)); if (Array.isArray(parsed.bandRevisions)) setBandRevisions(parsed.bandRevisions.slice(-8)); if (Array.isArray(parsed.setlist)) setSetlist(parsed.setlist.slice(0, 20)); if (parsed.practiceStats) setPracticeStats(parsed.practiceStats); } } catch { setAdvancedStatus("Saved advanced chart metadata could not be read; starting with a clean local session."); } }, []);
+  useEffect(() => { try { window.localStorage.setItem(CHART_META_STORAGE_KEY, JSON.stringify({ confidence, transitionMisses, bandNotes: bandNotes.slice(-40), bandRevisions: bandRevisions.slice(-8), setlist: setlist.slice(0, 20), practiceStats })); } catch { /* local enhancements remain session-only when storage is unavailable */ } }, [confidence, transitionMisses, bandNotes, bandRevisions, setlist, practiceStats]);
+  useEffect(() => () => { const access = midiAccessRef.current; if (access) { for (const input of access.inputs.values()) input.onmidimessage = null; access.onstatechange = null; } micStreamRef.current?.getTracks().forEach((track) => track.stop()); if (micFrameRef.current !== null) window.cancelAnimationFrame(micFrameRef.current); void micContextRef.current?.close(); if (metronomeTimerRef.current !== null) window.clearInterval(metronomeTimerRef.current); if (rehearsalTimerRef.current !== null) window.clearInterval(rehearsalTimerRef.current); }, []);
 
-  useEffect(() => {
-    const prepare = () => setIsPrinting(true);
-    const finish = () => setIsPrinting(false);
-    window.addEventListener("beforeprint", prepare);
-    window.addEventListener("afterprint", finish);
-    return () => {
-      window.removeEventListener("beforeprint", prepare);
-      window.removeEventListener("afterprint", finish);
-    };
-  }, []);
-
+  const customParts = useMemo(() => normalizeTuning(customTuningText.split(/[\s,]+/).filter(Boolean)), [customTuningText]);
+  const customTuningValid = customParts.length === 6 && customParts.every(Boolean); const tuningNotes = useMemo(() => tuning === "custom" && customTuningValid ? customParts as string[] : TUNING_NOTES[tuning === "custom" ? "standard" : tuning], [tuning, customParts, customTuningValid]);
+  const tuningLabel = tuning === "custom" ? customTuningValid ? `Custom · ${tuningNotes.join(" ")}` : "Custom tuning invalid · using Standard preview" : TUNING_LABELS[tuning];
   const filters = useMemo(() => ({ root, difficulty, quality, position, characteristic, functionKey, functionRole }), [root, difficulty, quality, position, characteristic, functionKey, functionRole]);
+  const filteredEntries = useMemo(() => { const allowedIds = presetIds ? new Set(presetIds) : null; return uniqueShapes(CHORD_LIBRARY.filter((entry) => {
+    if (allowedIds && !allowedIds.has(entry.id)) return false; if (root !== "all" && entry.root !== root) return false; if (difficulty !== "all" && !entry.difficultyTags.includes(difficulty as never)) return false;
+    if (quality !== "all" && entry.quality !== quality) return false; if (position === "open" && !entry.position.toLowerCase().includes("open")) return false; if (position === "barre" && !entry.difficultyTags.includes("barre")) return false;
+    if (position === "inverted" && entry.inversion !== "inverted") return false; if (characteristic === "open" && !entry.chord.frets.includes(0)) return false; if (characteristic === "barre" && !entry.chord.barre) return false;
+    if (characteristic === "partial" && !entry.difficultyTags.includes("partial") && entry.chord.frets.filter((fret) => fret >= 0).length > 4) return false;
+    if (functionRole !== "all" && !entry.functionContexts.some((context) => context.key === functionKey && context.roles.includes(functionRole as HarmonicRole))) return false; return true;
+  })); }, [presetIds, root, difficulty, quality, position, characteristic, functionKey, functionRole]);
+  const rankedEntries = useMemo(() => { const anchor = anchorId ? CHORD_BY_ID.get(anchorId) : null; if (!anchor) return filteredEntries; const transitionScores = new Map(filteredEntries.map((entry) => [entry.id, scoreTransition(anchor.chord, entry.chord).score])); return [...filteredEntries].sort((a, b) => (transitionScores.get(a.id) ?? 100) - (transitionScores.get(b.id) ?? 100) || skillScore(a, skill) - skillScore(b, skill) || a.id.localeCompare(b.id)); }, [filteredEntries, anchorId, skill]);
+  useEffect(() => setVisibleLimit(PAGE_SIZE), [filters, presetIds, anchorId, skill]);
+  useEffect(() => { const visibleIds = new Set(filteredEntries.map((entry) => entry.id)); setCompareIds((current) => current.filter((id) => visibleIds.has(id))); if (anchorId && !visibleIds.has(anchorId)) setAnchorId(null); }, [filteredEntries, anchorId]);
+  const displayedEntries = useMemo(() => rankedEntries.slice(0, visibleLimit), [rankedEntries, visibleLimit]);
+  const selectedEntries = useMemo(() => selectedIds.flatMap((id) => { const entry = CHORD_BY_ID.get(id); return entry ? [entry] : []; }), [selectedIds]);
+  const compareEntries = useMemo(() => compareIds.flatMap((id) => { const entry = CHORD_BY_ID.get(id); return entry ? [entry] : []; }), [compareIds]);
+  const printEntries = selectedEntries.length ? selectedEntries : rankedEntries;
+  const activeRecognitionEntry = useMemo(() => CHORD_BY_ID.get(recognitionTargetId) ?? selectedEntries[0] ?? null, [recognitionTargetId, selectedEntries]);
+  useEffect(() => { recognitionConfigRef.current = { targetId: recognitionTargetId, selectedIds, tuningNotes, capo }; }, [recognitionTargetId, selectedIds, tuningNotes, capo]);
+  const heatmap = useMemo(() => { const counts = new Map<number, number>(); selectedEntries.forEach((entry) => entry.chord.frets.forEach((fret) => { if (fret > 0) counts.set(fret, (counts.get(fret) ?? 0) + 1); })); const max = Math.max(1, ...counts.values()); return [...counts.entries()].sort((a, b) => a[0] - b[0]).map(([fret, count]) => ({ fret, count, width: Math.round(count / max * 100) })); }, [selectedEntries]);
+  const transitions = useMemo(() => selectedEntries.slice(1).map((entry, index) => ({ from: selectedEntries[index], to: entry, detail: voiceLeading(selectedEntries[index], entry), score: scoreTransition(selectedEntries[index].chord, entry.chord).score })), [selectedEntries]);
+  const transitionWeakSpots = useMemo(() => transitions.map((item) => ({ ...item, misses: transitionMisses[`${item.from.id}->${item.to.id}`] ?? 0, ease: item.score })).sort((a, b) => (b.misses * 20 + (100 - b.ease)) - (a.misses * 20 + (100 - a.ease))).slice(0, 4), [transitions, transitionMisses]);
+  const confidenceFor = useCallback((entry: ChordLibraryItem) => {
+    const record = confidence[entry.id]; const reps = record?.reps ?? 0; const hits = record?.hits ?? 0; const misses = record?.misses ?? recognitionMisses[entry.id] ?? 0; const practice = record?.recordedPractice ?? 0;
+    return Math.max(0, Math.min(100, Math.round(reps ? ((hits / Math.max(1, reps)) * 70) + Math.min(20, reps * 2) + Math.min(10, practice) : Math.max(0, 50 - misses * 8))));
+  }, [confidence, recognitionMisses]);
+  const fatigue = useMemo(() => { const burden = selectedEntries.reduce((sum, entry) => sum + fretBurden(entry), 0); const average = selectedEntries.length ? burden / selectedEntries.length : 0; return { value: Math.min(100, Math.round(average * 12)), label: average < 2.5 ? "low" : average < 5 ? "moderate" : "high" }; }, [selectedEntries]);
+  const capoRecommendations = useMemo(() => { if (!progression.length) return []; return Array.from({ length: 8 }, (_, candidateCapo) => { const shapes = progression.map((step) => transposeChordName(step.played, -candidateCapo)); const matches = shapes.map((symbol) => findShape(symbol, skill)); const cost = matches.reduce((sum, match) => sum + (match?.entry ? skillScore(match.entry, skill) + (match.entry.chord.barre ? 5 : 0) : 12), 0); return { capo: candidateCapo, shapeKey: transposeNote(functionKey, -candidateCapo, functionKey.includes("b")), cost, shapes }; }).sort((a, b) => a.cost - b.cost || a.capo - b.capo).slice(0, 3); }, [progression, skill, functionKey]);
+  const transposedProgression = useMemo(() => progression.map((step) => ({ ...step, played: transposeChordName(step.played, transposeAmount), sounded: transposeChordName(step.sounded, transposeAmount) })), [progression, transposeAmount]);
+  const rehearsalEntries = selectedEntries.length ? selectedEntries : displayedEntries.slice(0, 12);
+  const chartConfidenceAverage = useMemo(() => rehearsalEntries.length ? Math.round(rehearsalEntries.reduce((sum, entry) => sum + confidenceFor(entry), 0) / rehearsalEntries.length) : 0, [rehearsalEntries, confidenceFor]);
+  const whyChord = useMemo(() => { const entry = rehearsalEntries[rehearsalIndex] ?? activeRecognitionEntry; if (!entry) return null; const context = entry.functionContexts.find((item) => item.key === functionKey); return { entry, role: context?.roles[0] ?? "chromatic or unclassified", explanation: context?.label ?? `This ${entry.qualityLabel.toLowerCase()} is shown as a practical ${functionKey} chart shape; the bundled data has no more specific functional explanation.` }; }, [rehearsalEntries, rehearsalIndex, activeRecognitionEntry, functionKey]);
 
-  const filteredEntries = useMemo(() => {
-    const allowedIds = presetIds ? new Set(presetIds) : null;
-    return uniqueShapes(CHORD_LIBRARY.filter((entry) => {
-      if (allowedIds && !allowedIds.has(entry.id)) return false;
-      if (root !== "all" && entry.root !== root) return false;
-      if (difficulty !== "all" && !entry.difficultyTags.includes(difficulty as never)) return false;
-      if (quality !== "all" && entry.quality !== quality) return false;
-      if (position === "open" && !entry.position.toLowerCase().includes("open")) return false;
-      if (position === "barre" && !entry.difficultyTags.includes("barre")) return false;
-      if (position === "inverted" && entry.inversion !== "inverted") return false;
-      if (characteristic === "open" && !entry.chord.frets.includes(0)) return false;
-      if (characteristic === "barre" && !entry.chord.barre) return false;
-      if (characteristic === "partial" && !entry.difficultyTags.includes("partial") && entry.chord.frets.filter((fret) => fret >= 0).length > 4) return false;
-      if (functionKey !== "all" && !entry.functionContexts.some((context) => context.key === functionKey && (functionRole === "all" || context.roles.includes(functionRole as HarmonicRole)))) return false;
-      return true;
-    }));
-  }, [presetIds, root, difficulty, quality, position, characteristic, functionKey, functionRole]);
-
-  useEffect(() => setVisibleLimit(PAGE_SIZE), [filters, presetIds]);
-
-  const displayedEntries = useMemo(() => filteredEntries.slice(0, visibleLimit), [filteredEntries, visibleLimit]);
-  const selectedEntries = useMemo(() => uniqueShapes(selectedIds.flatMap((id) => {
-    const entry = CHORD_LIBRARY.find((candidate) => candidate.id === id);
-    return entry ? [entry] : [];
-  })), [selectedIds]);
-  const compareEntries = useMemo(() => compareIds.flatMap((id) => {
-    const entry = CHORD_LIBRARY.find((candidate) => candidate.id === id);
-    return entry ? [entry] : [];
-  }), [compareIds]);
-  const printEntries = selectedEntries.length ? selectedEntries : filteredEntries;
-
-  const resetFilters = () => {
-    setRoot("all"); setDifficulty("all"); setQuality("all"); setPosition("all");
-    setCharacteristic("all"); setFunctionKey("all"); setFunctionRole("all");
-  };
-
-  const applyEntries = (name: string, entries: ChordLibraryItem[], key?: string) => {
-    resetFilters();
-    setPresetName(name);
-    setPresetIds(uniqueShapes(entries).map((entry) => entry.id));
-    if (key) setFunctionKey(key);
-  };
-
-  const selectNamedOpen = (names: string[]) => names.flatMap((name) => {
-    const candidates = CHORD_LIBRARY.filter((entry) => entry.chord.name === name && entry.position.toLowerCase().includes("open"));
-    return candidates.length ? [bestEntry(candidates)] : [];
-  });
-
-  const applyPracticalProgression = (label: string, roles: HarmonicRole[]) => {
-    const key = functionKey === "all" ? "G" : functionKey;
-    applyEntries(`${label} in ${key}`, resolveRoles(key, roles), key);
-  };
-
+  const resetFilters = () => { setRoot("all"); setDifficulty("all"); setQuality("all"); setPosition("all"); setCharacteristic("all"); setFunctionRole("all"); };
+  const applyEntries = (name: string, entries: ChordLibraryItem[], key?: string, steps: ProgressionStep[] = [], fallbacks: Record<string, string> = {}) => { resetFilters(); setPresetName(name); setPresetIds(uniqueShapes(entries).map((entry) => entry.id)); setFallbackById(fallbacks); setProgression(steps); setSongStatus(""); setChartTemplate("custom"); if (key) setFunctionKey(key); };
+  const applyTheoryPreset = (preset: typeof THEORY_PRESETS[number]) => { const resolved = resolveTheory(functionKey, preset.mode, preset.roles, skill); const entries = resolved.flatMap((item) => item.entry ? [item.entry] : []); const fallbacks = Object.fromEntries(resolved.flatMap((item) => item.entry && item.fallback ? [[item.entry.id, item.fallback]] : []));
+    const steps = resolved.map((item) => ({ role: item.role, played: item.symbol, sounded: transposeChordName(item.symbol, capo), fallback: item.fallback })); applyEntries(`${preset.label} in ${functionKey}`, entries, functionKey, steps, fallbacks); setSongStatus(resolved.some((item) => !item.entry) ? "Some theoretical chords have no matching library shape and remain listed in the progression." : ""); };
+  const loadSongs = async () => { if (songCatalog.length || songsLoading) return; setSongsLoading(true); setSongStatus("Loading the bundled song catalog…"); try { const songsModule = await import("../../shared/content/v1/songs.json"); const catalog = summarizeSongs(songsModule.default.songs); setSongCatalog(catalog); setSongStatus(catalog.length ? `Loaded ${catalog.length} bundled songs.` : "The bundled song catalog is empty."); } catch { setSongStatus("The bundled song catalog could not be loaded in this browser."); } finally { setSongsLoading(false); } };
+  const applySong = (id: string) => { const song = songCatalog.find((item) => item.id === id); if (!song) { setSongStatus("Choose a song after the bundled catalog finishes loading."); return; } const sectionSymbols = song.sections.flatMap((section) => section.chords.map((symbol) => ({ section: section.title, symbol }))); const resolved = sectionSymbols.map((item) => ({ ...item, match: findShape(item.symbol, skill) })); const entries = resolved.flatMap((item) => item.match?.entry ? [item.match.entry] : []); const missing = resolved.filter((item) => !item.match).map((item) => item.symbol); const fallbacks = Object.fromEntries(resolved.flatMap((item) => item.match?.entry && item.match.fallback ? [[item.match.entry.id, item.match.fallback]] : []));
+    applyEntries(`Song · ${song.title}`, entries, song.key, resolved.map((item) => ({ role: item.section, played: item.symbol, sounded: transposeChordName(item.symbol, capo), fallback: item.match?.fallback ?? (!item.match ? "No library shape found." : undefined) })), fallbacks); setSelectedSongId(id); setPracticeBpm(song.bpm); setRhythmPattern(song.pattern); setSelectedIds(uniqueShapes(entries).map((entry) => entry.id)); setSongStatus(missing.length ? `Loaded ${song.title} at ${song.bpm} BPM (${song.timeSignature}); no library shapes for ${Array.from(new Set(missing)).join(", ")}.` : `Loaded ${song.title}: ${song.sections.map((section) => section.title).join(", ")} · ${song.bpm} BPM · ${song.timeSignature}.`); };
+  const applyPractical = (label: string, roles: HarmonicRole[]) => { const resolved = resolveTheory(functionKey, "major", roles, skill); applyEntries(`${label} in ${functionKey}`, resolved.flatMap((item) => item.entry ? [item.entry] : []), functionKey, resolved.map((item) => ({ role: item.role, played: item.symbol, sounded: transposeChordName(item.symbol, capo), fallback: item.fallback })), Object.fromEntries(resolved.flatMap((item) => item.entry && item.fallback ? [[item.entry.id, item.fallback]] : []))); };
+  const applyGenre = (genre: string) => { const roles = GENRE_PRESETS[genre] ?? GENRE_PRESETS.Pop; const baseSymbols = roles.map((role) => ({ role, symbol: expectedSymbol(functionKey, "major", role as HarmonicRole) })); const styled = baseSymbols.map((item, index) => ({ ...item, symbol: genre === "Blues" ? `${rootOf(item.symbol)}7` : genre === "Jazz" ? `${rootOf(item.symbol)}${index === 0 ? "m7" : index === 1 ? "7" : "maj7"}` : item.symbol })); const resolved = styled.map((item) => ({ ...item, match: findShape(item.symbol, skill) })); const entries = resolved.flatMap((item) => item.match?.entry ? [item.match.entry] : []); applyEntries(`${genre} voicing chart in ${functionKey}`, entries, functionKey, resolved.map((item) => ({ role: item.role, played: item.symbol, sounded: transposeChordName(item.symbol, capo), fallback: item.match?.fallback }))); setSelectedIds(uniqueShapes(entries).map((entry) => entry.id)); setSongStatus(`${genre} preset uses available chart voicings; it is a practical vocabulary suggestion, not a complete genre rulebook.`); };
+  const applyTemplate = (kind: TemplateKind) => { const template = CHART_TEMPLATES[kind]; setChartTemplate(kind); setPracticeBpm(template.bpm); setRhythmPattern(template.rhythm); setAnnotations((current) => ({ ...current, notes: current.notes || template.notes })); setSaveStatus(`Applied ${template.label} defaults without replacing your selected chords.`); };
+  const applyDailyChart = () => { const today = new Date().toISOString().slice(0, 10); const counts = new Map<string, number>(); const misses = { ...recognitionMisses }; savedCharts.forEach((chart) => { chart.selectedIds.forEach((id) => counts.set(id, (counts.get(id) ?? 0) + 1)); Object.entries(chart.recognitionMisses).forEach(([id, count]) => { misses[id] = Math.max(misses[id] ?? 0, count); }); }); const assigned = savedCharts.filter((chart) => chart.annotations.dueDate && chart.annotations.dueDate <= today).flatMap((chart) => chart.selectedIds); const candidates = Array.from(new Set([...assigned, ...Object.keys(misses), ...selectedIds])).flatMap((id) => { const entry = CHORD_BY_ID.get(id); return entry ? [{ entry, score: (misses[id] ?? 0) * 4 + (assigned.includes(id) ? 8 : 0) - (counts.get(id) ?? 0) }] : []; }).sort((a, b) => b.score - a.score).slice(0, 8).map((item) => item.entry); const fallback = candidates.length ? candidates : uniqueShapes(CHORD_LIBRARY).sort((a, b) => skillScore(a, skill) - skillScore(b, skill)).slice(0, 6); applyEntries("Daily local practice chart", fallback); setSelectedIds(fallback.map((entry) => entry.id)); setSongStatus("Daily chart is local-only: due saved assignments, recognition misses, and less-used saved shapes are weighted. No cloud history is read."); };
   const toggleSelected = (id: string) => setSelectedIds((current) => current.includes(id) ? current.filter((value) => value !== id) : [...current, id]);
   const toggleCompare = (id: string) => setCompareIds((current) => current.includes(id) ? current.filter((value) => value !== id) : current.length < 3 ? [...current, id] : [...current.slice(1), id]);
-  const revealAlternative = (id: string) => {
-    setSelectedIds((current) => current.includes(id) ? current : [...current, id]);
-    setPresetIds((current) => current && !current.includes(id) ? [...current, id] : current);
-  };
+  const revealAlternative = (id: string) => { setSelectedIds((current) => current.includes(id) ? current : [...current, id]); setPresetIds((current) => current && !current.includes(id) ? [...current, id] : current); };
+  const moveSelected = (id: string, delta: number) => setSelectedIds((current) => { const index = current.indexOf(id); const target = Math.max(0, Math.min(current.length - 1, index + delta)); if (index < 0 || index === target) return current; const next = [...current]; next.splice(index, 1); next.splice(target, 0, id); return next; });
+  const dropSelected = (targetId: string, sourceId: string) => setSelectedIds((current) => { const from = current.indexOf(sourceId); const to = current.indexOf(targetId); if (from < 0 || to < 0 || from === to) return current; const next = [...current]; next.splice(from, 1); next.splice(to, 0, sourceId); return next; });
+  const selectSimplest = () => { const grouped = new Map<string, ChordLibraryItem[]>(); filteredEntries.forEach((entry) => { const key = `${NOTE_INDEX[entry.root]}:${entry.quality}`; grouped.set(key, [...(grouped.get(key) ?? []), entry]); }); setSelectedIds(Array.from(grouped.values()).map((items) => bestEntry(items, skill).id)); setSaveStatus(`Selected the simplest ${skill} voicing for each visible chord identity.`); };
+  const simplifyAfterMisses = () => { if (!selectedEntries.length) { setSaveStatus("Select some chords before adapting the chart."); return; } const simplified = selectedEntries.map((entry) => { const sameIdentity = CHORD_LIBRARY.filter((candidate) => NOTE_INDEX[candidate.root] === NOTE_INDEX[entry.root] && candidate.quality === entry.quality); return bestEntry(sameIdentity.length ? sameIdentity : [entry], "beginner"); }); setSelectedIds(uniqueShapes(simplified).map((entry) => entry.id)); if (Object.values(recognitionMisses).some((count) => count >= 2)) setPracticeBpm((current) => Math.max(40, current - 10)); setSaveStatus("Applied an easier working copy and, after repeated misses, reduced practice tempo by 10 BPM. Saved versions were not changed."); };
+  const startMidi = async () => { const request = (navigator as Navigator & { requestMIDIAccess?: () => Promise<MidiAccessLike> }).requestMIDIAccess; if (!request) { setMidiStatus("Web MIDI is unavailable in this browser. You can still use microphone evidence or manual practice."); return; } try { const access = await request.call(navigator); midiAccessRef.current = access; const connect = () => { for (const input of access.inputs.values()) input.onmidimessage = (event) => { const [status = 0, note = 0, velocity = 0] = Array.from(event.data); const command = status & 0xf0; const pitchClass = note % 12; const previous = new Set(heldMidiRef.current); if (command === 0x90 && velocity > 0) heldMidiRef.current.add(pitchClass); else if (command === 0x80 || (command === 0x90 && velocity === 0)) heldMidiRef.current.delete(pitchClass); const config = recognitionConfigRef.current; const target = CHORD_BY_ID.get(config.targetId) ?? CHORD_BY_ID.get(config.selectedIds[0]); if (!target) { setMidiStatus("MIDI is connected. Select a chord or choose Check this chord."); return; } const report = recognitionReport(target, command === 0x80 || velocity === 0 ? previous : heldMidiRef.current, config.tuningNotes, config.capo); setMidiStatus(report.text); if (report.ok) setConfidence((current) => { const previousRecord = current[target.id] ?? { reps: 0, hits: 0, misses: 0 }; return { ...current, [target.id]: { ...previousRecord, reps: previousRecord.reps + 1, hits: previousRecord.hits + 1, lastPracticed: new Date().toISOString() } }; }); else if (!heldMidiRef.current.size && report.misses) { setRecognitionMisses((current) => ({ ...current, [target.id]: Math.min(99, (current[target.id] ?? 0) + 1) })); setConfidence((current) => { const previousRecord = current[target.id] ?? { reps: 0, hits: 0, misses: 0 }; return { ...current, [target.id]: { ...previousRecord, reps: previousRecord.reps + 1, misses: previousRecord.misses + 1, lastPracticed: new Date().toISOString() } }; }); } }; }; connect(); access.onstatechange = connect; setMidiEnabled(true); setMidiStatus(`MIDI connected. ${activeRecognitionEntry ? `Play ${activeRecognitionEntry.chord.name}; feedback compares held pitch classes.` : "Select a chord to check."}`); } catch { setMidiStatus("MIDI permission was declined or no accessible MIDI device was found."); } };
+  const stopMidi = () => { const access = midiAccessRef.current; if (access) { for (const input of access.inputs.values()) input.onmidimessage = null; access.onstatechange = null; } midiAccessRef.current = null; heldMidiRef.current.clear(); setMidiEnabled(false); setMidiStatus("MIDI stopped and listeners removed."); };
+  const startMic = async () => { if (!navigator.mediaDevices?.getUserMedia) { setMicStatus("Microphone input is unavailable in this browser."); return; } try { const stream = await navigator.mediaDevices.getUserMedia({ audio: true }); const AudioContextCtor = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext; if (!AudioContextCtor) { stream.getTracks().forEach((track) => track.stop()); setMicStatus("Audio analysis is unavailable in this browser."); return; } const context = new AudioContextCtor(); const analyser = context.createAnalyser(); analyser.fftSize = 1024; context.createMediaStreamSource(stream).connect(analyser); const buffer = new Float32Array(analyser.fftSize); micStreamRef.current = stream; micContextRef.current = context; setMicEnabled(true); let lastUpdate = 0; const update = (time = 0) => { if (time - lastUpdate >= 160) { lastUpdate = time; analyser.getFloatTimeDomainData(buffer); const evidence = estimatePitch(buffer, context.sampleRate); const midiNote = evidence.hz ? Math.round(12 * Math.log2(evidence.hz / 440) + 69) : null; const note = midiNote === null ? null : NOTE_NAMES_SHARP[((midiNote % 12) + 12) % 12]; setMicStatus(`Live evidence: input ${Math.round(Math.min(1, evidence.rms * 8) * 100)}%${evidence.hz && note ? ` · strongest periodic pitch about ${note} (${Math.round(evidence.hz)} Hz)` : " · no stable single pitch"}. A browser analyser cannot reliably identify all notes in a polyphonic guitar chord without a trained model.`); } micFrameRef.current = window.requestAnimationFrame(update); }; micFrameRef.current = window.requestAnimationFrame(update); } catch { setMicStatus("Microphone permission was declined or the input could not be opened."); } };
+  const stopMic = () => { micStreamRef.current?.getTracks().forEach((track) => track.stop()); micStreamRef.current = null; if (micFrameRef.current !== null) window.cancelAnimationFrame(micFrameRef.current); micFrameRef.current = null; void micContextRef.current?.close(); micContextRef.current = null; setMicEnabled(false); setMicStatus("Microphone stopped; the stream and analyser were released."); };
+  const persistCharts = (next: SavedChart[]) => { try { window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next)); setSavedCharts(next); } catch { setSaveStatus("This browser could not update local chart storage."); } };
+  const snapshot = (): ChartHistory => ({ savedAt: new Date().toISOString(), selectedIds: selectedIds.filter((id) => CHORD_BY_ID.has(id)), annotations, cardAnnotations, practiceBpm, rhythmPattern, flashcards });
+  const currentChart = (name: string, id = `${Date.now()}`, history: ChartHistory[] = []): SavedChart => ({ version: 3, id, name, selectedIds: selectedIds.filter((value) => CHORD_BY_ID.has(value)), filters: { root, difficulty, quality, position, characteristic, key: functionKey, role: functionRole }, settings: { orientation, highContrast, capo, tuning, customTuning: customTuningValid ? customParts as string[] : [...TUNING_NOTES.standard], layout, columns, skill, nashville, paperSize, printMargin, practiceBpm, rhythmPattern, flashcards, template: chartTemplate }, annotations, cardAnnotations, recognitionMisses, history: history.slice(-8) });
+  const saveChart = () => { const name = saveName.trim(); if (!name) { setSaveStatus("Name your chart first."); return; } const existing = savedCharts.find((chart) => chart.name.toLowerCase() === name.toLowerCase()); const next = currentChart(name, existing?.id, [...(existing?.history ?? []), snapshot()]); persistCharts(existing ? savedCharts.map((chart) => chart.id === existing.id ? next : chart) : [...savedCharts, next]); setSaveName(""); setSaveStatus(existing ? `Saved a new version of “${name}” (history capped at 8).` : `Saved “${name}”.`); };
+  const loadSnapshot = (chart: SavedChart, item: ChartHistory) => { setSelectedIds(item.selectedIds.filter((id) => CHORD_BY_ID.has(id))); setAnnotations(item.annotations); setCardAnnotations(item.cardAnnotations); setPracticeBpm(item.practiceBpm); setRhythmPattern(item.rhythmPattern); setFlashcards(item.flashcards); setPresetName(`History · ${chart.name}`); setSaveStatus(`Loaded local snapshot from ${new Date(item.savedAt).toLocaleString()}. Save to keep it as the latest version.`); };
+  const loadChart = (chart: SavedChart) => { setSelectedIds(chart.selectedIds.filter((id) => CHORD_BY_ID.has(id))); setPresetIds(null); setPresetName(`Saved · ${chart.name}`); setRoot(CHORD_LIBRARY_ROOTS.includes(chart.filters.root) ? chart.filters.root : "all"); setDifficulty(chart.filters.difficulty); setQuality(chart.filters.quality); setPosition(chart.filters.position); setCharacteristic(chart.filters.characteristic); setFunctionKey(CHORD_FUNCTION_KEYS.includes(chart.filters.key) ? chart.filters.key : "G"); setFunctionRole(chart.filters.role); setOrientation(chart.settings.orientation); setHighContrast(chart.settings.highContrast); setCapo(chart.settings.capo); setTuning(chart.settings.tuning); setCustomTuningText(chart.settings.customTuning.join(" ")); setLayout(chart.settings.layout); setColumns(chart.settings.columns); setSkill(chart.settings.skill); setNashville(chart.settings.nashville); setPaperSize(chart.settings.paperSize); setPrintMargin(chart.settings.printMargin); setPracticeBpm(chart.settings.practiceBpm); setRhythmPattern(chart.settings.rhythmPattern); setFlashcards(chart.settings.flashcards); setChartTemplate(chart.settings.template); setAnnotations(chart.annotations); setCardAnnotations(chart.cardAnnotations); setRecognitionMisses(chart.recognitionMisses); setProgression([]); setFallbackById({}); setSaveStatus(`Loaded “${chart.name}”.`); };
+  const exportJson = () => { const data = JSON.stringify({ exportedAt: new Date().toISOString(), chart: currentChart(saveName.trim() || presetName), progression }, null, 2); const url = URL.createObjectURL(new Blob([data], { type: "application/json" })); const link = document.createElement("a"); link.href = url; link.download = `${(saveName.trim() || presetName).toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "chord-chart"}.json`; link.click(); URL.revokeObjectURL(url); setSaveStatus("Exported a shareable chart JSON file."); };
+  const printChart = () => { setIsPrinting(true); window.requestAnimationFrame(() => window.requestAnimationFrame(() => window.print())); };
+  const runLocalBuilder = () => { const recommendation = localChartRecommendation(functionKey, builderMode, builderGenre, skill, builderMinutes, builderSong); applyEntries(recommendation.title, recommendation.entries, functionKey, recommendation.steps as ProgressionStep[]); setSelectedIds(recommendation.entries.map((entry) => entry.id)); setBuilderStatus(`Built ${recommendation.entries.length} local recommendations from key, ${skill} skill, ${builderGenre} vocabulary, and ${builderMinutes} minutes. No external AI or content service was used.`); };
+  const playMetronomeTick = (accent = false) => { const AudioContextCtor = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext; if (!AudioContextCtor) return; const context = chartAudioContext ?? new AudioContextCtor(); chartAudioContext = context; const oscillator = context.createOscillator(); const gain = context.createGain(); oscillator.frequency.value = accent ? 1040 : 680; gain.gain.setValueAtTime(0.0001, context.currentTime); gain.gain.exponentialRampToValueAtTime(accent ? 0.08 : 0.045, context.currentTime + 0.005); gain.gain.exponentialRampToValueAtTime(0.0001, context.currentTime + 0.065); oscillator.connect(gain).connect(context.destination); oscillator.start(); oscillator.stop(context.currentTime + 0.07); };
+  const toggleMetronome = () => { if (metronomeRunning) { if (metronomeTimerRef.current !== null) window.clearInterval(metronomeTimerRef.current); metronomeTimerRef.current = null; setMetronomeRunning(false); setBeat(0); setRehearsalStatus("Metronome paused."); return; } let tick = 0; setBeat(0); playMetronomeTick(true); metronomeTimerRef.current = window.setInterval(() => { tick = (tick + 1) % 4; setBeat(tick); playMetronomeTick(tick === 0); }, Math.round(60000 / practiceBpm)); setMetronomeRunning(true); setRehearsalStatus(`Metronome running at ${practiceBpm} BPM.`); };
+  const resetRehearsal = () => { if (rehearsalTimerRef.current !== null) window.clearInterval(rehearsalTimerRef.current); rehearsalTimerRef.current = null; setRehearsalRunning(false); setRehearsalIndex(0); setRehearsalStatus("Rehearsal reset to the first card."); };
+  const toggleRehearsal = () => { if (rehearsalRunning) { if (rehearsalTimerRef.current !== null) window.clearInterval(rehearsalTimerRef.current); rehearsalTimerRef.current = null; setRehearsalRunning(false); setRehearsalStatus("Rehearsal paused. Use resume or manual advance when ready."); return; } if (!rehearsalEntries.length) { setRehearsalStatus("Select at least one chart card before starting rehearsal."); return; } setRehearsalRunning(true); setRehearsalStatus(`Rehearsal started: card 1 of ${rehearsalEntries.length}.`); rehearsalTimerRef.current = window.setInterval(() => { setRehearsalIndex((current) => { const next = (current + 1) % rehearsalEntries.length; setRehearsalStatus(`Rehearsal card ${next + 1} of ${rehearsalEntries.length}: ${rehearsalEntries[next].chord.name}.`); return next; }); }, Math.max(500, Math.round(60000 / practiceBpm * 4))); };
+  const advanceRehearsal = (delta = 1) => { if (!rehearsalEntries.length) return; setRehearsalIndex((current) => (current + delta + rehearsalEntries.length) % rehearsalEntries.length); };
+  const markConfidence = (entry: ChordLibraryItem, hit: boolean) => { setConfidence((current) => { const previous = current[entry.id] ?? { reps: 0, hits: 0, misses: 0 }; return { ...current, [entry.id]: { ...previous, reps: previous.reps + 1, hits: previous.hits + (hit ? 1 : 0), misses: previous.misses + (hit ? 0 : 1), lastPracticed: new Date().toISOString() } }; }); if (!hit) setRecognitionMisses((current) => ({ ...current, [entry.id]: Math.min(99, (current[entry.id] ?? 0) + 1) })); setPracticeStats((current) => ({ ...current, minutes: current.minutes + 1, weekMinutes: current.weekMinutes + 1, streak: Math.max(1, current.streak) })); };
+  const startDrill = () => { if (!transitionWeakSpots.length) { setAdvancedStatus("Select an ordered chart with at least two cards to generate a transition drill."); return; } const target = transitionWeakSpots[0]; setSelectedIds([target.from.id, target.to.id]); setDrillActive(true); setPracticeBpm((current) => Math.max(40, Math.min(current, 72))); setAdvancedStatus(`Drill started for ${target.from.chord.name} → ${target.to.chord.name}. This is a local recommendation based on transition ease ${target.ease}/100 and ${target.misses} recorded misses.`); };
+  const checkOffline = async () => { if (typeof window === "undefined") return; try { const registration = await navigator.serviceWorker?.getRegistration(); const cacheNames = "caches" in window ? await caches.keys() : []; setOfflineStatus(registration || cacheNames.length ? `Offline-ready signals found (${cacheNames.length} browser cache${cacheNames.length === 1 ? "" : "s"}). Saved charts remain local; install is managed by the app shell.` : "No service worker/cache was detected. Use the browser’s install option when the app offers it; this chart still works from saved local data."); } catch { setOfflineStatus("Offline status is unavailable in this browser; no changes were made to the app service worker."); } };
+  const addCurrentToSetlist = () => { const item: SetlistItem = { id: `set-${Date.now()}`, chartId: savedCharts.find((chart) => chart.name === presetName)?.id ?? `local-${Date.now()}`, label: presetName, position: setlist.length }; setSetlist((current) => [...current, item].slice(0, 20)); setAdvancedStatus(`Added “${presetName}” to the local setlist.`); };
+  const moveSetlist = (id: string, delta: number) => setSetlist((current) => { const index = current.findIndex((item) => item.id === id); const target = Math.max(0, Math.min(current.length - 1, index + delta)); if (index < 0 || index === target) return current; const next = [...current]; const [item] = next.splice(index, 1); next.splice(target, 0, item); return next.map((value, position) => ({ ...value, position })); });
+  const dropSetlist = (targetId: string, sourceId: string) => { if (!sourceId || sourceId === targetId) return; setSetlist((current) => { const from = current.findIndex((item) => item.id === sourceId); const to = current.findIndex((item) => item.id === targetId); if (from < 0 || to < 0) return current; const next = [...current]; const [item] = next.splice(from, 1); next.splice(to, 0, item); return next.map((value, position) => ({ ...value, position })); }); setSetlistDragId(""); };
+  const addBandNote = () => { const note = bandNote.trim(); if (!note) return; const now = new Date().toISOString(); setBandNotes((current) => [...current, { id: `note-${Date.now()}`, role: bandRole, part: bandPart.trim().slice(0, 60) || "Unassigned", note: note.slice(0, 240), at: now }].slice(-40)); setBandRevisions((current) => [...current, now].slice(-8)); setBandNote(""); setAdvancedStatus("Added a local band annotation. Nothing was uploaded or shared remotely."); };
+  const exportChordPro = () => { const symbols = (progression.length ? progression : selectedEntries.map((entry) => ({ role: "", played: entry.chord.name, sounded: entry.chord.name }))).map((step) => `[${step.played}]`).join(" "); const data = `{title: ${presetName}}\n{key: ${functionKey}}\n${symbols}\n`; const url = URL.createObjectURL(new Blob([data], { type: "text/plain" })); const link = document.createElement("a"); link.href = url; link.download = "chord-chart.chordpro"; link.click(); URL.revokeObjectURL(url); setAdvancedStatus("Exported an authorized chart metadata view as ChordPro text."); };
+  const exportMusicXml = () => { const symbols = (progression.length ? progression : selectedEntries.map((entry) => ({ played: entry.chord.name }))).map((step) => `<harmony><root><root-step>${rootOf(step.played)}</root-step></root><kind>major</kind></harmony>`).join(""); const data = `<?xml version="1.0" encoding="UTF-8"?><score-partwise version="3.1"><part-list/><part id="P1"><measure number="1">${symbols}</measure></part></score-partwise>`; const url = URL.createObjectURL(new Blob([data], { type: "application/vnd.recordare.musicxml+xml" })); const link = document.createElement("a"); link.href = url; link.download = "chord-chart.musicxml"; link.click(); URL.revokeObjectURL(url); setAdvancedStatus("Exported an authorized chart metadata view as MusicXML."); };
+  const importAuthorized = async (file?: File) => { if (!file) return; try { const text = await file.text(); const symbols = file.name.toLowerCase().endsWith(".musicxml") || file.name.toLowerCase().endsWith(".xml") ? parseMusicXmlSymbols(text) : parseChordProSymbols(text); const resolved = symbols.map((symbol) => findShape(symbol, skill)).flatMap((match) => match?.entry ? [match.entry] : []); if (!resolved.length) { setAdvancedStatus("No supported chord symbols were found. Import only content you have rights to use; this tool does not fetch licensed material."); return; } applyEntries(`Imported · ${file.name.slice(0, 60)}`, resolved, functionKey); setSelectedIds(uniqueShapes(resolved).map((entry) => entry.id)); setAdvancedStatus(`Imported ${resolved.length} local voicing references from ${file.name}. Only chord metadata was read.`); } catch { setAdvancedStatus("The selected file could not be read as ChordPro or MusicXML."); } finally { if (importInputRef.current) importInputRef.current.value = ""; } };
+  const attachTeacherMedia = (files: FileList | null) => { if (!files) return; const metadata = Array.from(files).slice(0, 3).map((file, index) => ({ id: `media-${Date.now()}-${index}`, name: file.name.slice(0, 100), type: file.type || "unknown", size: file.size })); setTeacherMedia(metadata); setAdvancedStatus("Attached session-only media metadata. Raw audio/video is not placed in chart localStorage or uploaded."); if (mediaInputRef.current) mediaInputRef.current.value = ""; };
 
-  const persistCharts = (next: SavedChart[]) => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-      setSavedCharts(next);
-    } catch {
-      setSaveStatus("This browser could not update local chart storage.");
-    }
-  };
+  useEffect(() => { const onKeyDown = (event: KeyboardEvent) => { if (!stageMode) return; const target = event.target as HTMLElement | null; if (target?.matches("input, textarea, select, button, [contenteditable='true']")) return; if (event.key === " ") { event.preventDefault(); toggleRehearsal(); } else if (event.key.toLowerCase() === "n" || event.key === "ArrowRight") advanceRehearsal(1); else if (event.key.toLowerCase() === "p" || event.key === "ArrowLeft") advanceRehearsal(-1); else if (event.key.toLowerCase() === "m") toggleMetronome(); }; window.addEventListener("keydown", onKeyDown); return () => window.removeEventListener("keydown", onKeyDown); });
 
-  const saveChart = () => {
-    const name = saveName.trim();
-    if (!name) { setSaveStatus("Name your chart first."); return; }
-    const chart: SavedChart = {
-      id: `${Date.now()}`,
-      name,
-      selectedIds: selectedIds.filter((id) => CHORD_LIBRARY.some((entry) => entry.id === id)),
-      filters: { root, difficulty, quality, position, characteristic, key: functionKey, role: functionRole },
-      settings: { orientation, highContrast, capo, tuning, layout, columns }
-    };
-    persistCharts([...savedCharts, chart]);
-    setSaveName("");
-    setSaveStatus(`Saved “${name}”.`);
-  };
-
-  const loadChart = (chart: SavedChart) => {
-    setSelectedIds(chart.selectedIds.filter((id) => CHORD_LIBRARY.some((entry) => entry.id === id)));
-    setPresetIds(null); setPresetName(`Saved · ${chart.name}`);
-    setRoot(CHORD_LIBRARY_ROOTS.includes(chart.filters.root) ? chart.filters.root : "all");
-    setDifficulty(chart.filters.difficulty); setQuality(chart.filters.quality); setPosition(chart.filters.position);
-    setCharacteristic(chart.filters.characteristic); setFunctionKey(CHORD_FUNCTION_KEYS.includes(chart.filters.key) ? chart.filters.key : "all");
-    setFunctionRole(HARMONIC_FUNCTION_OPTIONS.includes(chart.filters.role as HarmonicRole) ? chart.filters.role : "all");
-    setOrientation(chart.settings.orientation === "left" ? "left" : "right");
-    setHighContrast(Boolean(chart.settings.highContrast)); setCapo(Math.min(7, Math.max(0, Number(chart.settings.capo) || 0)));
-    setTuning(TUNING_LABELS[chart.settings.tuning] ? chart.settings.tuning : "standard");
-    setLayout(chart.settings.layout === "compact" ? "compact" : "full"); setColumns(chart.settings.columns === 2 ? 2 : 3);
-    setSaveStatus(`Loaded “${chart.name}”.`);
-  };
-
-  const printChart = () => {
-    setIsPrinting(true);
-    window.requestAnimationFrame(() => window.requestAnimationFrame(() => window.print()));
-  };
-
-  return (
-    <main className={`page chords focused-page chart-builder ${highContrast ? "chart-builder-high-contrast" : ""}`}>
-      <section className="studio-heading chords-hero">
-        <div>
-          <span className="tag">Chord Chart Builder</span>
-          <h1>Build a useful chart, then print only what you need.</h1>
-          <p>Start with a level, key, progression, or curated set. Filter the playable shapes, compare nearby grips, and save the result for a song or lesson.</p>
-        </div>
-        <div className="studio-session-note print-card">
-          <span className="label">Current chart</span>
-          <strong>{presetName}</strong>
-          <span>{selectedIds.length ? `${selectedEntries.length} selected shape${selectedEntries.length === 1 ? "" : "s"} will print.` : `${filteredEntries.length} filtered shape${filteredEntries.length === 1 ? "" : "s"} will print.`}</span>
-        </div>
-      </section>
-
-      <section className="chart-builder-controls" aria-label="Chord chart controls">
-        <div className="chart-control-group">
-          <div className="chart-control-heading"><div><span className="label">1 · Start</span><h2>Presets and progressions</h2></div><button className="btn ghost" type="button" onClick={() => { resetFilters(); setPresetIds(null); setPresetName("Original full library by root"); }}>Original level/root browser</button></div>
-          <div className="chart-preset-row">
-            <button className="btn" type="button" onClick={() => applyEntries("First 8 open chords", selectNamedOpen(["C", "A", "G", "E", "D", "Am", "Em", "Dm"]))}>First 8 open chords</button>
-            <button className="btn" type="button" onClick={() => applyEntries("Essential barre chords", uniqueShapes(CHORD_LIBRARY.filter((entry) => entry.difficultyTags.includes("barre"))).slice(0, 8))}>Essential barre chords</button>
-            <button className="btn" type="button" onClick={() => applyEntries("Campfire key of G", resolveRoles("G", ["I", "IV", "V", "vi"]), "G")}>Campfire G</button>
-            {LEVELS.map((level, index) => <button className="btn" key={level.name} type="button" onClick={() => applyEntries(`Level · ${level.name}`, levelEntries(index))}>{level.name}</button>)}
-          </div>
-          <div className="chart-preset-row">
-            {PROGRESSION_PACKS.map((pack) => <button className="btn ghost" key={pack.id} type="button" onClick={() => applyEntries(pack.title, pack.chordIds.flatMap((id) => { const entry = CHORD_LIBRARY.find((candidate) => candidate.id === id); return entry ? [entry] : []; }), pack.keyCenter)}>{pack.title}</button>)}
-          </div>
-          <div className="chart-preset-row">
-            <button className="btn ghost" type="button" onClick={() => applyPracticalProgression("I–IV–V", ["I", "IV", "V"])}>I–IV–V</button>
-            <button className="btn ghost" type="button" onClick={() => applyPracticalProgression("I–V–vi–IV", ["I", "V", "vi", "IV"])}>I–V–vi–IV</button>
-            <button className="btn ghost" type="button" onClick={() => applyPracticalProgression("12-bar blues chords", ["I", "IV", "V"])}>Blues I–IV–V</button>
-            <button className="btn ghost" type="button" onClick={() => applyPracticalProgression("ii–V–I", ["ii", "V", "I"])}>ii–V–I</button>
-            <button className="btn primary" type="button" onClick={() => applyPracticalProgression("Common chords", ["I", "ii", "iii", "IV", "V", "vi"])}>Common I–vi</button>
-          </div>
-        </div>
-
-        <div className="chart-control-group">
-          <div className="chart-control-heading"><div><span className="label">2 · Refine</span><h2>Shape filters</h2></div><button className="btn ghost" type="button" onClick={resetFilters}>Reset filters</button></div>
-          <div className="chart-filter-grid">
-            <label>Root<select value={root} onChange={(event) => setRoot(event.target.value)}><option value="all">All roots</option>{CHORD_LIBRARY_ROOTS.map((value) => <option key={value}>{value}</option>)}</select></label>
-            <label>Difficulty<select value={difficulty} onChange={(event) => setDifficulty(event.target.value)}><option value="all">All difficulty</option>{CHORD_DIFFICULTY_TAGS.map((value) => <option key={value}>{value}</option>)}</select></label>
-            <label>Quality<select value={quality} onChange={(event) => setQuality(event.target.value)}><option value="all">All qualities</option>{CHORD_QUALITY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
-            <label>Position<select value={position} onChange={(event) => setPosition(event.target.value)}><option value="all">All positions</option><option value="open">Open position</option><option value="barre">Barre position</option><option value="inverted">Inverted</option></select></label>
-            <label>Shape / ringing<select value={characteristic} onChange={(event) => setCharacteristic(event.target.value)}><option value="all">All shapes</option><option value="open">Open strings ring</option><option value="barre">Has a barre</option><option value="partial">Partial grip</option></select></label>
-            <label>Key<select value={functionKey} onChange={(event) => setFunctionKey(event.target.value)}><option value="all">All keys</option>{CHORD_FUNCTION_KEYS.map((value) => <option key={value}>{value}</option>)}</select></label>
-            <label>Function<select value={functionRole} disabled={functionKey === "all"} onChange={(event) => setFunctionRole(event.target.value)}><option value="all">I ii iii IV V vi</option>{HARMONIC_FUNCTION_OPTIONS.map((value) => <option key={value}>{value}</option>)}</select></label>
-          </div>
-        </div>
-
-        <div className="chart-control-group">
-          <span className="label">3 · Display and print</span>
-          <div className="chart-settings-grid">
-            <label>Handedness<select value={orientation} onChange={(event) => setOrientation(event.target.value as Orientation)}><option value="right">Right-handed</option><option value="left">Left-handed</option></select></label>
-            <label>Capo<select value={capo} onChange={(event) => setCapo(Number(event.target.value))}>{Array.from({ length: 8 }, (_, fret) => <option key={fret} value={fret}>{fret ? `Fret ${fret}` : "No capo"}</option>)}</select></label>
-            <label>Tuning<select value={tuning} onChange={(event) => setTuning(event.target.value as Tuning)}>{Object.entries(TUNING_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-            <label>Card detail<select value={layout} onChange={(event) => setLayout(event.target.value as Layout)}><option value="full">Full cards</option><option value="compact">Compact cards</option></select></label>
-            <label>Print columns<select value={columns} onChange={(event) => setColumns(Number(event.target.value) as PrintColumns)}><option value={2}>2 columns</option><option value={3}>3 columns</option></select></label>
-            <label className="chart-checkbox"><input type="checkbox" checked={highContrast} onChange={(event) => setHighContrast(event.target.checked)} />High contrast</label>
-          </div>
-          <p className="chart-tuning-note">{TUNING_LABELS[tuning]}. Tuning changes the display note only; shapes are not silently transposed.</p>
-          <div className="chart-action-row">
-            <button className="btn" type="button" onClick={() => setSelectedIds((current) => Array.from(new Set([...current, ...displayedEntries.map((entry) => entry.id)])))}>Select visible</button>
-            <button className="btn ghost" type="button" onClick={() => { const visible = new Set(displayedEntries.map((entry) => entry.id)); setSelectedIds((current) => current.filter((id) => !visible.has(id))); }} disabled={!displayedEntries.some((entry) => selectedIds.includes(entry.id))}>Clear visible</button>
-            <button className="btn ghost" type="button" onClick={() => setSelectedIds([])} disabled={!selectedIds.length}>Clear all</button>
-            <button className="btn primary" type="button" onClick={printChart}>Print {selectedEntries.length ? `${selectedEntries.length} selected` : `${filteredEntries.length} filtered`}</button>
-          </div>
-        </div>
-
-        <div className="chart-control-group chart-save-controls">
-          <div><span className="label">Reusable charts</span><h2>Save for a song, lesson, or practice pack</h2></div>
-          <div className="chart-save-row"><label><span className="visually-hidden">Chart name</span><input type="text" value={saveName} onChange={(event) => setSaveName(event.target.value)} placeholder="Chart name" maxLength={60} /></label><button className="btn primary" type="button" onClick={saveChart}>Save current chart</button></div>
-          {saveStatus ? <p className="chart-save-status" role="status">{saveStatus}</p> : null}
-          {savedCharts.length ? <div className="chart-saved-list">{savedCharts.map((chart) => <div key={chart.id}><strong>{chart.name}</strong><span>{chart.selectedIds.length} selected</span><button className="btn" type="button" onClick={() => loadChart(chart)}>Load</button><button className="btn ghost" type="button" onClick={() => persistCharts(savedCharts.filter((item) => item.id !== chart.id))}>Delete</button></div>)}</div> : <p className="muted">Saved charts stay in this browser.</p>}
-        </div>
-      </section>
-
-      {compareEntries.length ? <section className="chart-compare-panel">
-        <div className="chart-control-heading"><div><span className="label">Nearby-shape compare</span><h2>{compareEntries.map((entry) => entry.chord.name).join(" → ")}</h2></div><button className="btn ghost" type="button" onClick={() => setCompareIds([])}>Clear compare</button></div>
-        <div className="chart-compare-summary">
-          {compareEntries.slice(1).map((entry, index) => {
-            const previous = compareEntries[index];
-            const shared = entry.chord.frets.filter((fret, stringIndex) => fret === previous.chord.frets[stringIndex]).length;
-            const movement = entry.chord.frets.reduce((sum, fret, stringIndex) => sum + Math.abs(Math.max(0, fret) - Math.max(0, previous.chord.frets[stringIndex])), 0);
-            return <p key={entry.id}><strong>{previous.chord.name} → {entry.chord.name}:</strong> {shared} unchanged strings · {movement} total fret steps. {movement < 8 ? "A compact transition." : "Move slowly and release pressure between grips."}</p>;
-          })}
-          {compareEntries.length === 1 ? <p>Add one or two more cards to compare shared strings and approximate fret movement.</p> : null}
-        </div>
-      </section> : null}
-
-      <section className="chord-section chart-screen-results">
-        <div className="chord-section-header chart-results-header">
-          <div><h2>{presetName}</h2><p>{filteredEntries.length} unique physical shape{filteredEntries.length === 1 ? "" : "s"}; showing {Math.min(displayedEntries.length, filteredEntries.length)}.</p></div>
-          <span>{selectedEntries.length} selected · {compareEntries.length}/3 comparing</span>
-        </div>
-        {displayedEntries.length ? <div className="chart-results-grid">{displayedEntries.map((entry) => <ChartCard key={entry.id} entry={entry} selected={selectedIds.includes(entry.id)} comparing={compareIds.includes(entry.id)} orientation={orientation} highContrast={highContrast} capo={capo} tuning={tuning} layout={layout} onToggle={() => toggleSelected(entry.id)} onCompare={() => toggleCompare(entry.id)} onAlternative={revealAlternative} />)}</div> : <div className="chart-empty"><h3>No shapes match these filters.</h3><p>Reset one filter or choose another preset.</p></div>}
-        {displayedEntries.length < filteredEntries.length ? <div className="chart-load-more"><button className="btn" type="button" onClick={() => setVisibleLimit((current) => current + PAGE_SIZE)}>Load {Math.min(PAGE_SIZE, filteredEntries.length - displayedEntries.length)} more</button></div> : null}
-      </section>
-
-      <section className={`chart-print-sheet chart-print-${columns}`} aria-label="Printable chord chart">
-        <header className="chart-print-heading"><h1>{presetName}</h1><p>{TUNING_LABELS[tuning]} · {orientation === "left" ? "left" : "right"}-handed · {capo ? `capo ${capo}` : "no capo"}</p></header>
-        {isPrinting ? printEntries.map((entry) => <ChartCard key={`print-${entry.id}`} entry={entry} selected={selectedIds.includes(entry.id)} comparing={false} orientation={orientation} highContrast={highContrast} capo={capo} tuning={tuning} layout={layout} printable />) : null}
-      </section>
-    </main>
-  );
+  return <ChartInstrumentContext.Provider value={instrument}><main className={`page chords focused-page chart-builder chart-paper-${paperSize} chart-margin-${printMargin} ${highContrast ? "chart-builder-high-contrast" : ""} ${stageMode ? "chart-stage-mode" : ""}`}>
+    <section className="studio-heading chords-hero"><div><span className="tag">Chord Chart Builder</span><h1>Build a useful chart, then print only what you need.</h1><p>Generate theory or song charts, hear each shape, optimize transitions, and save an ordered practice sheet.</p></div><div className="studio-session-note print-card"><span className="label">Current chart</span><strong>{presetName}</strong><span>{selectedEntries.length ? `${selectedEntries.length} selected shapes will print in their custom order.` : `${filteredEntries.length} filtered shapes will print.`}</span></div></section>
+    <section className="chart-control-group chart-local-builder" aria-label="Local chart builder"><div className="chart-control-heading"><div><span className="label">Local chart assistant</span><h2>Build my chart</h2></div><span className="chart-local-badge">Deterministic on-device recommendations</span></div><p className="muted">Choose a key, skill, genre, song context, and time budget. The assistant uses the bundled chord data only; it is not an external AI service.</p><div className="chart-filter-grid"><label>Mode<select value={builderMode} onChange={(event) => setBuilderMode(event.target.value as HarmonyMode)}><option value="major">Major</option><option value="minor">Natural minor</option></select></label><label>Genre<select value={builderGenre} onChange={(event) => setBuilderGenre(event.target.value)}>{Object.keys(GENRE_PRESETS).map((genre) => <option key={genre}>{genre}</option>)}</select></label><label>Song or goal<input value={builderSong} maxLength={80} placeholder="Optional title or practice goal" onChange={(event) => setBuilderSong(event.target.value)} /></label><label>Practice minutes<input type="number" min={5} max={60} value={builderMinutes} onChange={(event) => setBuilderMinutes(Math.max(5, Math.min(60, Number(event.target.value) || 15)))} /></label></div><div className="chart-action-row"><button className="btn primary" type="button" onClick={runLocalBuilder}>Build local chart</button>{builderStatus ? <span className="chart-save-status" role="status">{builderStatus}</span> : null}</div></section>
+    <section className="chart-control-group chart-performance-panel" aria-label="Rehearsal and stage controls"><div className="chart-control-heading"><div><span className="label">Performance practice</span><h2>{stageMode ? "Stage mode" : "Metronome and rehearsal"}</h2></div><button className={`btn ${stageMode ? "primary" : "ghost"}`} type="button" onClick={() => setStageMode((current) => !current)} aria-pressed={stageMode}>{stageMode ? "Exit stage mode" : "Enter stage mode"}</button></div><p className="muted">Stage mode uses oversized dark cards and guarded keyboard controls: Space pause/resume, N/Right next, P/Left previous, M metronome. Focus an input or button to keep shortcuts inactive.</p><div className="chart-performance-controls"><label>Count-in beats<input type="number" min={0} max={8} value={countIn} onChange={(event) => setCountIn(Math.max(0, Math.min(8, Number(event.target.value) || 0)))} /></label><button className="btn" type="button" onClick={toggleMetronome}>{metronomeRunning ? "Pause metronome" : `Start ${countIn}-beat count-in`}</button><button className="btn primary" type="button" onClick={toggleRehearsal}>{rehearsalRunning ? "Pause rehearsal" : "Start rehearsal"}</button><button className="btn ghost" type="button" onClick={() => advanceRehearsal(-1)}>Previous</button><button className="btn ghost" type="button" onClick={() => advanceRehearsal(1)}>Next</button><button className="btn ghost" type="button" onClick={resetRehearsal}>Reset</button><span className="chart-beat" aria-label={`Beat ${beat + 1}`}>Beat {beat + 1} · {rehearsalEntries.length ? `Card ${rehearsalIndex + 1}/${rehearsalEntries.length}` : "No cards"}</span></div><p className="chart-evidence" role="status" aria-live="polite">{rehearsalStatus}</p>{rehearsalEntries[rehearsalIndex] ? <div className="chart-stage-card"><span className="label">Current rehearsal chord</span><strong>{rehearsalEntries[rehearsalIndex].chord.name}</strong><span>{rhythmPattern} · {practiceBpm} BPM</span></div> : null}</section>
+    <section className="chart-builder-controls" aria-label="Chord chart controls">
+      <div className="chart-control-group"><div className="chart-control-heading"><div><span className="label">1 · Start</span><h2>Presets, songs, and harmony</h2></div><button className="btn ghost" type="button" onClick={() => { resetFilters(); setPresetIds(null); setPresetName("Original full library by root"); setProgression([]); setFallbackById({}); }}>Full library</button></div>
+        <div className="chart-filter-grid"><label>Generator key<select value={functionKey} onChange={(event) => setFunctionKey(event.target.value)}>{CHORD_FUNCTION_KEYS.map((value) => <option key={value}>{value}</option>)}</select></label><label>Song chart<select value={selectedSongId} disabled={!songCatalog.length} onChange={(event) => applySong(event.target.value)}><option value="" disabled>{songsLoading ? "Loading songs…" : songCatalog.length ? "Choose a bundled song" : "Load the catalog first"}</option>{songCatalog.map((song) => <option key={song.id} value={song.id}>{song.title} · {song.artist}</option>)}</select></label><button className="btn ghost" type="button" onClick={loadSongs} disabled={songsLoading || Boolean(songCatalog.length)}>{songCatalog.length ? "Song catalog loaded" : songsLoading ? "Loading…" : "Load bundled songs"}</button><button className="btn ghost" type="button" onClick={applyDailyChart}>Build daily local chart</button></div>
+        <div className="chart-preset-row">{THEORY_PRESETS.map((preset) => <button className="btn" key={preset.id} type="button" onClick={() => applyTheoryPreset(preset)}>{preset.label}</button>)}<button className="btn ghost" type="button" onClick={() => applyPractical("I–V–vi–IV", ["I", "V", "vi", "IV"])}>I–V–vi–IV</button><button className="btn ghost" type="button" onClick={() => applyPractical("ii–V–I", ["ii", "V", "I"])}>ii–V–I</button></div>
+        <div className="chart-preset-row">{PROGRESSION_PACKS.map((pack) => <button className="btn ghost" key={pack.id} type="button" onClick={() => applyEntries(pack.title, pack.chordIds.flatMap((id) => { const entry = CHORD_LIBRARY.find((candidate) => candidate.id === id); return entry ? [entry] : []; }), pack.keyCenter)}>{pack.title}</button>)}{LEVELS.map((level, index) => <button className="btn ghost" key={level.name} type="button" onClick={() => applyEntries(`Level · ${level.name}`, levelEntries(index))}>{level.name}</button>)}</div>
+        <div className="chart-preset-row" aria-label="Genre voicing presets">{Object.keys(GENRE_PRESETS).map((genre) => <button className="btn ghost" key={genre} type="button" onClick={() => applyGenre(genre)}>{genre}</button>)}</div>
+        {songStatus ? <p className="chart-save-status" role="status">{songStatus}</p> : null}
+        {progression.length ? <div className="chart-progression" aria-label="Capo-aware generated progression"><strong>Played shapes with section/function labels</strong><p>{progression.map((step) => `${step.role}: ${step.played}`).join(" → ")}</p><strong>Sounding with {capo ? `capo ${capo}` : "no capo"}</strong><p>{progression.map((step) => transposeChordName(step.played, capo)).join(" → ")}</p><strong>Lowest barre-cost shape suggestions</strong>{capoRecommendations.map((item) => <p key={item.capo}>Capo {item.capo} · shape key {item.shapeKey} · cost {item.cost}: {item.shapes.join(" → ")}</p>)}<small>Cost combines library difficulty, missing-shape penalties, and barre burden for capo 0–7. It recommends shapes only; it does not rewrite song key metadata.</small>{progression.some((step) => step.fallback) ? <p className="chart-fallback">Fallback labels are shown on the affected cards; missing theoretical identities remain visible here.</p> : null}</div> : null}
+      </div>
+      <div className="chart-control-group"><div className="chart-control-heading"><div><span className="label">2 · Refine</span><h2>Shape filters and ranking</h2></div><button className="btn ghost" type="button" onClick={resetFilters}>Reset filters</button></div><div className="chart-filter-grid">
+        <label>Root<select value={root} onChange={(event) => setRoot(event.target.value)}><option value="all">All roots</option>{CHORD_LIBRARY_ROOTS.map((value) => <option key={value}>{value}</option>)}</select></label><label>Difficulty<select value={difficulty} onChange={(event) => setDifficulty(event.target.value)}><option value="all">All difficulty</option>{CHORD_DIFFICULTY_TAGS.map((value) => <option key={value}>{value}</option>)}</select></label><label>Quality<select value={quality} onChange={(event) => setQuality(event.target.value)}><option value="all">All qualities</option>{CHORD_QUALITY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label><label>Position<select value={position} onChange={(event) => setPosition(event.target.value)}><option value="all">All positions</option><option value="open">Open</option><option value="barre">Barre</option><option value="inverted">Inverted</option></select></label><label>Shape<select value={characteristic} onChange={(event) => setCharacteristic(event.target.value)}><option value="all">All shapes</option><option value="open">Open strings</option><option value="barre">Has barre</option><option value="partial">Partial grip</option></select></label><label>Library function<select value={functionRole} onChange={(event) => setFunctionRole(event.target.value)}><option value="all">All functions</option>{["I","ii","iii","IV","V","vi","vii°"].map((value) => <option key={value}>{value}</option>)}</select></label><label>Player level<select value={skill} onChange={(event) => setSkill(event.target.value as SkillLevel)}><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label>
+      </div><div className="chart-action-row"><button className="btn primary" type="button" onClick={selectSimplest}>Select simplest voicings</button>{anchorId ? <button className="btn ghost" type="button" onClick={() => setAnchorId(null)}>Clear transition ranking</button> : <span className="muted">Use “Rank from here” on a card to sort by transition ease.</span>}</div></div>
+      <div className="chart-control-group"><span className="label">3 · Display, tuning, rhythm, and print</span><div className="chart-settings-grid"><label>Handedness<select value={orientation} onChange={(event) => setOrientation(event.target.value as Orientation)}><option value="right">Right-handed</option><option value="left">Left-handed</option></select></label><label>Capo<select value={capo} onChange={(event) => setCapo(Number(event.target.value))}>{Array.from({ length: 8 }, (_, fret) => <option key={fret} value={fret}>{fret ? `Fret ${fret}` : "No capo"}</option>)}</select></label><label>Tuning<select value={tuning} onChange={(event) => setTuning(event.target.value as Tuning)}>{Object.entries(TUNING_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Custom tuning<input value={customTuningText} onChange={(event) => setCustomTuningText(event.target.value)} disabled={tuning !== "custom"} aria-invalid={tuning === "custom" && !customTuningValid} placeholder="E A D G B E" /></label><label>Card detail<select value={layout} onChange={(event) => setLayout(event.target.value as Layout)}><option value="full">Full</option><option value="compact">Compact</option></select></label><label>Print columns<select value={columns} onChange={(event) => setColumns(Number(event.target.value) as PrintColumns)}><option value={2}>2 columns</option><option value={3}>3 columns</option></select></label><label>Paper<select value={paperSize} onChange={(event) => setPaperSize(event.target.value as PaperSize)}><option value="letter">US Letter</option><option value="a4">A4</option></select></label><label>Margins<select value={printMargin} onChange={(event) => setPrintMargin(event.target.value as PrintMargin)}><option value="narrow">Narrow</option><option value="normal">Normal</option><option value="wide">Wide</option></select></label><label>Practice BPM<input type="number" min={30} max={240} value={practiceBpm} onChange={(event) => setPracticeBpm(Math.max(30, Math.min(240, Number(event.target.value) || 80)))} /></label><label>Right-hand pattern<input value={rhythmPattern} maxLength={80} onChange={(event) => setRhythmPattern(event.target.value)} /></label><label>Printable flashcards<select value={flashcards} onChange={(event) => setFlashcards(event.target.value as FlashcardMode)}><option value="off">Off · full cards</option><option value="front">Front · chord name</option><option value="back">Back · diagram and tones</option></select></label><label className="chart-checkbox"><input type="checkbox" checked={highContrast} onChange={(event) => setHighContrast(event.target.checked)} />High contrast</label><label className="chart-checkbox"><input type="checkbox" checked={nashville} onChange={(event) => setNashville(event.target.checked)} />Nashville numbers</label></div>
+        <p className="chart-tuning-note">{tuningLabel}. The diagrams retain their library frets; the six displayed pitches are calculated from this tuning. Print: {paperSize === "a4" ? "A4" : "US Letter"}, {printMargin} margins.</p><div className="chart-action-row"><button className="btn" type="button" onClick={() => setSelectedIds((current) => Array.from(new Set([...current, ...displayedEntries.map((entry) => entry.id)])))}>Select visible</button><button className="btn ghost" type="button" onClick={() => setSelectedIds([])} disabled={!selectedIds.length}>Clear all</button><button className="btn ghost" type="button" onClick={exportJson}>Export JSON</button><button className="btn primary" type="button" onClick={printChart}>Print / Save as PDF</button></div>
+      </div>
+      <div className="chart-control-group chart-save-controls"><div><span className="label">Teacher, templates, and versioned charts</span><h2>Save the complete assignment</h2></div><div className="chart-preset-row" aria-label="Reusable chart templates">{(Object.keys(CHART_TEMPLATES) as TemplateKind[]).map((kind) => <button className={`btn ghost ${chartTemplate === kind ? "active" : ""}`} key={kind} type="button" onClick={() => applyTemplate(kind)}>{CHART_TEMPLATES[kind].label}</button>)}</div><div className="chart-annotation-grid"><label>Student<input value={annotations.student} maxLength={80} onChange={(event) => setAnnotations((current) => ({ ...current, student: event.target.value }))} /></label><label>Due date<input type="date" value={annotations.dueDate} onChange={(event) => setAnnotations((current) => ({ ...current, dueDate: event.target.value }))} /></label><label>Teacher notes<textarea value={annotations.notes} maxLength={800} onChange={(event) => setAnnotations((current) => ({ ...current, notes: event.target.value }))} /></label></div><div className="chart-save-row"><label><span className="visually-hidden">Chart name</span><input value={saveName} onChange={(event) => setSaveName(event.target.value)} placeholder="Chart name (same name creates a version)" maxLength={60} /></label><button className="btn primary" type="button" onClick={saveChart}>Save current chart</button></div>{saveStatus ? <p className="chart-save-status" role="status">{saveStatus}</p> : null}{savedCharts.length ? <div className="chart-saved-list">{savedCharts.map((chart) => <div key={chart.id}><strong>{chart.name}</strong><span>{chart.selectedIds.length} selected · {chart.history.length} versions</span><button className="btn" type="button" onClick={() => loadChart(chart)}>Load</button><button className="btn ghost" type="button" onClick={() => persistCharts(savedCharts.filter((item) => item.id !== chart.id))}>Delete</button>{chart.history.length ? <details><summary>History</summary>{chart.history.slice().reverse().map((item) => <button className="btn ghost" key={item.savedAt} type="button" onClick={() => loadSnapshot(chart, item)}>{new Date(item.savedAt).toLocaleString()}</button>)}</details> : null}</div>)}</div> : <p className="muted">Versioned chart settings stay in this browser. History is capped at eight snapshots per name.</p>}</div>
+    </section>
+    <section className="chart-intelligence-grid" aria-label="Live practice tools">
+      <div className="chart-control-group"><span className="label">Live chord evidence</span><h2>MIDI pitch-class check</h2><label>Chord to check<select value={activeRecognitionEntry?.id ?? ""} onChange={(event) => setRecognitionTargetId(event.target.value)}><option value="">Select a chart chord</option>{selectedEntries.map((entry) => <option key={entry.id} value={entry.id}>{entry.chord.name}</option>)}</select></label><div className="chart-action-row"><button className="btn primary" type="button" onClick={midiEnabled ? stopMidi : startMidi}>{midiEnabled ? "Stop MIDI" : "Start MIDI check"}</button><button className="btn ghost" type="button" onClick={micEnabled ? stopMic : startMic}>{micEnabled ? "Stop microphone" : "Start microphone evidence"}</button></div><p className="chart-evidence" role="status"><strong>MIDI:</strong> {midiStatus}</p><p className="chart-evidence" role="status"><strong>Microphone:</strong> {micStatus}</p><p className="muted">Permissions are requested only by these buttons. MIDI compares held pitch classes and suggests strings associated with missing notes. Microphone evidence is level plus strongest periodic pitch, not full polyphonic chord recognition.</p></div>
+      <div className="chart-control-group"><span className="label">Adaptive practice</span><h2>Misses, tempo, and fatigue</h2><p><strong>Local MIDI misses:</strong> {Object.values(recognitionMisses).reduce((sum, count) => sum + count, 0)}</p><p><strong>Finger-fatigue index:</strong> {fatigue.value}/100 · {fatigue.label}</p><p className="muted">Calculated from barre and stretch burden across the ordered selection. For a high reading, split the set, relax the fretting hand, and take breaks; this is simple practice guidance, not medical advice.</p><button className="btn" type="button" onClick={simplifyAfterMisses}>Make a simpler working copy</button></div>
+    </section>
+    {selectedEntries.length ? <section className="chart-selected-order"><div className="chart-control-heading"><div><span className="label">Selected print order</span><h2>Drag cards or use the keyboard-labelled buttons</h2></div></div><div className="chart-order-list">{selectedEntries.map((entry, index) => <div key={entry.id} draggable tabIndex={0} aria-label={`${entry.chord.name}, position ${index + 1} of ${selectedEntries.length}. Use Move earlier or Move later to reorder.`} onDragStart={(event) => event.dataTransfer.setData("text/chord-id", entry.id)} onDragOver={(event) => event.preventDefault()} onDrop={(event) => dropSelected(entry.id, event.dataTransfer.getData("text/chord-id"))}><span>{index + 1}. {entry.chord.name}</span><button type="button" onClick={() => moveSelected(entry.id, -1)} disabled={index === 0} aria-label={`Move ${entry.chord.name} earlier`}>↑</button><button type="button" onClick={() => moveSelected(entry.id, 1)} disabled={index === selectedEntries.length - 1} aria-label={`Move ${entry.chord.name} later`}>↓</button></div>)}</div></section> : null}
+    {selectedEntries.length ? <section className="chart-compare-panel chart-heatmap-panel"><div className="chart-control-heading"><div><span className="label">Chart movement map</span><h2>Frets and voice leading</h2></div></div><div className="chart-heatmap" aria-label="Selected-shape fret-use heatmap">{heatmap.length ? heatmap.map((item) => <div key={item.fret}><span>Fret {item.fret}</span><i style={{ width: `${item.width}%` }} /><strong>{item.count}</strong></div>) : <p>These shapes use open strings only.</p>}</div><div className="chart-transition-path">{transitions.map(({ from, to, detail, score }) => <article key={`${from.id}-${to.id}`}><strong>{from.chord.name} → {to.chord.name}</strong><span>ease {score}/100 · {detail.bass}</span><span>{detail.retainedStrings.length ? `Retained strings: ${detail.retainedStrings.join(", ")}` : "No unchanged string positions"}</span><span>{detail.retainedFingers.length ? `Keep ${detail.retainedFingers.join(", ")}` : "No exact finger pivot retained"}</span><span>Nearest total fret movement: {detail.movement}</span></article>)}</div></section> : null}
+    {compareEntries.length ? <section className="chart-compare-panel"><div className="chart-control-heading"><div><span className="label">Nearby-shape compare</span><h2>{compareEntries.map((entry) => entry.chord.name).join(" → ")}</h2></div><button className="btn ghost" type="button" onClick={() => setCompareIds([])}>Clear compare</button></div><div className="chart-compare-summary">{compareEntries.slice(1).map((entry, index) => { const cost = scoreTransition(compareEntries[index].chord, entry.chord); return <p key={entry.id}><strong>{compareEntries[index].chord.name} → {entry.chord.name}:</strong> score {cost.score}/100 · {cost.explanation}</p>; })}{compareEntries.length === 1 ? <p>Add one or two more cards to compare approximate movement.</p> : null}</div></section> : null}
+    {selectedEntries.length ? <section className="chart-practice-strip" aria-label="Mobile practice strip">{selectedEntries.map((entry) => <article key={`practice-${entry.id}`}><h3>{entry.chord.name}{nashville ? ` · ${nashvilleFor(entry, functionKey) ?? ""}` : ""}</h3><ChordDiagram chord={entry.chord} orientation={orientation} highContrast={highContrast} /></article>)}</section> : null}
+    <section className="chord-section chart-screen-results"><div className="chord-section-header chart-results-header"><div><h2>{presetName}</h2><p>{filteredEntries.length} unique physical shapes; showing {Math.min(displayedEntries.length, filteredEntries.length)}.</p></div><span>{selectedEntries.length} selected · {compareEntries.length}/3 comparing</span></div>{displayedEntries.length ? <div className="chart-results-grid">{displayedEntries.map((entry) => <ChartCard key={entry.id} entry={entry} selected={selectedIds.includes(entry.id)} comparing={compareIds.includes(entry.id)} orientation={orientation} highContrast={highContrast} capo={capo} tuningLabel={tuningLabel} tuningNotes={tuningNotes} layout={layout} nashville={nashville ? nashvilleFor(entry, functionKey) : null} fallback={fallbackById[entry.id]} cardAnnotation={cardAnnotations[entry.id]} rhythmPattern={rhythmPattern} practiceBpm={practiceBpm} flashcards={flashcards} onAnnotation={(value) => setCardAnnotations((current) => ({ ...current, [entry.id]: value }))} onToggle={() => toggleSelected(entry.id)} onCompare={() => toggleCompare(entry.id)} onAnchor={() => setAnchorId(entry.id)} onRecognitionTarget={() => { setRecognitionTargetId(entry.id); setMidiStatus(`Ready to check ${entry.chord.name}. Start MIDI if it is not connected.`); }} onAlternative={revealAlternative} />)}</div> : <div className="chart-empty"><h3>No shapes match these filters.</h3><p>Reset one filter or choose another preset.</p></div>}{displayedEntries.length < filteredEntries.length ? <div className="chart-load-more"><button className="btn" type="button" onClick={() => setVisibleLimit((current) => current + PAGE_SIZE)}>Load {Math.min(PAGE_SIZE, filteredEntries.length - displayedEntries.length)} more</button></div> : null}</section>
+    <section className={`chart-print-sheet chart-print-${columns} chart-flash-sheet-${flashcards}`} aria-label="Printable chord chart"><header className="chart-print-heading"><h1>{presetName}</h1><p>{tuningLabel} · {orientation}-handed · {capo ? `capo ${capo}` : "no capo"} · {practiceBpm} BPM · {rhythmPattern} · {paperSize === "a4" ? "A4" : "US Letter"} · {printMargin} margins</p>{annotations.student ? <p><strong>Student:</strong> {annotations.student}</p> : null}{annotations.dueDate ? <p><strong>Due:</strong> {annotations.dueDate}</p> : null}{annotations.notes ? <p className="chart-print-notes">{annotations.notes}</p> : null}</header>{isPrinting ? printEntries.map((entry) => <ChartCard key={`print-${entry.id}`} entry={entry} selected={selectedIds.includes(entry.id)} comparing={false} orientation={orientation} highContrast={highContrast} capo={capo} tuningLabel={tuningLabel} tuningNotes={tuningNotes} layout={layout} nashville={nashville ? nashvilleFor(entry, functionKey) : null} fallback={fallbackById[entry.id]} cardAnnotation={cardAnnotations[entry.id]} rhythmPattern={rhythmPattern} practiceBpm={practiceBpm} flashcards={flashcards} printable />) : null}</section>
+    <section className="chart-control-group chart-advanced-settings" aria-label="Instrument and arrangement settings"><span className="label">Instrument and arrangement</span><div className="chart-settings-grid"><label>Instrument<select value={instrument} onChange={(event) => setInstrument(event.target.value as InstrumentProfile)}>{Object.entries(INSTRUMENT_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Transpose arrangement<select value={transposeAmount} onChange={(event) => setTransposeAmount(Number(event.target.value))}>{Array.from({ length: 13 }, (_, index) => index - 6).map((value) => <option key={value} value={value}>{value > 0 ? `+${value}` : value} semitones</option>)}</select></label></div><p className="chart-tuning-note">{INSTRUMENT_GUIDANCE[instrument]} Transpose changes names and progression labels only; source voicings remain unchanged unless a compatible local shape is found.</p>{transposedProgression.length ? <p className="chart-progression-line"><strong>Transposed arrangement:</strong> {transposedProgression.map((step) => `${step.role}: ${step.played}`).join(" → ")}</p> : null}</section>
+    <section className="chart-intelligence-grid chart-advanced-workflows" aria-label="Chart practice and collaboration workflows"><div className="chart-control-group"><span className="label">Chord confidence and drills</span><h2>Local confidence</h2><p><strong>Average confidence:</strong> {chartConfidenceAverage}/100</p><p className="muted">Scores use explicit MIDI matches, your manual hit/miss marks, repetitions, and optional metadata only. They do not claim to analyze recordings.</p><div className="chart-confidence-list">{rehearsalEntries.slice(0, 8).map((entry) => <div key={entry.id}><span>{entry.chord.name}</span><strong>{confidenceFor(entry)}%</strong><button className="btn ghost" type="button" onClick={() => markConfidence(entry, true)}>Mark clean</button><button className="btn ghost" type="button" onClick={() => markConfidence(entry, false)}>Mark miss</button></div>)}</div><button className="btn primary" type="button" onClick={startDrill}>Start weak-transition drill</button>{drillActive ? <p className="chart-evidence" role="status">Drill active: repeat the selected transition, then mark each chord clean or missed.</p> : null}</div><div className="chart-control-group"><span className="label">Setlist and band notes</span><h2>Performance order</h2><div className="chart-action-row"><button className="btn" type="button" onClick={addCurrentToSetlist}>Add current chart</button><button className="btn ghost" type="button" onClick={() => setSetlist([])} disabled={!setlist.length}>Clear setlist</button></div>{setlist.length ? <div className="chart-setlist" aria-label="Local setlist">{setlist.map((item, index) => <div key={item.id} draggable onDragEnd={() => undefined}><span>{index + 1}. {item.label}</span><button className="btn ghost" type="button" onClick={() => moveSetlist(item.id, -1)} disabled={index === 0}>↑</button><button className="btn ghost" type="button" onClick={() => moveSetlist(item.id, 1)} disabled={index === setlist.length - 1}>↓</button></div>)}</div> : <p className="muted">No local setlist items yet.</p>}<div className="chart-annotation-grid"><label>Band role<select value={bandRole} onChange={(event) => setBandRole(event.target.value as CollaborationRole)}>{["owner", "lead", "rhythm", "bass", "teacher"].map((role) => <option key={role}>{role}</option>)}</select></label><label>Part<input value={bandPart} maxLength={60} onChange={(event) => setBandPart(event.target.value)} /></label><label>Local arrangement note<textarea value={bandNote} maxLength={240} placeholder="e.g. drummer drops out in bridge" onChange={(event) => setBandNote(event.target.value)} /></label></div><button className="btn" type="button" onClick={addBandNote}>Add band annotation</button>{bandNotes.length ? <p className="muted">{bandNotes.length} local annotations · {bandRevisions.length} capped revisions. Export JSON to hand off a copy.</p> : null}</div></section>
+    <section className="chart-intelligence-grid chart-advanced-workflows" aria-label="Offline and authorized chart tools"><div className="chart-control-group"><span className="label">Daily chart and offline</span><h2>Practice context</h2><p><strong>Local streak:</strong> {practiceStats.streak} day{practiceStats.streak === 1 ? "" : "s"} · <strong>Session:</strong> {practiceStats.minutes} min · <strong>This week:</strong> {practiceStats.weekMinutes} min</p><button className="btn" type="button" onClick={checkOffline}>Check offline readiness</button><p className="chart-evidence" role="status">{offlineStatus}</p><p className="muted">The chart does not install a second service worker. Offline signals come from the existing app shell and browser cache only.</p></div><div className="chart-control-group"><span className="label">Authorized interchange</span><h2>ChordPro and MusicXML</h2><p className="muted">Import/export reads chord metadata only. Use files you have rights to use; no licensed song content is fetched or copied.</p><div className="chart-action-row"><button className="btn" type="button" onClick={exportChordPro}>Export ChordPro</button><button className="btn" type="button" onClick={exportMusicXml}>Export MusicXML</button><button className="btn ghost" type="button" onClick={() => importInputRef.current?.click()}>Import authorized chart</button></div><input ref={importInputRef} className="visually-hidden" type="file" accept=".cho,.chordpro,.musicxml,.xml,text/plain,application/xml" onChange={(event) => void importAuthorized(event.target.files?.[0])} />{advancedStatus ? <p className="chart-save-status" role="status">{advancedStatus}</p> : null}</div><div className="chart-control-group"><span className="label">Teacher feedback</span><h2>Session-only media references</h2><p className="muted">Choose up to three local audio/video files. Only filename/type/size metadata is retained for this session; raw media is never stored in chart localStorage or uploaded.</p><button className="btn" type="button" onClick={() => mediaInputRef.current?.click()}>Attach feedback media</button><input ref={mediaInputRef} className="visually-hidden" type="file" accept="audio/*,video/*" multiple onChange={(event) => attachTeacherMedia(event.target.files)} />{teacherMedia.length ? <ul className="chart-media-list">{teacherMedia.map((media) => <li key={media.id}>{media.name} · {media.type || "media"} · {Math.round(media.size / 1024)} KB</li>)}</ul> : <p className="muted">No session attachments.</p>}</div></section>
+    <section className="chart-control-group chart-why-panel" aria-label="Why this chord"><span className="label">Harmony context</span><h2>Why this chord?</h2>{whyChord ? <><p><strong>{whyChord.entry.chord.name}</strong> is acting as <strong>{whyChord.role}</strong> in the active key of {functionKey}.</p><p>{whyChord.explanation}</p><p className="muted">This explanation comes from the bundled chord-function metadata and falls back clearly when a context is unavailable.</p></> : <p className="muted">Select a chart chord to see its local harmonic explanation.</p>}</section>
+  </main></ChartInstrumentContext.Provider>;
 }

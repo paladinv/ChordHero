@@ -80,6 +80,28 @@
         -1,
         -1
       ]
+    },
+    {
+      "id": "standard-7",
+      "label": "7-string Standard (six-string adapted)",
+      "strings": [
+        "B",
+        "E",
+        "A",
+        "D",
+        "G",
+        "B",
+        "E"
+      ],
+      "semitoneOffsets": [
+        -5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ]
     }
   ],
   "sampleVoices": [

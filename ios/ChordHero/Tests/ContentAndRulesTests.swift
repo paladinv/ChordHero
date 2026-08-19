@@ -9,11 +9,17 @@ final class ContentAndRulesTests: XCTestCase {
         let content = try repository.load()
         XCTAssertEqual(content.chords.count, 346)
         XCTAssertEqual(content.levels.count, 4)
-        XCTAssertEqual(content.progressionPacks.count, 4)
+        XCTAssertEqual(
+            Set(content.progressionPacks.map(\.id)),
+            Set(["key-of-g-starter", "key-of-c-warmups", "walking-bass-inversions", "barre-bootcamp"])
+        )
         XCTAssertEqual(content.exercises.count, 36)
         XCTAssertEqual(content.songs.count, 50)
         XCTAssertTrue(content.songs.allSatisfy { $0.variations.count >= 3 })
-        XCTAssertEqual(content.tunings.count, 4)
+        XCTAssertEqual(
+            Set(content.tunings.map(\.id)),
+            Set(["standard", "drop-d", "dadgad", "half-step-down", "standard-7"])
+        )
         XCTAssertTrue(content.levels.flatMap(\.chordIds).allSatisfy { content.chordByID[$0] != nil })
     }
 

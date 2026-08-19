@@ -18,6 +18,8 @@ function applySavedPreferences() {
     const root = document.documentElement;
     root.dataset.motion = preferences.reducedMotion ? "reduced" : "full";
     root.dataset.contrast = preferences.highContrast ? "high" : "standard";
+    root.dataset.colorblind = preferences.colorBlindSafe ? "safe" : "standard";
+    root.dataset.spacing = preferences.dyslexiaSpacing ? "wide" : "standard";
     root.dataset.handedness = preferences.handedness === "left" ? "left" : "right";
     root.style.setProperty("--diagram-scale", String(Number(preferences.diagramScale) || 1));
     root.style.setProperty("--audio-volume", String(preferences.audioMuted ? 0 : Number(preferences.audioVolume) || 0.8));

@@ -65,6 +65,8 @@ const CONTEXT_SAMPLE: Record<string, number> = {
   Am: 45
 };
 
+const CHORD_ROOT: Record<string, number> = { C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4, F: 5, "F#": 6, Gb: 6, G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11 };
+
 function samplePath(midi: number) {
   return `/samples/guitar/clean/${midi}.mp3`;
 }
@@ -84,28 +86,33 @@ type GuitarStepOptions = {
   accent?: boolean;
   volume?: number;
   when?: number;
+  targetSound?: "acoustic-strum" | "muted-funk" | "fingerstyle" | "clean-electric";
 };
 
 export async function playRecordedGuitarStep(
   context: AudioContext,
-  { token, technique, accent = false, volume = 0.2, when }: GuitarStepOptions
+  { token, technique, accent = false, volume = 0.2, when, targetSound = "clean-electric" }: GuitarStepOptions
 ) {
   if (token === "·") return false;
   const clean = token.replace("!", "");
   const stringNumber = Number(clean.match(/\d/)?.[0] ?? (technique === "strumming" ? 4 : 3));
-  const path = clean === "X" ? "/samples/guitar/muted.mp3" : samplePath(STRING_SAMPLE[stringNumber] ?? 54);
+  const path = clean === "X" || targetSound === "muted-funk" ? "/samples/guitar/muted.mp3" : samplePath(STRING_SAMPLE[stringNumber] ?? 54);
   const buffer = await loadRecordedAudio(context, path);
   if (!buffer) return false;
 
   const source = context.createBufferSource();
   const gain = context.createGain();
+  const tone = context.createBiquadFilter();
   const now = Math.max(context.currentTime, when ?? context.currentTime);
   source.buffer = buffer;
-  source.playbackRate.value = technique === "strumming" ? 0.96 : 1;
+  source.playbackRate.value = targetSound === "acoustic-strum" ? 0.94 : targetSound === "fingerstyle" ? 1.02 : technique === "strumming" ? 0.96 : 1;
+  tone.type = "lowpass";
+  tone.frequency.setValueAtTime(targetSound === "muted-funk" ? 2400 : targetSound === "acoustic-strum" ? 5200 : targetSound === "fingerstyle" ? 4200 : 7600, now);
   gain.gain.setValueAtTime(0.0001, now);
   gain.gain.exponentialRampToValueAtTime(accent ? volume * 1.25 : volume, now + 0.005);
-  gain.gain.exponentialRampToValueAtTime(0.0001, now + (clean === "X" ? 0.16 : 0.42));
-  source.connect(gain);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + (clean === "X" || targetSound === "muted-funk" ? 0.13 : targetSound === "fingerstyle" ? 0.5 : 0.42));
+  source.connect(tone);
+  tone.connect(gain);
   gain.connect(context.destination);
   source.start(now);
   return true;
@@ -113,16 +120,22 @@ export async function playRecordedGuitarStep(
 
 export async function playRecordedBackingPulse(
   context: AudioContext,
-  chord: "G" | "C" | "Am",
+  chord: string,
   when: number,
   volume = 0.1
 ) {
-  const buffer = await loadRecordedAudio(context, samplePath(CONTEXT_SAMPLE[chord]));
+  const directSample = CONTEXT_SAMPLE[chord];
+  const rootName = chord.match(/^([A-G](?:#|b)?)/)?.[1] ?? "C";
+  const root = CHORD_ROOT[rootName] ?? 0;
+  const sourceMidi = directSample ?? 48;
+  const targetMidi = 48 + root;
+  const buffer = await loadRecordedAudio(context, samplePath(sourceMidi));
   if (!buffer) return false;
   const source = context.createBufferSource();
   const gain = context.createGain();
   const now = Math.max(context.currentTime, when);
   source.buffer = buffer;
+  source.playbackRate.value = directSample ? 1 : 2 ** ((targetMidi - sourceMidi) / 12);
   gain.gain.setValueAtTime(0.0001, now);
   gain.gain.exponentialRampToValueAtTime(volume, now + 0.01);
   gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.75);

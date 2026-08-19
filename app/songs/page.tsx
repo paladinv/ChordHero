@@ -223,6 +223,9 @@ export default function SongsPage() {
   const [midiStatus, setMidiStatus] = useState("MIDI pedal not connected");
   const [loopSectionId, setLoopSectionId] = useState<string | null>(null);
   const [setlistSongIds, setSetlistSongIds] = useState<string[]>([]);
+  const [resolvedCapo, setResolvedCapo] = useState<number | null>(null);
+  const [resolvedTuning, setResolvedTuning] = useState<string | null>(null);
+  const [practiceContext, setPracticeContext] = useState<{ exercise: string; chords: string[]; pattern: string; style: string } | null>(null);
 
   const songTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -230,7 +233,7 @@ export default function SongsPage() {
 
   const activeSong = SONGS[songIndex];
   const activeVariation = activeSong.variations?.find((variation) => variation.id === variationId) ?? activeSong.variations?.[0];
-  const displayedChords = activeSong.chords.map((chord) => transposeChord(simplifyMode ? simplifyChord(chord) : chord, transpose));
+  const displayedChords = (practiceContext?.chords.length ? practiceContext.chords : activeSong.chords).map((chord) => transposeChord(simplifyMode ? simplifyChord(chord) : chord, transpose));
   const sectionRanges = useMemo(() => {
     let cursor = 0;
     return (activeSong.sections ?? []).map((section) => { const length = section.blocks.flatMap((block) => block.type === "chords" ? block.chords ?? [] : []).length; const range = { ...section, start: cursor, end: Math.max(cursor, cursor + length - 1) }; cursor += length; return range; });
@@ -252,15 +255,22 @@ export default function SongsPage() {
     const nextIndex = Math.max(0, SONGS.findIndex((song) => song.id === requestedSongId));
     const requestedVariationId = params.get("variationId");
     const requestedSetlistId = params.get("setlistId");
+    if (params.get("context") === "right-hand") {
+      const chords = (params.get("progression") ?? "").split(",").map((value) => value.trim()).filter((value) => /^[A-G](?:#|b)?(?:m|maj|min|sus[24]|7|m7|maj7)?$/i.test(value)).slice(0, 8);
+      setPracticeContext({ exercise: params.get("exercise") ?? "right-hand drill", chords, pattern: (params.get("pattern") ?? "D U").slice(0, 96), style: (params.get("style") ?? "core").slice(0, 32) });
+      setSongTempoBpm(Math.max(40, Math.min(180, Number(params.get("tempo")) || 90)));
+    }
     if (requestedSetlistId) setSetlistSongIds(readSongLibraryState().setlists.find((setlist) => setlist.id === requestedSetlistId)?.entries.map((entry) => entry.songId) ?? []);
     if (requestedSongId && SONGS[nextIndex]) {
       setSongIndex(nextIndex);
-      setSongTempoBpm(SONGS[nextIndex].bpm);
+      setSongTempoBpm(Number(params.get("tempo")) || SONGS[nextIndex].bpm);
       setVariationId(requestedVariationId ?? SONGS[nextIndex].variations?.[0]?.id ?? "");
       setTranspose(Number(params.get("transpose") ?? 0));
       setLargePrint(params.get("largePrint") === "1");
       setHandsFree(params.get("handsFree") === "1");
       setSimplifyMode(params.get("simplify") === "1");
+      setResolvedCapo(params.has("capo") ? Number(params.get("capo")) : null);
+      setResolvedTuning(params.get("tuning"));
     }
   }, []);
 
@@ -404,12 +414,13 @@ export default function SongsPage() {
         </div>
         <div className="studio-session-note" aria-label="Play-along recommendation">
           <span className="label">A good first pass</span>
-          <strong>{activeSong.title} · {activeSong.bpm} BPM</strong>
-          <span>Listen through once, then join after the four-count.</span>
+          <strong>{activeSong.title} · {songTempoBpm} BPM</strong>
+          <span>Listen through once, then join after the four-count.{resolvedCapo !== null ? ` Capo ${resolvedCapo}.` : ""}{resolvedTuning ? ` Tuning ${resolvedTuning}.` : ""}</span>
         </div>
       </section>
 
       <section className="song-coach song-coach-page">
+        {practiceContext ? <aside className="song-practice-context" aria-label="Right-hand practice context"><div><span className="label">From Right-hand Studio</span><strong>{practiceContext.exercise} · {practiceContext.style}</strong><p>{practiceContext.chords.length ? practiceContext.chords.join(" – ") : "Choose any Song Coach progression"} · {practiceContext.pattern}</p></div><button type="button" onClick={() => { setPracticeContext(null); setSongStep(0); setSongStatus("idle"); }}>Use selected song instead</button></aside> : null}
         <div className="song-card">
           <div className="song-meta">
             <label className="label" htmlFor="song-select">
@@ -522,7 +533,7 @@ export default function SongsPage() {
             <div className="song-guidance">
               <div className="song-guidance-card">
                 <span className="label">Strumming pattern</span>
-                <p className="strum-pattern">{activeVariation?.pattern ?? activeSong.strumPattern}</p>
+                <p className="strum-pattern">{practiceContext?.pattern ?? activeVariation?.pattern ?? activeSong.strumPattern}</p>
                 <p className="muted">{activeVariation?.feel ?? activeSong.strumFeel}</p>
               </div>
               <div className="song-guidance-card">

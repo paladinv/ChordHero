@@ -1,15 +1,47 @@
-<svg width="240" height="160" viewBox="0 0 240 160" fill="none" xmlns="http://www.w3.org/2000/svg">
+<svg width="192" height="192" viewBox="0 0 192 192" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Chord Hero</title>
+  <desc id="desc">A guitar pick containing a fretboard, chord fingering dots, and a sweeping strum.</desc>
   <defs>
-    <linearGradient id="pick" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#f4b350"/>
-      <stop offset="100%" stop-color="#d4573b"/>
+    <linearGradient id="pick" x1="38" y1="22" x2="154" y2="174" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#238C83"/>
+      <stop offset="1" stop-color="#07534F"/>
     </linearGradient>
+    <linearGradient id="strum" x1="42" y1="134" x2="151" y2="62" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F4B350"/>
+      <stop offset="1" stop-color="#FFD482"/>
+    </linearGradient>
+    <filter id="shadow" x="16" y="14" width="160" height="170" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="6" stdDeviation="6" flood-color="#0B322F" flood-opacity="0.2"/>
+    </filter>
   </defs>
-  <rect x="12" y="8" width="216" height="144" rx="72" fill="url(#pick)"/>
-  <rect x="32" y="28" width="176" height="104" rx="52" fill="#fffaf1" opacity="0.95"/>
-  <circle cx="90" cy="78" r="10" fill="#1f7a74"/>
-  <circle cx="150" cy="78" r="10" fill="#1f7a74"/>
-  <path d="M90 104C102 116 138 116 150 104" stroke="#1b1a17" stroke-width="6" stroke-linecap="round"/>
-  <path d="M118 32L130 60H110L118 32Z" fill="#1f7a74"/>
-  <path d="M118 60L136 86H100L118 60Z" fill="#1f7a74"/>
+
+  <g filter="url(#shadow)">
+    <path d="M96 18C119.2 18 145.7 27.1 157 47.4C171.9 74.1 156 121.7 110.2 166.6C102.3 174.4 89.7 174.4 81.8 166.6C36 121.7 20.1 74.1 35 47.4C46.3 27.1 72.8 18 96 18Z" fill="url(#pick)"/>
+    <path d="M96 25C117.1 25 140.8 33.1 150.9 51.2C163.5 73.8 149.8 116.1 105.3 159.8C100.1 164.9 91.9 164.9 86.7 159.8C42.2 116.1 28.5 73.8 41.1 51.2C51.2 33.1 74.9 25 96 25Z" stroke="#FFF9ED" stroke-opacity="0.26" stroke-width="2"/>
+  </g>
+
+  <g opacity="0.9" stroke="#FFF9ED" stroke-linecap="round">
+    <path d="M68 57V127" stroke-width="2"/>
+    <path d="M79.2 53V133" stroke-width="1.8"/>
+    <path d="M90.4 51V139" stroke-width="1.5"/>
+    <path d="M101.6 51V139" stroke-width="1.5"/>
+    <path d="M112.8 53V133" stroke-width="1.8"/>
+    <path d="M124 57V127" stroke-width="2"/>
+  </g>
+  <g opacity="0.42" stroke="#FFF9ED" stroke-width="2" stroke-linecap="round">
+    <path d="M62 70H130"/>
+    <path d="M60 88H132"/>
+    <path d="M61 106H131"/>
+    <path d="M64 124H128"/>
+  </g>
+
+  <circle cx="79" cy="79" r="6.5" fill="#F8C56B" stroke="#FFF9ED" stroke-width="2"/>
+  <circle cx="102" cy="97" r="6.5" fill="#F8C56B" stroke="#FFF9ED" stroke-width="2"/>
+  <circle cx="113" cy="115" r="6.5" fill="#F8C56B" stroke="#FFF9ED" stroke-width="2"/>
+
+  <path d="M43 130C69 144 119 140 147 105" stroke="#073F3C" stroke-opacity="0.34" stroke-width="10" stroke-linecap="round"/>
+  <path d="M42 125C69 141 121 136 150 99" stroke="url(#strum)" stroke-width="6" stroke-linecap="round"/>
+  <path d="M144 98L155 94L151 105" fill="#FFD482"/>
+
+  <path d="M139 46L142.3 54.7L151 58L142.3 61.3L139 70L135.7 61.3L127 58L135.7 54.7L139 46Z" fill="#FFF9ED"/>
 </svg>

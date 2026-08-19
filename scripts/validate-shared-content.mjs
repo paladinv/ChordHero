@@ -64,8 +64,10 @@ for (const song of songs.songs) {
   }
 }
 if (songs.songs.length !== 50) fail(`Expected 50 songs, found ${songs.songs.length}`);
-if (settings.tunings.length !== 4) fail("Expected four tunings");
+if (settings.tunings.length !== 5) fail("Expected five tunings, including seven-string standard adaptation");
+const sevenString = settings.tunings.find((tuning) => tuning.id === "standard-7");
+if (!sevenString || sevenString.strings.length !== 7 || sevenString.semitoneOffsets.length !== 7) fail("The seven-string tuning must define seven strings and offsets");
 
 const harmonicReport = validateHarmonicNotes(chords.chordLibrary);
 
-console.log(`Shared content is valid: 346 chords, 4 levels, 4 packs, 36 exercises, 50 songs, 4 tunings. Harmonic coverage: ${harmonicReport.complete} complete, ${harmonicReport.partial} intentional/partial, ${harmonicReport.bassWarnings} bass-label warnings.`);
+console.log(`Shared content is valid: 346 chords, 4 levels, 4 packs, 36 exercises, 50 songs, 5 tunings. Harmonic coverage: ${harmonicReport.complete} complete, ${harmonicReport.partial} intentional/partial, ${harmonicReport.bassWarnings} bass-label warnings.`);

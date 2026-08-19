@@ -10,6 +10,15 @@ A timed chord‑switching practice game for guitar players. The app flashes a ch
 - Right-hand studio with 36 strumming, plectrum, and fingerpicking drills
 - Beginner, intermediate, and expert practice filters
 - Animated follow-along patterns with adjustable tempo and optional audio clicks
+- Lazy microphone coach with calibration, beat timing, root-pitch evidence, harmonic-template chord confidence, and last-two-take comparison
+- Per-drill goals, clean-streak speed ladders, style presets, custom chord backing, guided milestones, and local practice history
+- User-opened Practice Lab with live onset cues, demo-only slow motion, target-voicing and backing-mix controls, no-look/performance modes, a six-part skill map, adaptive warmups, fatigue and recovery prompts, bookmarks, named playlists, personal notes, and constrained random drills
+- Validated attributed challenge-pack JSON import/export; imported exercise references and metadata stay available offline in local browser storage
+- Local teacher assignments with consent-safe audio/video links or recording references
+
+Right-hand microphone analysis runs only after the learner opens the coach and grants permission. Learners can calibrate the target progression to their own guitar/tuning, then choose timing-only, root, or root-and-quality evidence. Full-guitar results are confidence estimates rather than guaranteed chord recognition. Recording privacy is explicit: retain the last two takes locally, keep a take in memory for manual export, or prepare teacher-share metadata without uploading audio. Close-up video uses a local approved-source registry with required creator/licence/attribution plus optional captions, transcript, and left-handed footage; Chord Hero supplies no footage and does not verify rights. Teacher media links and timestamped recording references are metadata only—Chord Hero does not provide hosted accounts or upload storage.
+
+Live listen mode is a lightweight attack-to-pulse guide, not continuous chord recognition. Target sounds reuse and filter the app's existing guitar samples rather than downloading instrument libraries. Skill-map values are practice-history indicators, performance scorecards clearly distinguish microphone timing evidence from completion-only results, and community/teacher challenge packs require local JSON import—there is no hosted community catalogue or automatic rights verification.
 
 ## Local development
 1. Install dependencies: `npm install`

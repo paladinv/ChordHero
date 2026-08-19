@@ -7,7 +7,7 @@
   "background_color": "#f7f1e8",
   "theme_color": "#1f7a74",
   "icons": [
-    { "src": "/chord-hero-logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+    { "src": "/chord-hero-logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
   ],
   "shortcuts": [
     { "name": "Daily plan", "url": "/practice" },

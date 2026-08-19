@@ -42,7 +42,21 @@ export type PracticeAssignment = {
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
+  feedbackAttachments?: PracticeFeedbackAttachment[];
 };
+
+export type PracticeFeedbackAttachment = {
+  id: string;
+  kind: "audioLink" | "videoLink" | "recordingReference";
+  label: string;
+  url?: string;
+  recordingId?: string;
+  createdAt: string;
+  consentNote: string;
+  timestampSeconds?: number;
+};
+
+export type WeeklyRightHandGoal = { targetMinutes: number; minimumTechniquePercent: number };
 
 export type CustomRightHandRoutine = {
   id: string;
@@ -56,6 +70,8 @@ export type CustomRightHandRoutine = {
 export type AccessibilityPreferences = {
   reducedMotion: boolean;
   highContrast: boolean;
+  colorBlindSafe: boolean;
+  dyslexiaSpacing: boolean;
   diagramScale: number;
   audioVolume: number;
   audioMuted: boolean;
@@ -71,6 +87,7 @@ export type PracticePlatformState = {
   assignments: PracticeAssignment[];
   customRoutines: CustomRightHandRoutine[];
   accessibility: AccessibilityPreferences;
+  weeklyRightHandGoal: WeeklyRightHandGoal;
 };
 
 export const PRACTICE_STORAGE_KEY = "chord-hero:practice-platform:v1";
@@ -79,10 +96,12 @@ export const PRACTICE_STATE_EVENT = "chord-hero:practice-state";
 export const DEFAULT_ACCESSIBILITY: AccessibilityPreferences = {
   reducedMotion: false,
   highContrast: false,
+  colorBlindSafe: false,
+  dyslexiaSpacing: false,
   diagramScale: 1,
   audioVolume: 0.8,
   audioMuted: false,
-  haptics: true,
+  haptics: false,
   handedness: "right"
 };
 
@@ -94,7 +113,8 @@ export function emptyPracticePlatformState(): PracticePlatformState {
     plans: [],
     assignments: [],
     customRoutines: [],
-    accessibility: { ...DEFAULT_ACCESSIBILITY }
+    accessibility: { ...DEFAULT_ACCESSIBILITY },
+    weeklyRightHandGoal: { targetMinutes: 45, minimumTechniquePercent: 20 }
   };
 }
 
@@ -109,7 +129,8 @@ export function normalizePracticePlatformState(value: unknown): PracticePlatform
     plans: Array.isArray(source.plans) ? source.plans.slice(-31) : [],
     assignments: Array.isArray(source.assignments) ? source.assignments : [],
     customRoutines: Array.isArray(source.customRoutines) ? source.customRoutines : [],
-    accessibility: { ...DEFAULT_ACCESSIBILITY, ...(source.accessibility ?? {}) }
+    accessibility: { ...DEFAULT_ACCESSIBILITY, ...(source.accessibility ?? {}) },
+    weeklyRightHandGoal: { targetMinutes: 45, minimumTechniquePercent: 20, ...(source.weeklyRightHandGoal ?? {}) }
   };
 }
 
@@ -209,7 +230,8 @@ export function mergePracticePlatformStates(local: PracticePlatformState, remote
     plans: [...new Map([...local.plans, ...remote.plans].map((plan) => [plan.date, plan])).values()].slice(-31),
     assignments: mergeById(local.assignments, remote.assignments),
     customRoutines: mergeById(local.customRoutines, remote.customRoutines),
-    accessibility: newer.accessibility
+    accessibility: newer.accessibility,
+    weeklyRightHandGoal: newer.weeklyRightHandGoal
   });
 }
 

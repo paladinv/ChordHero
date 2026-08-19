@@ -1,5 +1,4 @@
 "use client";
-
 import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
@@ -17,149 +16,20 @@ import {
   preloadRightHandAudio
 } from "../../lib/recordedAudio";
 import type { RecordingAnalysis } from "../../lib/songRecordingAnalysis";
-
-const RightHandRecordingCoach = dynamic(() => import("../../components/RightHandRecordingCoach"), {
-  ssr: false,
-  loading: () => <div className="recording-coach-loading">Loading microphone coach…</div>
-});
-
+import { RIGHT_HAND_GUIDED_PATHS as GUIDED_PATHS, RIGHT_HAND_PROGRESSIONS as PROGRESSIONS, RIGHT_HAND_ROUND_OPTIONS as ROUND_OPTIONS } from "../../lib/rightHandPracticePresets";
+import type { PracticeModeSettings, RightHandChallengeMode, RightHandStylePreset } from "../../components/RightHandAdvancedTools";
+import { DEFAULT_RIGHT_HAND_MODE_SETTINGS, describeRightHandStep as describeStep, formatPracticeTime as formatTime, readPracticeAudioPreferences, rememberedRightHandTempo as rememberedTempo, rightHandCountLabel as countLabel, rightHandExerciseById as exerciseById, rightHandSubdivisionsPerBeat as subdivisionsPerBeat, saveRightHandPracticeResult as savePracticeResult, shouldPlayStyleBacking, validCustomProgression, type ExerciseProgress } from "../../lib/rightHandPracticeRuntime";
+const RightHandRecordingCoach = dynamic(() => import("../../components/RightHandRecordingCoach"), { ssr: false, loading: () => <div className="recording-coach-loading">Loading coach…</div> });
+const LicensedDemo = dynamic(() => import("../../components/LicensedDemo"), { ssr: false, loading: () => <div className="licensed-demo-loading">Loading demonstration slot…</div> });
+const RightHandAdvancedTools = dynamic(() => import("../../components/RightHandAdvancedTools"), { ssr: false, loading: () => <div className="recording-coach-loading">Loading controls…</div> });
+const RH3D = dynamic(() => import("../../components/RightHandTechnique3D"), { ssr: false });
 type PracticeStatus = "idle" | "countin" | "running" | "paused" | "complete";
 type SoundMode = "click" | "guitar" | "both" | "silent";
-type Backing = "off" | "G" | "C" | "Am";
 type Rating = "clean" | "mistakes" | "fast";
-type ExerciseProgress = {
-  bestBpm: number;
-  sessions: number;
-  cleanSessions: number;
-  totalSeconds: number;
-  lastPracticed: string;
-  cleanStreak?: number;
-  bestTimingScore?: number;
-  recentMisses?: number[];
-};
 type ClickFeel = "straight" | "swing";
 type AccentMode = "downbeat" | "two-four" | "pattern";
-
 const TECHNIQUES = Object.keys(TECHNIQUE_DETAILS) as RightHandTechnique[];
 const DIFFICULTIES = Object.keys(DIFFICULTY_DETAILS) as RightHandDifficulty[];
-const ROUND_OPTIONS = [
-  { seconds: 30, label: "30 sec" },
-  { seconds: 60, label: "1 min" },
-  { seconds: 180, label: "3 min" },
-  { seconds: 0, label: "Free" }
-];
-const GUIDED_PATHS = [
-  {
-    id: "steady-strummer",
-    title: "First week of strumming",
-    description: "Pulse → down-up motion → rests → mutes",
-    exercises: ["strum-quarter-downs", "strum-eighth-engine", "strum-space", "strum-first-mute"]
-  },
-  {
-    id: "accurate-pick",
-    title: "Alternate-picking accuracy",
-    description: "Single string → crossing → skipping → triplets",
-    exercises: ["pick-single-string", "pick-two-string", "pick-inside-out", "pick-triplet-roll"]
-  },
-  {
-    id: "fingerstyle-foundation",
-    title: "Fingerstyle foundations",
-    description: "Thumb → P–i–m–a → pinches → Travis picking",
-    exercises: ["finger-thumb", "finger-pima", "finger-pinches", "finger-travis"]
-  }
-];
-
-const PRACTICE_STORAGE_KEY = "chord-hero:practice-platform:v1";
-
-function readPracticeAudioPreferences() {
-  try {
-    const state = JSON.parse(window.localStorage.getItem(PRACTICE_STORAGE_KEY) ?? "null");
-    return {
-      audioMuted: Boolean(state?.accessibility?.audioMuted),
-      audioVolume: Number(state?.accessibility?.audioVolume) || 0.8
-    };
-  } catch {
-    return { audioMuted: false, audioVolume: 0.8 };
-  }
-}
-
-function savePracticeResult(result: {
-  area: "rightHand";
-  itemId: string;
-  title: string;
-  seconds: number;
-  score?: number;
-  misses?: number;
-  tempo?: number;
-  note?: string;
-}) {
-  void import("../../lib/practicePlatform").then(({ recordPracticeResult }) => recordPracticeResult(result));
-}
-
-function describeStep(step: string, technique: RightHandTechnique) {
-  const accent = step.endsWith("!");
-  const clean = step.replace("!", "");
-  if (clean === "·") return { main: "—", detail: "rest", accent, rest: true, strings: [] as number[] };
-  if (clean === "X") return { main: "×", detail: "mute", accent, rest: false, strings: [1, 2, 3, 4, 5, 6] };
-  if (technique === "strumming") {
-    return {
-      main: clean === "D" ? "↓" : "↑",
-      detail: clean === "D" ? "down" : "up",
-      accent,
-      rest: false,
-      strings: [1, 2, 3, 4, 5, 6]
-    };
-  }
-  if (technique === "plectrum") {
-    const match = clean.match(/^(\d)(D|U)$/);
-    const stringNumber = Number(match?.[1] ?? 3);
-    return {
-      main: match?.[2] === "D" ? "↓" : "↑",
-      detail: `string ${stringNumber}`,
-      accent,
-      rest: false,
-      strings: [stringNumber]
-    };
-  }
-  const strings = clean.match(/\d/g)?.map(Number) ?? [];
-  return {
-    main: clean.replace(/[\d+]/g, "") || clean,
-    detail: strings.length ? `string ${strings.join(" + ")}` : "pinch",
-    accent,
-    rest: false,
-    strings
-  };
-}
-
-function countLabel(index: number, subdivision: RightHandExercise["subdivision"]) {
-  if (subdivision === "Quarter notes") return String((index % 4) + 1);
-  if (subdivision === "Eighth notes") return index % 2 === 0 ? String((index / 2) % 4 + 1) : "&";
-  if (subdivision === "Triplets") return [String(Math.floor(index / 3) % 4 + 1), "trip", "let"][index % 3];
-  return [String(Math.floor(index / 4) % 4 + 1), "e", "&", "a"][index % 4];
-}
-
-function subdivisionsPerBeat(subdivision: RightHandExercise["subdivision"]) {
-  if (subdivision === "Quarter notes") return 1;
-  if (subdivision === "Eighth notes") return 2;
-  if (subdivision === "Triplets") return 3;
-  return 4;
-}
-
-function formatTime(seconds: number) {
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes}:${String(Math.max(0, seconds % 60)).padStart(2, "0")}`;
-}
-
-function exerciseById(id: string | null) {
-  return RIGHT_HAND_EXERCISES.find((exercise) => exercise.id === id);
-}
-
-function rememberedTempo(exercise: RightHandExercise, progressBpm = 0) {
-  if (typeof window === "undefined") return progressBpm || exercise.bpm;
-  const stored = Number(window.localStorage.getItem(`chord-hero:right-hand:tempo:${exercise.id}`));
-  return Number.isFinite(stored) && stored >= 40 && stored <= 180 ? stored : progressBpm || exercise.bpm;
-}
-
 export default function RightHandPage() {
   const [technique, setTechnique] = useState<RightHandTechnique>("strumming");
   const [difficulty, setDifficulty] = useState<RightHandDifficulty>("beginner");
@@ -172,7 +42,9 @@ export default function RightHandPage() {
   const [loopsCompleted, setLoopsCompleted] = useState(0);
   const [roundSeconds, setRoundSeconds] = useState(60);
   const [soundMode, setSoundMode] = useState<SoundMode>("both");
-  const [backing, setBacking] = useState<Backing>("off");
+  const [progressionId, setProgressionId] = useState("off");
+  const [customProgression, setCustomProgression] = useState("G C D G");
+  const [stylePreset, setStylePreset] = useState("neutral");
   const [autoRamp, setAutoRamp] = useState(true);
   const [rampAmount, setRampAmount] = useState(4);
   const [showPaths, setShowPaths] = useState(false);
@@ -190,7 +62,11 @@ export default function RightHandPage() {
   const [customPattern, setCustomPattern] = useState("");
   const [customRoutineCount, setCustomRoutineCount] = useState(0);
   const [voiceEnabled, setVoiceEnabled] = useState(false);
-
+  const [ladderRequiredRounds, setLadderRequiredRounds] = useState(2);
+  const [showDemoMedia, setShowDemoMedia] = useState(false);
+  const [showAdvancedTools, setShowAdvancedTools] = useState(false);
+  const [challengeMode, setChallengeMode] = useState<RightHandChallengeMode>("standard");
+  const [modes, setModes] = useState<PracticeModeSettings>(DEFAULT_RIGHT_HAND_MODE_SETTINGS);
   const audioContextRef = useRef<AudioContext | null>(null);
   const schedulerRef = useRef<number | null>(null);
   const elapsedTimerRef = useRef<number | null>(null);
@@ -199,7 +75,6 @@ export default function RightHandPage() {
   const statusRef = useRef<PracticeStatus>("idle");
   const tapsRef = useRef<number[]>([]);
   const togglePlaybackRef = useRef<() => void>(() => undefined);
-
   const exercises = useMemo(
     () => RIGHT_HAND_EXERCISES.filter((exercise) => exercise.technique === technique && exercise.difficulty === difficulty),
     [difficulty, technique]
@@ -215,7 +90,15 @@ export default function RightHandPage() {
   const remainingSeconds = roundSeconds ? Math.max(0, roundSeconds - elapsedSeconds) : elapsedSeconds;
   const activePath = GUIDED_PATHS.find((path) => path.id === activePathId);
   const pathIndex = activePath?.exercises.indexOf(selectedExercise?.id ?? "") ?? -1;
-
+  const chordProgression = useMemo(() => {
+    const selectedProgression = PROGRESSIONS.find((item) => item.id === progressionId);
+    return progressionId === "custom" ? validCustomProgression(customProgression) : [...(selectedProgression?.chords ?? [])];
+  }, [customProgression, progressionId]);
+  const goalTargetBpm = exerciseProgress?.goalTargetBpm ?? Math.min(180, selectedExercise.bpm + 20);
+  const goalRequiredRounds = exerciseProgress?.goalRequiredRounds ?? 3;
+  const goalRoundsAtTarget = exerciseProgress?.goalRoundsAtTarget ?? 0;
+  const goalTimingScore = exerciseProgress?.goalTimingScore ?? 85;
+  const goalPracticeMinutes = exerciseProgress?.goalPracticeMinutes ?? 10;
   const clearScheduledWork = useCallback(() => {
     sourcesGenerationRef.current += 1;
     if (schedulerRef.current !== null) window.clearInterval(schedulerRef.current);
@@ -225,7 +108,6 @@ export default function RightHandPage() {
     timeoutsRef.current.forEach((timeout) => window.clearTimeout(timeout));
     timeoutsRef.current.clear();
   }, []);
-
   const scheduleTimeout = useCallback((callback: () => void, delay: number) => {
     const timeout = window.setTimeout(() => {
       timeoutsRef.current.delete(timeout);
@@ -234,7 +116,6 @@ export default function RightHandPage() {
     timeoutsRef.current.add(timeout);
     return timeout;
   }, []);
-
   const ensureAudio = useCallback(async () => {
     if (!audioContextRef.current) audioContextRef.current = new AudioContext();
     const context = audioContextRef.current;
@@ -242,7 +123,6 @@ export default function RightHandPage() {
     await preloadRightHandAudio(context);
     return context;
   }, []);
-
   const finishSession = useCallback(() => {
     if (!selectedExercise || !["running", "countin"].includes(statusRef.current)) return;
     clearScheduledWork();
@@ -269,7 +149,6 @@ export default function RightHandPage() {
       };
     });
   }, [clearScheduledWork, elapsedSeconds, roundSeconds, selectedExercise]);
-
   const pauseSession = useCallback(() => {
     if (!["running", "countin"].includes(statusRef.current)) return;
     clearScheduledWork();
@@ -277,7 +156,6 @@ export default function RightHandPage() {
     setStatus("paused");
     setStatusMessage("Paused");
   }, [clearScheduledWork]);
-
   const resetSession = useCallback(() => {
     clearScheduledWork();
     statusRef.current = "idle";
@@ -288,7 +166,6 @@ export default function RightHandPage() {
     setLoopsCompleted(0);
     setStatusMessage("Ready to practise");
   }, [clearScheduledWork]);
-
   const beginScheduledPlayback = useCallback((
     context: AudioContext,
     exercise: RightHandExercise,
@@ -306,7 +183,6 @@ export default function RightHandPage() {
     const preferences = readPracticeAudioPreferences();
     const masterVolume = preferences.audioMuted ? 0 : preferences.audioVolume;
     statusRef.current = "running";
-
     const scheduleAhead = () => {
       if (
         generation !== sourcesGenerationRef.current ||
@@ -320,46 +196,47 @@ export default function RightHandPage() {
           schedulerRef.current = null;
           return;
         }
-
         const stepOrdinal = scheduledIndex;
         const patternIndex = patternIndexes[stepOrdinal % patternIndexes.length];
         const rawStep = exercise.pattern[patternIndex];
         const step = describeStep(rawStep, exercise.technique);
         const isBeat = scheduledIndex % perBeat === 0;
         const beatNumber = Math.floor(scheduledIndex / perBeat);
+        const subdivisionIndex = scheduledIndex % perBeat;
         const isSilentGap = silentEvery > 0 && beatNumber > 0 && beatNumber % silentEvery === silentEvery - 1;
-        const metronomeAccent = accentMode === "two-four"
+        const regularAccent = accentMode === "two-four"
           ? isBeat && beatNumber % 4 % 2 === 1
           : accentMode === "downbeat" ? isBeat && beatNumber % 4 === 0 : step.accent || isBeat;
+        const metronomeAccent = challengeMode === "random" ? (beatNumber * 11 + stepOrdinal * 5 + patternIndexes.length) % 7 < 2 : regularAccent;
         const when = nextStepTime;
         if (!step.rest && !isSilentGap && masterVolume > 0 && (soundMode === "click" || soundMode === "both")) {
-          void playRecordedClick(context, { accent: metronomeAccent, volume: 0.13 * masterVolume, when });
+          void playRecordedClick(context, { accent: metronomeAccent, volume: 0.13 * masterVolume * modes.clickMix / 100, when });
         }
         if (!step.rest && masterVolume > 0 && (soundMode === "guitar" || soundMode === "both")) {
           void playRecordedGuitarStep(context, {
             token: rawStep,
             technique: exercise.technique,
             accent: step.accent,
-            volume: (soundMode === "both" ? 0.15 : 0.22) * masterVolume,
+            volume: (soundMode === "both" ? 0.15 : 0.22) * masterVolume * modes.guitarMix / 100,
+            targetSound: modes.targetSound,
             when
           });
         }
-        if (backing !== "off" && isBeat && masterVolume > 0) {
-          void playRecordedBackingPulse(context, backing, when, 0.07 * masterVolume);
+        if (chordProgression.length && masterVolume > 0 && shouldPlayStyleBacking(stylePreset, beatNumber, subdivisionIndex, perBeat)) {
+          const chordIndex = Math.floor(beatNumber / 4) % chordProgression.length;
+          void playRecordedBackingPulse(context, chordProgression[chordIndex], when, 0.07 * masterVolume * modes.contextMix / 100);
         }
-
         scheduleTimeout(() => {
           if (generation !== sourcesGenerationRef.current) return;
           setActiveStep(patternIndex);
+          if (isBeat && preferences.haptics && !preferences.reducedMotion && "vibrate" in navigator) navigator.vibrate(metronomeAccent ? 18 : 9);
           if (stepOrdinal > 0 && stepOrdinal % patternIndexes.length === 0) setLoopsCompleted((value) => value + 1);
         }, (when - context.currentTime) * 1000);
-
         scheduledIndex += 1;
         const swingable = clickFeel === "swing" && perBeat === 2;
         nextStepTime += swingable ? (scheduledIndex % 2 === 1 ? baseStepDuration * 4 / 3 : baseStepDuration * 2 / 3) : baseStepDuration;
       }
     };
-
     scheduleTimeout(() => {
       if (generation !== sourcesGenerationRef.current) return;
       statusRef.current = "running";
@@ -371,11 +248,9 @@ export default function RightHandPage() {
         setElapsedSeconds(Math.floor((performance.now() - startedAt) / 1000));
       }, 250);
     }, (startAt - context.currentTime) * 1000);
-
     scheduleAhead();
     schedulerRef.current = window.setInterval(scheduleAhead, 25);
-  }, [accentMode, backing, bpm, clickFeel, finishSession, roundSeconds, scheduleTimeout, silentEvery, soundMode, troubleLoop]);
-
+  }, [accentMode, bpm, challengeMode, chordProgression, clickFeel, finishSession, modes, roundSeconds, scheduleTimeout, silentEvery, soundMode, stylePreset, troubleLoop]);
   const startSession = useCallback(async () => {
     if (!selectedExercise || statusRef.current === "running" || statusRef.current === "countin") return;
     clearScheduledWork();
@@ -387,15 +262,14 @@ export default function RightHandPage() {
     setStatus("countin");
     setCountIn(4);
     setStatusMessage("Count in");
-
     for (let beat = 0; beat < 4; beat += 1) {
       const when = firstBeat + beat * beatDuration;
-      void playRecordedClick(context, { accent: beat === 0, volume: 0.2, when });
+      const audio = readPracticeAudioPreferences();
+      void playRecordedClick(context, { accent: beat === 0, volume: (audio.audioMuted ? 0 : 0.2 * audio.audioVolume * modes.clickMix / 100), when });
       scheduleTimeout(() => setCountIn(4 - beat), (when - context.currentTime) * 1000);
     }
     beginScheduledPlayback(context, selectedExercise, firstBeat + 4 * beatDuration, generation);
-  }, [beginScheduledPlayback, bpm, clearScheduledWork, ensureAudio, scheduleTimeout, selectedExercise]);
-
+  }, [beginScheduledPlayback, bpm, clearScheduledWork, ensureAudio, modes.clickMix, scheduleTimeout, selectedExercise]);
   const selectExercise = useCallback((exercise: RightHandExercise) => {
     resetSession();
     setTroubleLoop(null);
@@ -404,7 +278,6 @@ export default function RightHandPage() {
     setSelectedId(exercise.id);
     setBpm(rememberedTempo(exercise, progress[exercise.id]?.bestBpm));
   }, [progress, resetSession]);
-
   const changeFilters = useCallback((nextTechnique: RightHandTechnique, nextDifficulty: RightHandDifficulty) => {
     resetSession();
     setTechnique(nextTechnique);
@@ -419,11 +292,10 @@ export default function RightHandPage() {
       setBpm(rememberedTempo(first, progress[first.id]?.bestBpm));
     }
   }, [progress, resetSession]);
-
   const rateSession = useCallback((rating: Rating) => {
     if (!selectedExercise) return;
     const previousStreak = progress[selectedExercise.id]?.cleanStreak ?? 0;
-    const earnedRamp = rating === "clean" && previousStreak + 1 >= 2;
+    const earnedRamp = rating === "clean" && autoRamp && previousStreak + 1 >= ladderRequiredRounds;
     const nextBpm = earnedRamp && autoRamp
       ? Math.min(180, bpm + rampAmount)
       : rating === "fast"
@@ -444,7 +316,11 @@ export default function RightHandPage() {
             ...current,
             bestBpm: Math.max(current.bestBpm, bpm),
             cleanSessions: current.cleanSessions + 1,
-            cleanStreak: earnedRamp ? 0 : previousStreak + 1
+            cleanStreak: earnedRamp ? 0 : previousStreak + 1,
+            ladderStage: earnedRamp ? (current.ladderStage ?? 0) + 1 : current.ladderStage ?? 0,
+            goalTargetBpm,
+            goalRequiredRounds,
+            goalRoundsAtTarget: bpm >= goalTargetBpm ? Math.min(goalRequiredRounds, (current.goalRoundsAtTarget ?? 0) + 1) : current.goalRoundsAtTarget ?? 0
           }
         };
       });
@@ -462,15 +338,17 @@ export default function RightHandPage() {
       misses: rating === "clean" ? 0 : rating === "mistakes" ? 2 : 4,
       note: rating === "fast" ? "Tempo felt too fast." : rating === "mistakes" ? "Repeat at the same tempo." : "Self-rated clean round."
     });
+    window.dispatchEvent(new CustomEvent("chord-hero:right-hand-rating", { detail: rating }));
     resetSession();
     setBpm(nextBpm);
+    const preferences = readPracticeAudioPreferences();
+    if (rating === "clean" && preferences.haptics && !preferences.reducedMotion && "vibrate" in navigator) navigator.vibrate([18, 32, 18]);
     setStatusMessage(
       rating === "clean"
-        ? earnedRamp && autoRamp ? `Two clean rounds. Next tempo: ${nextBpm} BPM.` : `Clean streak ${previousStreak + 1}/2. Repeat once before raising tempo.`
+        ? earnedRamp && autoRamp ? `${ladderRequiredRounds} clean rounds. Speed ladder advances to ${nextBpm} BPM.` : `Clean streak ${previousStreak + 1}/${ladderRequiredRounds}. Repeat before raising tempo.`
         : rating === "fast" ? `Tempo reduced to ${nextBpm} BPM.` : "Repeat at the same tempo."
     );
-  }, [autoRamp, bpm, elapsedSeconds, progress, rampAmount, resetSession, roundSeconds, selectedExercise]);
-
+  }, [autoRamp, bpm, elapsedSeconds, goalRequiredRounds, goalTargetBpm, ladderRequiredRounds, progress, rampAmount, resetSession, roundSeconds, selectedExercise]);
   const handleRecordingAnalysis = useCallback((analysis: RecordingAnalysis) => {
     if (!selectedExercise) return;
     setProgress((previous) => {
@@ -488,15 +366,14 @@ export default function RightHandPage() {
       misses: analysis.troubleBeats.length, note: `${analysis.timingTendency}; chord-attack ${analysis.chordAttackScore}%`
     });
   }, [bpm, selectedExercise]);
-
-  const loopTroubleStep = useCallback((step: number) => {
+  const loopTroubleStep = useCallback((step: number, requestedEnd?: number) => {
     if (!selectedExercise) return;
     const start = Math.max(0, Math.min(step, selectedExercise.pattern.length - 1));
-    setTroubleLoop({ start, end: Math.min(selectedExercise.pattern.length - 1, start + 3) });
+    const end = Math.max(start, Math.min(selectedExercise.pattern.length - 1, requestedEnd ?? start + 3));
+    setTroubleLoop({ start, end });
     resetSession();
-    setStatusMessage(`Looping steps ${start + 1}–${Math.min(selectedExercise.pattern.length, start + 4)}.`);
+    setStatusMessage(`Looping steps ${start + 1}–${end + 1}.`);
   }, [resetSession, selectedExercise]);
-
   const tapTempo = useCallback(() => {
     const now = performance.now();
     const recent = tapsRef.current.filter((tap) => now - tap < 2500);
@@ -507,7 +384,6 @@ export default function RightHandPage() {
     const average = gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
     setBpm(Math.max(40, Math.min(180, Math.round(60000 / average))));
   }, []);
-
   const enableMidi = useCallback(async () => {
     type MidiAccess = { inputs: Map<string, { onmidimessage: ((event: { data: Uint8Array }) => void) | null }> };
     type MidiNavigator = Navigator & { requestMIDIAccess?: () => Promise<MidiAccess> };
@@ -526,7 +402,6 @@ export default function RightHandPage() {
     setMidiEnabled(true);
     setStatusMessage("MIDI pedal enabled. Any note toggles playback.");
   }, []);
-
   const enableVoiceControl = useCallback(() => {
     type Recognition = { continuous: boolean; lang: string; start: () => void; stop: () => void; onresult: ((event: { results: ArrayLike<ArrayLike<{ transcript: string }>> }) => void) | null; onend: (() => void) | null };
     type RecognitionConstructor = new () => Recognition;
@@ -547,7 +422,6 @@ export default function RightHandPage() {
     setVoiceEnabled(true);
     setStatusMessage("Voice control ready: start, pause, faster, or slower.");
   }, []);
-
   const saveCustomRoutine = useCallback(() => {
     if (!selectedExercise) return;
     const tokens = customPattern.trim().split(/[\s,]+/).filter(Boolean);
@@ -564,31 +438,76 @@ export default function RightHandPage() {
     setCustomTitle(""); setCustomPattern(""); setCustomRoutineCount((count) => count + 1);
     setStatusMessage("Custom routine saved to your practice workspace.");
   }, [bpm, customPattern, customTitle, selectedExercise]);
-
+  const updateGoal = useCallback((targetBpm: number, requiredRounds: number, timingScore: number, practiceMinutes: number) => {
+    if (!selectedExercise) return;
+    setProgress((previous) => {
+      const current = previous[selectedExercise.id] ?? { bestBpm: 0, sessions: 0, cleanSessions: 0, totalSeconds: 0, lastPracticed: "" };
+      return { ...previous, [selectedExercise.id]: { ...current, goalTargetBpm: targetBpm, goalRequiredRounds: requiredRounds, goalTimingScore: timingScore, goalPracticeMinutes: practiceMinutes, goalRoundsAtTarget: 0 } };
+    });
+    setStatusMessage(`Goal saved: ${requiredRounds} clean rounds, ${targetBpm} BPM, ${timingScore}% timing, ${practiceMinutes} minutes.`);
+  }, [selectedExercise]);
+  const applyChallenge = useCallback((mode: RightHandChallengeMode) => {
+    resetSession(); setChallengeMode(mode);
+    if (mode === "sustain") setRoundSeconds(120);
+    if (mode === "ladder") setAutoRamp(true);
+    if (mode === "silent") setSilentEvery(4);
+    setStatusMessage(mode === "standard" ? "Standard practice restored." : `${mode} challenge ready.`);
+  }, [resetSession]);
+  const playInContext = useCallback(() => {
+    if (!selectedExercise) return;
+    const params = new URLSearchParams({ context: "right-hand", exercise: selectedExercise.id, tempo: String(bpm), pattern: selectedExercise.pattern.join(" "), style: stylePreset });
+    if (chordProgression.length) params.set("progression", chordProgression.join(","));
+    window.location.assign(`/songs?${params.toString()}`);
+  }, [bpm, chordProgression, selectedExercise, stylePreset]);
+  const resetSpeedLadder = useCallback(() => {
+    if (!selectedExercise) return;
+    setProgress((previous) => {
+      const current = previous[selectedExercise.id];
+      if (!current) return previous;
+      return { ...previous, [selectedExercise.id]: { ...current, cleanStreak: 0, ladderStage: 0 } };
+    });
+    setBpm(selectedExercise.bpm);
+    resetSession();
+    setStatusMessage(`Speed ladder reset to ${selectedExercise.bpm} BPM.`);
+  }, [resetSession, selectedExercise]);
+  const applyStylePreset = useCallback((preset: RightHandStylePreset) => {
+    setStylePreset(preset.id);
+    setClickFeel(preset.feel);
+    setAccentMode(preset.accent);
+    setProgressionId(preset.progression);
+    const exercise = exerciseById(preset.exerciseId);
+    if (exercise) selectExercise(exercise);
+    setStatusMessage(`${preset.label} setup loaded. Adjust it freely in advanced tools.`);
+  }, [selectExercise]);
   useEffect(() => {
     statusRef.current = status;
   }, [status]);
-
   useEffect(() => {
     if (hydrated) return;
     const savedProgress = window.localStorage.getItem("chord-hero:right-hand:progress");
     const savedSettings = window.localStorage.getItem("chord-hero:right-hand:settings");
     const params = new URLSearchParams(window.location.search);
     if (savedProgress) {
-      try { setProgress(JSON.parse(savedProgress)); } catch { /* Ignore malformed local data. */ }
+      try { setProgress(JSON.parse(savedProgress)); } catch { }
     }
     if (savedSettings) {
       try {
         const settings = JSON.parse(savedSettings);
         if (ROUND_OPTIONS.some((option) => option.seconds === settings.roundSeconds)) setRoundSeconds(settings.roundSeconds);
         if (["click", "guitar", "both", "silent"].includes(settings.soundMode)) setSoundMode(settings.soundMode);
-        if (["off", "G", "C", "Am"].includes(settings.backing)) setBacking(settings.backing);
+        if (PROGRESSIONS.some((item) => item.id === settings.progressionId)) setProgressionId(settings.progressionId);
+        else if (settings.backing === "G") setProgressionId("gcd");
+        else if (settings.backing === "C") setProgressionId("pop-c");
+        if (typeof settings.customProgression === "string") setCustomProgression(settings.customProgression);
+        if (typeof settings.stylePreset === "string") setStylePreset(settings.stylePreset);
         if (typeof settings.autoRamp === "boolean") setAutoRamp(settings.autoRamp);
         if ([2, 4, 6].includes(settings.rampAmount)) setRampAmount(settings.rampAmount);
         if (["straight", "swing"].includes(settings.clickFeel)) setClickFeel(settings.clickFeel);
         if (["downbeat", "two-four", "pattern"].includes(settings.accentMode)) setAccentMode(settings.accentMode);
         if ([0, 4, 8].includes(settings.silentEvery)) setSilentEvery(settings.silentEvery);
-      } catch { /* Ignore malformed local data. */ }
+        if ([2, 3, 4].includes(settings.ladderRequiredRounds)) setLadderRequiredRounds(settings.ladderRequiredRounds);
+        if (["standard", "sustain", "ladder", "silent", "random"].includes(settings.challengeMode)) setChallengeMode(settings.challengeMode);
+      } catch { }
     }
     const linkedExercise = exerciseById(params.get("exercise"));
     const fallbackTechnique = (window.localStorage.getItem("chord-hero:right-hand:technique") as RightHandTechnique) || "strumming";
@@ -609,7 +528,6 @@ export default function RightHandPage() {
       setCustomRoutineCount(readPracticePlatformState().customRoutines.length);
     });
   }, [hydrated]);
-
   useEffect(() => {
     if (!hydrated || !selectedExercise) return;
     window.localStorage.setItem("chord-hero:right-hand:progress", JSON.stringify(progress));
@@ -618,13 +536,12 @@ export default function RightHandPage() {
     window.localStorage.setItem(`chord-hero:right-hand:last:${technique}:${difficulty}`, selectedExercise.id);
     window.localStorage.setItem(`chord-hero:right-hand:tempo:${selectedExercise.id}`, String(bpm));
     window.localStorage.setItem("chord-hero:right-hand:settings", JSON.stringify({
-      roundSeconds, soundMode, backing, autoRamp, rampAmount, clickFeel, accentMode, silentEvery
+      roundSeconds, soundMode, progressionId, customProgression, stylePreset, autoRamp, rampAmount, clickFeel, accentMode, silentEvery, ladderRequiredRounds, challengeMode
     }));
     const url = new URL(window.location.href);
     url.searchParams.set("exercise", selectedExercise.id);
     window.history.replaceState(null, "", `${url.pathname}${url.search}`);
-  }, [accentMode, activePathId, autoRamp, backing, bpm, clickFeel, difficulty, hydrated, progress, rampAmount, roundSeconds, selectedExercise, silentEvery, soundMode, technique]);
-
+  }, [accentMode, activePathId, autoRamp, bpm, challengeMode, clickFeel, customProgression, difficulty, hydrated, ladderRequiredRounds, progress, progressionId, rampAmount, roundSeconds, selectedExercise, silentEvery, soundMode, stylePreset, technique]);
   useEffect(() => {
     const toggle = () => {
       if (statusRef.current === "running" || statusRef.current === "countin") pauseSession();
@@ -652,7 +569,6 @@ export default function RightHandPage() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [exercises, pauseSession, selectExercise, selectedIndex, startSession]);
-
   useEffect(() => {
     type PracticeWindow = Window & {
       render_game_to_text?: () => string;
@@ -669,6 +585,10 @@ export default function RightHandPage() {
       loops: loopsCompleted,
       elapsedSeconds,
       roundSeconds,
+      stylePreset,
+      chordProgression,
+      troubleLoop,
+      goal: { targetBpm: goalTargetBpm, completedRounds: goalRoundsAtTarget, requiredRounds: goalRequiredRounds },
       coordinateSystem: "Pattern steps run left to right; guitar strings display 1 (high) to 6 (low)."
     });
     practiceWindow.advanceTime = (milliseconds) => {
@@ -681,16 +601,10 @@ export default function RightHandPage() {
       delete practiceWindow.render_game_to_text;
       delete practiceWindow.advanceTime;
     };
-  }, [activeStep, bpm, difficulty, elapsedSeconds, loopsCompleted, roundSeconds, selectedExercise, technique]);
-
+  }, [activeStep, bpm, chordProgression, difficulty, elapsedSeconds, goalRequiredRounds, goalRoundsAtTarget, goalTargetBpm, loopsCompleted, roundSeconds, selectedExercise, stylePreset, technique, troubleLoop]);
   useEffect(() => () => clearScheduledWork(), [clearScheduledWork]);
-
   if (!selectedExercise || !currentStep) return null;
-
-  const motionStyle = {
-    "--target-string": String(currentStep.strings[0] ?? 3)
-  } as CSSProperties;
-
+  const motionStyle = { "--target-string": String(currentStep.strings[0] ?? 3) } as CSSProperties;
   return (
     <main className="page right-hand-page">
       <section className="right-hand-heading">
@@ -705,7 +619,6 @@ export default function RightHandPage() {
           <span>{exerciseProgress?.sessions ?? 0} rounds · {formatTime(exerciseProgress?.totalSeconds ?? 0)} practised{exerciseProgress?.bestTimingScore ? ` · ${exerciseProgress.bestTimingScore}% timing` : ""}</span>
         </div>
       </section>
-
       <section className="right-hand-techniques" aria-label="Choose a right-hand technique">
         {TECHNIQUES.map((item) => {
           const detail = TECHNIQUE_DETAILS[item];
@@ -723,7 +636,6 @@ export default function RightHandPage() {
           );
         })}
       </section>
-
       <section className="practice-paths">
         <button className="practice-paths-toggle" type="button" onClick={() => setShowPaths((visible) => !visible)} aria-expanded={showPaths}>
           <span><span className="label">Guided paths</span><strong>{activePath?.title ?? "Not sure where to start?"}</strong></span>
@@ -743,13 +655,12 @@ export default function RightHandPage() {
                   setShowPaths(false);
                 }}
               >
-                <strong>{path.title}</strong><span>{path.description}</span><small>{path.exercises.length} steps</small>
+                <strong>{path.title}</strong><span>{path.description}</span><small>{path.exercises.filter((id) => (progress[id]?.cleanSessions ?? 0) > 0).length} / {path.exercises.length} milestones</small>
               </button>
             ))}
           </div>
         )}
       </section>
-
       <section className="right-hand-workspace">
         <aside className="exercise-browser">
           <div className="difficulty-tabs" aria-label="Choose difficulty">
@@ -787,7 +698,6 @@ export default function RightHandPage() {
             })}
           </div>
         </aside>
-
         <div className="practice-player">
           <header className="practice-player-header">
             <div>
@@ -798,9 +708,9 @@ export default function RightHandPage() {
             </div>
             <span className="exercise-position">{selectedIndex + 1} / {exercises.length}</span>
           </header>
-
           <div className={`follow-along ${status === "running" ? "playing" : ""}`}>
-            <div className={`motion-demo technique-${technique}`} style={motionStyle}>
+            <RH3D technique={selectedExercise.technique} step={activeStep} strings={currentStep.strings} run={status === "running"} id={selectedExercise.id} loop={loopsCompleted} />
+            <div className={`motion-demo technique-${technique} demo-speed-${modes.demoSpeed * 100}`} style={motionStyle}>
               {status === "countin" ? (
                 <div className="count-in-display"><span>Get ready</span><strong>{countIn}</strong></div>
               ) : (
@@ -816,7 +726,7 @@ export default function RightHandPage() {
                 </>
               )}
             </div>
-            <div className="pattern-stage">
+            <div className={`pattern-stage ${modes.noLook && status === "running" ? "no-look" : ""}`}>
               <div className="pattern-meta">
                 <span>{selectedExercise.subdivision}</span>
                 <span>{status === "running" ? `${loopsCompleted} loops` : `${selectedExercise.pattern.length} steps`}</span>
@@ -838,13 +748,12 @@ export default function RightHandPage() {
               </div>
             </div>
           </div>
-
           <div className="session-setup" aria-label="Practice round settings">
             <div>
               <span className="label">Round</span>
               <div className="segmented compact">
                 {ROUND_OPTIONS.map((option) => (
-                  <button key={option.seconds} type="button" className={roundSeconds === option.seconds ? "active" : ""} onClick={() => setRoundSeconds(option.seconds)}>{option.label}</button>
+                  <button key={option.seconds} type="button" className={roundSeconds === option.seconds ? "active" : ""} onClick={() => { setRoundSeconds(option.seconds); setChallengeMode("standard"); }}>{option.label}</button>
                 ))}
               </div>
             </div>
@@ -858,16 +767,13 @@ export default function RightHandPage() {
               </select>
             </div>
             <div>
-              <label className="label" htmlFor="right-hand-backing">Context</label>
-              <select id="right-hand-backing" value={backing} onChange={(event) => setBacking(event.target.value as Backing)}>
-                <option value="off">No backing</option>
-                <option value="G">G pulse</option>
-                <option value="C">C pulse</option>
-                <option value="Am">Am pulse</option>
+              <label className="label" htmlFor="right-hand-backing">Chord context</label>
+              <select id="right-hand-backing" value={progressionId} onChange={(event) => setProgressionId(event.target.value)}>
+                {PROGRESSIONS.map((progression) => <option key={progression.id} value={progression.id}>{progression.label}</option>)}
               </select>
             </div>
+            {progressionId === "custom" ? <div className="custom-progression-field"><label className="label" htmlFor="custom-progression">Custom chords</label><input id="custom-progression" value={customProgression} onChange={(event) => setCustomProgression(event.target.value)} placeholder="G C Em D" aria-describedby="custom-progression-help" /><small id="custom-progression-help">2–8 chord symbols, e.g. G C Em D</small></div> : null}
           </div>
-
           <div className="transport">
             <button
               className="transport-play"
@@ -890,41 +796,31 @@ export default function RightHandPage() {
               <strong>{formatTime(remainingSeconds)}</strong>
             </div>
           </div>
-
-          <div className="practice-options">
-            <label><input type="checkbox" checked={autoRamp} onChange={(event) => setAutoRamp(event.target.checked)} /> Raise tempo after two clean rounds</label>
-            <select aria-label="Automatic tempo increase" value={rampAmount} onChange={(event) => setRampAmount(Number(event.target.value))} disabled={!autoRamp}>
-              <option value={2}>+2 BPM</option>
-              <option value={4}>+4 BPM</option>
-              <option value={6}>+6 BPM</option>
-            </select>
-            <button type="button" className={midiEnabled ? "active" : ""} onClick={() => void enableMidi()}>{midiEnabled ? "MIDI pedal ready" : "Enable MIDI pedal"}</button>
-            <button type="button" className={voiceEnabled ? "active" : ""} onClick={enableVoiceControl}>{voiceEnabled ? "Voice ready" : "Voice control"}</button>
-          </div>
-
-          <details className="advanced-practice-tools">
-            <summary>Feel, silent bars & trouble loops</summary>
-            <div className="advanced-practice-grid">
-              <label>Feel<select value={clickFeel} onChange={(event) => setClickFeel(event.target.value as ClickFeel)}><option value="straight">Straight</option><option value="swing">Swing eighths</option></select></label>
-              <label>Accents<select value={accentMode} onChange={(event) => setAccentMode(event.target.value as AccentMode)}><option value="pattern">Pattern + beat</option><option value="downbeat">Beat 1</option><option value="two-four">Beats 2 & 4</option></select></label>
-              <label>Silent-gap challenge<select value={silentEvery} onChange={(event) => setSilentEvery(Number(event.target.value))}><option value={0}>Off</option><option value={4}>Every 4th beat</option><option value={8}>Every 8th beat</option></select></label>
-              <button type="button" onClick={() => loopTroubleStep(activeStep)}>Loop current 4 steps</button>
-              {troubleLoop ? <button type="button" onClick={() => { setTroubleLoop(null); resetSession(); }}>Clear trouble loop</button> : null}
-            </div>
-            <div className="challenge-checkpoint"><strong>{loopsCompleted >= 4 ? "Checkpoint reached" : `${Math.min(loopsCompleted, 4)} / 4 clean loops`}</strong><span>{loopsCompleted >= 4 ? "Listen back or rate the round before adding speed." : "Stay relaxed through four loops; silent gaps make the checkpoint harder."}</span></div>
-          </details>
-
-          <section className="practice-safety-strip" aria-label="Technique preparation and recovery">
-            <div><span className="label">Warm up · 90 sec</span><strong>Muted strings at half tempo</strong><p>Keep the pick grip light and make the motion smaller than feels necessary.</p></div>
-            <div><span className="label">Cool down · 60 sec</span><strong>Open-hand reset</strong><p>Stop for sharp pain, numbness, or persistent tension. Shake out gently; never stretch into pain.</p></div>
+          <section className="advanced-tools-launch">
+            <div><span className="label">Goals & control</span><strong>{goalRoundsAtTarget} / {goalRequiredRounds} goal rounds · ladder stage {exerciseProgress?.ladderStage ?? 0}</strong></div>
+            <button type="button" onClick={() => setShowAdvancedTools((show) => !show)} aria-expanded={showAdvancedTools}>{showAdvancedTools ? "Close advanced controls" : "Open advanced controls"}</button>
           </section>
-
+          {showAdvancedTools ? <RightHandAdvancedTools
+            autoRamp={autoRamp} rampAmount={rampAmount} ladderRequiredRounds={ladderRequiredRounds}
+            midiEnabled={midiEnabled} voiceEnabled={voiceEnabled} clickFeel={clickFeel} accentMode={accentMode}
+            silentEvery={silentEvery} troubleLoop={troubleLoop} activeStep={activeStep} loopsCompleted={loopsCompleted}
+            goalTargetBpm={goalTargetBpm} goalRequiredRounds={goalRequiredRounds} goalRoundsAtTarget={goalRoundsAtTarget}
+            ladderStage={exerciseProgress?.ladderStage ?? 0} cleanStreak={exerciseProgress?.cleanStreak ?? 0} stylePreset={stylePreset}
+            exerciseId={selectedExercise.id} technique={selectedExercise.technique} patternLength={selectedExercise.pattern.length} subdivisionsPerBeat={subdivisionsPerBeat(selectedExercise.subdivision)} challengeMode={challengeMode}
+            goalTimingScore={goalTimingScore} goalPracticeMinutes={goalPracticeMinutes} practisedMinutes={(exerciseProgress?.totalSeconds ?? 0) / 60}
+            status={status} bpm={bpm} elapsedSeconds={elapsedSeconds} difficulty={difficulty} exercise={selectedExercise} progress={progress}
+            onAutoRampChange={setAutoRamp} onRampAmountChange={setRampAmount} onLadderRequiredRoundsChange={setLadderRequiredRounds}
+            onResetSpeedLadder={resetSpeedLadder} onEnableMidi={() => void enableMidi()} onEnableVoice={enableVoiceControl}
+            onClickFeelChange={setClickFeel} onAccentModeChange={setAccentMode} onSilentEveryChange={setSilentEvery}
+            onSetTroubleLoop={loopTroubleStep} onClearTroubleLoop={() => { setTroubleLoop(null); resetSession(); }} onUpdateGoal={updateGoal} onApplyStylePreset={applyStylePreset}
+            onChallengeChange={applyChallenge} onPlayInContext={playInContext}
+            onModeSettingsChange={setModes} onSetBpm={setBpm} onSelectExercise={selectExercise} onPreparePerformance={() => { if (!chordProgression.length) setProgressionId("pop-g"); setRoundSeconds(60); }} onStartRound={() => togglePlaybackRef.current()}
+          /> : null}
           <section className="microphone-coach-launch">
             <div><span className="label">Microphone feedback</span><h3>Compare a short take with the target pulse.</h3><p>Permission is requested only when you start recording. The latest take stays in this browser.</p></div>
             <button type="button" onClick={() => setShowRecordingCoach((show) => !show)}>{showRecordingCoach ? "Close coach" : "Open timing coach"}</button>
           </section>
-          {showRecordingCoach ? <RightHandRecordingCoach bpm={bpm} subdivisionsPerBeat={subdivisionsPerBeat(selectedExercise.subdivision)} expectedSteps={selectedExercise.pattern.length} exerciseId={selectedExercise.id} onAnalysis={handleRecordingAnalysis} onLoopTrouble={loopTroubleStep} /> : null}
-
+          {showRecordingCoach ? <RightHandRecordingCoach bpm={bpm} subdivisionsPerBeat={subdivisionsPerBeat(selectedExercise.subdivision)} expectedSteps={selectedExercise.pattern.length} exerciseId={selectedExercise.id} expectedChordProgression={chordProgression} onAnalysis={handleRecordingAnalysis} onLoopTrouble={loopTroubleStep} /> : null}
           {status === "complete" && (
             <section className="round-feedback" aria-labelledby="round-feedback-title">
               <div><span className="label">Round complete</span><h3 id="round-feedback-title">How did it feel?</h3><p>Your answer sets the next tempo and updates this drill&apos;s progress.</p></div>
@@ -935,25 +831,22 @@ export default function RightHandPage() {
               </div>
             </section>
           )}
-
           <div className="coach-note">
             <span className="coach-mark">i</span>
             <div><span className="label">Coach&apos;s cue</span><p>{selectedExercise.coaching}</p></div>
           </div>
-
           <details className="technique-clinic">
             <summary>Close-up motion lesson</summary>
             <div className="motion-storyboard" aria-label={`${selectedExercise.technique} motion demonstration`}>
               <span><b>1</b>Set a relaxed grip</span><span><b>2</b>Move through the target string</span><span><b>3</b>Return without locking the wrist</span>
             </div>
-            <p>The mirrored follow-along animation responds to the global left/right-handed setting. Downloadable instructor video assets are not bundled, so this offline lesson uses a lightweight animated storyboard.</p>
+            <p>The follow-along and approved media slot respond to the global left/right-handed setting. No media is fetched until you ask for it.</p>
+            {showDemoMedia ? <LicensedDemo technique={selectedExercise.technique} /> : <button className="load-demo-media" type="button" onClick={() => setShowDemoMedia(true)}>Load close-up video slot</button>}
           </details>
-
           <details className="custom-routine-builder">
             <summary>Build a custom routine · {customRoutineCount} saved</summary>
             <div><label>Routine name<input value={customTitle} onChange={(event) => setCustomTitle(event.target.value)} placeholder="My crossing warmup" /></label><label>Pattern tokens<input value={customPattern} onChange={(event) => setCustomPattern(event.target.value)} placeholder={selectedExercise.pattern.join(" ")} /></label><button type="button" onClick={saveCustomRoutine}>Save routine</button></div>
           </details>
-
           <details className="notation-guide">
             <summary>How to read this pattern</summary>
             <div>
@@ -966,7 +859,6 @@ export default function RightHandPage() {
             </div>
             <p>Shortcuts: Space play/pause · ↑/↓ tempo · [ / ] previous/next.</p>
           </details>
-
           <footer className="exercise-nav">
             <button type="button" disabled={selectedIndex <= 0} onClick={() => selectExercise(exercises[selectedIndex - 1])}>← Previous</button>
             <button

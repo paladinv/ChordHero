@@ -1,4 +1,4 @@
-const CACHE_VERSION = "chord-hero-shell-v3";
+const CACHE_VERSION = "chord-hero-shell-v4-logo";
 const APP_SHELL = [
   "/", "/practice", "/trainer", "/right-hand", "/songs", "/library", "/chords", "/about",
   "/manifest.webmanifest", "/chord-hero-logo.svg", "/samples/guitar/manifest.json",

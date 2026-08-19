@@ -11,6 +11,7 @@
     "content:export": "node scripts/export-shared-content.mjs",
     "content:validate": "node scripts/validate-shared-content.mjs",
     "harmony:validate": "node --experimental-strip-types scripts/validate-harmony.mjs",
+    "guitar3d:validate": "node --experimental-strip-types scripts/validate-guitar-technique3d.mjs",
     "song-library:compatibility": "node scripts/validate-song-library-compatibility.mjs",
     "ci:performance": "node scripts/check-performance-budget.mjs",
     "ci:visual": "node scripts/check-visual-regression.mjs",
@@ -21,12 +22,14 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "source-map-js": "^1.2.0",
+    "three": "^0.185.1",
     "ws": "^8.21.1"
   },
   "devDependencies": {
     "@types/node": "^20.11.30",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
+    "@types/three": "^0.185.4",
     "eslint": "^8.57.0",
     "eslint-config-next": "^14.2.0",
     "typescript": "^5.4.5"
