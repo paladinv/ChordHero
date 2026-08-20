@@ -1,5 +1,5 @@
 "use client";
-import { CSSProperties, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import {
   DIFFICULTY_DETAILS,
@@ -18,10 +18,12 @@ import {
 import type { RecordingAnalysis } from "../../lib/songRecordingAnalysis";
 import { RIGHT_HAND_GUIDED_PATHS as GUIDED_PATHS, RIGHT_HAND_PROGRESSIONS as PROGRESSIONS, RIGHT_HAND_ROUND_OPTIONS as ROUND_OPTIONS } from "../../lib/rightHandPracticePresets";
 import type { PracticeModeSettings, RightHandChallengeMode, RightHandStylePreset } from "../../components/RightHandAdvancedTools";
-import { DEFAULT_RIGHT_HAND_MODE_SETTINGS, describeRightHandStep as describeStep, formatPracticeTime as formatTime, readPracticeAudioPreferences, rememberedRightHandTempo as rememberedTempo, rightHandCountLabel as countLabel, rightHandDynamicsLevel as dynamicsLevel, rightHandExerciseById as exerciseById, rightHandSubdivisionsPerBeat as subdivisionsPerBeat, saveRightHandPracticeResult as savePracticeResult, shouldPlayStyleBacking, validCustomProgression, type ExerciseProgress } from "../../lib/rightHandPracticeRuntime";
+import { DEFAULT_RIGHT_HAND_MODE_SETTINGS, describeRightHandStep as describeStep, formatPracticeTime as formatTime, readPracticeAudioPreferences, rememberedRightHandTempo as rememberedTempo, rightHandDynamicsLevel as dynamicsLevel, rightHandExerciseById as exerciseById, rightHandSubdivisionsPerBeat as subdivisionsPerBeat, saveRightHandPracticeResult as savePracticeResult, shouldPlayStyleBacking, validCustomProgression, type ExerciseProgress } from "../../lib/rightHandPracticeRuntime";
+import RightHandFollowAlong from "../../components/RightHandFollowAlong";
 const RightHandRecordingCoach = dynamic(() => import("../../components/RightHandRecordingCoach"), { ssr: false, loading: () => <div className="recording-coach-loading">Loading coach…</div> });
 const LicensedDemo = dynamic(() => import("../../components/LicensedDemo"), { ssr: false, loading: () => <p>Loading demo…</p> });
 const RightHandAdvancedTools = dynamic(() => import("../../components/RightHandAdvancedTools"), { ssr: false, loading: () => <div className="recording-coach-loading">Loading controls…</div> });
+const RightHandLiveCoach = dynamic(() => import("../../components/RightHandLiveCoach"), { ssr: false, loading: () => <div className="recording-coach-loading">Loading 3D coach…</div> });
 type PracticeStatus = "idle" | "countin" | "running" | "paused" | "complete";
 type SoundMode = "click" | "guitar" | "both" | "silent";
 type Rating = "clean" | "mistakes" | "fast";
@@ -604,7 +606,6 @@ export default function RightHandPage() {
   }, [activeStep, bpm, chordProgression, difficulty, elapsedSeconds, goalRequiredRounds, goalRoundsAtTarget, goalTargetBpm, loopsCompleted, roundSeconds, selectedExercise, stylePreset, technique, troubleLoop]);
   useEffect(() => () => clearScheduledWork(), [clearScheduledWork]);
   if (!selectedExercise || !currentStep) return null;
-  const motionStyle = { "--target-string": String(currentStep.strings[0] ?? 3) } as CSSProperties;
   return (
     <main className="page right-hand-page">
       <section className="right-hand-heading">
@@ -708,45 +709,8 @@ export default function RightHandPage() {
             </div>
             <span className="exercise-position">{selectedIndex + 1} / {exercises.length}</span>
           </header>
-          <div className={`follow-along ${status === "running" ? "playing" : ""}`}>
-            <div className={`motion-demo technique-${technique} demo-speed-${modes.demoSpeed * 100}`} style={motionStyle}>
-              {status === "countin" ? (
-                <div className="count-in-display"><span>Get ready</span><strong>{countIn}</strong></div>
-              ) : (
-                <>
-                  <div className="string-motion" aria-hidden="true">
-                    {[1, 2, 3, 4, 5, 6].map((string) => (
-                      <i key={string} className={currentStep.strings.includes(string) ? "active" : ""} />
-                    ))}
-                    <b>{currentStep.main}</b>
-                  </div>
-                  <strong>{currentStep.main}</strong>
-                  <span>{currentStep.detail}</span>
-                </>
-              )}
-            </div>
-            <div className={`pattern-stage ${modes.noLook && status === "running" ? "no-look" : ""}`}>
-              <div className="pattern-meta">
-                <span>{selectedExercise.subdivision}</span>
-                <span>{status === "running" ? `${loopsCompleted} loops` : `${selectedExercise.pattern.length} steps`}</span>
-              </div>
-              <div className="pattern-strip scroll-hint" role="list" aria-label="Follow-along pattern">
-                {describedPattern.map((step, index) => (
-                  <div
-                    className={`pattern-step ${index === activeStep ? "active" : ""} ${step.accent ? "accent" : ""} ${step.rest ? "rest" : ""} ${troubleLoop && index >= troubleLoop.start && index <= troubleLoop.end ? "looped" : ""}`}
-                    key={`${selectedExercise.pattern[index]}-${index}`}
-                    role="listitem"
-                    aria-current={index === activeStep ? "step" : undefined}
-                    aria-label={`${countLabel(index, selectedExercise.subdivision)}: ${step.detail}${step.accent ? ", accented" : ""}`}
-                  >
-                    <span className="pattern-count">{countLabel(index, selectedExercise.subdivision)}</span>
-                    <strong aria-hidden="true">{step.main}</strong>
-                    <small aria-hidden="true">{step.detail}</small>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <RightHandFollowAlong status={status} technique={technique} demoSpeed={modes.demoSpeed} noLook={modes.noLook} countIn={countIn} activeStep={activeStep} loopsCompleted={loopsCompleted} selectedExercise={selectedExercise} currentStep={currentStep} describedPattern={describedPattern} troubleLoop={troubleLoop} />
+          <RightHandLiveCoach technique={selectedExercise.technique} step={activeStep} strings={currentStep.strings} run={status === "running"} autoOpen={status === "countin" || status === "running"} id={selectedExercise.id} loop={loopsCompleted} chordName={chordProgression[loopsCompleted % Math.max(1, chordProgression.length)]} />
           <div className="session-setup" aria-label="Practice round settings">
             <div>
               <span className="label">Round</span>
