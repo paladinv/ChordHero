@@ -1,22 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { ChordLibraryItem } from "../lib/chords";
+import { CHORD_LIBRARY, type ChordLibraryItem } from "../lib/chords";
 import { HARMONY_NOTES, type HarmonyNote } from "../lib/harmony";
 import { analyzePracticeRecording, type RecordingAnalysis } from "../lib/songRecordingAnalysis";
 import type { PracticeStats, TeacherAssignment } from "../lib/studentProfile";
 import {
   buildAchievementMap,
+  buildChordFamilyDependencyMap,
   buildPracticeToday,
   buildRepertoireMilestones,
   buildSessionPlan,
   buildTeacherAnalytics,
   compareLocalRecordings,
+  buildWeeklyPracticePlan,
   formatPlannerNote,
   FOCUSED_FIVE_MINUTE_DRILLS,
+  findGenrePresetEntry,
+  GENRE_VOICING_PRESETS,
+  getFretRangeLabel,
+  getVoicingCoverage,
   getEasierNextSteps,
   getGenrePracticePath,
   getOfflineLibraryStatus,
+  normalizeTransitionDrills,
+  pickRandomPracticalChord,
   scoreVoicingConfidence,
   simulateKeyChange,
   inspectFingerTransition,
@@ -26,6 +34,7 @@ import {
   type GenrePracticePath,
   type LocalRecordingDescriptor,
   type OfflinePackSelection,
+  type TransitionDrill,
   type VocalRange
 } from "../lib/chordPracticePlanner";
 
@@ -45,6 +54,8 @@ type ChordPracticePlannerProps = {
 const OFFLINE_STORAGE_KEY = "chord-hero-library-offline-planner-v1";
 const DEFAULT_OFFLINE_SELECTION: OfflinePackSelection = { keyIds: ["G"], tuningIds: ["standard"], sampleVoices: ["steel"] };
 const VIDEO_LINKS_STORAGE_KEY = "chord-hero-library-technique-video-links";
+const TRANSITION_DRILLS_STORAGE_KEY = "chord-hero-library-transition-drills";
+const NOTIFICATION_SETTINGS_STORAGE_KEY = "chord-hero-library-practice-notifications";
 
 function formatBytes(bytes: number) {
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
@@ -90,6 +101,15 @@ export default function ChordPracticePlanner({
   const [videoUrl, setVideoUrl] = useState("");
   const [videoMessage, setVideoMessage] = useState("");
   const [transitionHistory, setTransitionHistory] = useState<Array<{ id: string; label: string; score: number; recordedAt: string }>>([]);
+  const [transitionDrills, setTransitionDrills] = useState<TransitionDrill[]>([]);
+  const [drillName, setDrillName] = useState("");
+  const [drillTempo, setDrillTempo] = useState(72);
+  const [drillReps, setDrillReps] = useState(5);
+  const [notificationSettings, setNotificationSettings] = useState({ dueReviews: true, activeGoals: true });
+  const [notificationMessage, setNotificationMessage] = useState("");
+  const [randomEntryId, setRandomEntryId] = useState("");
+  const [genrePreset, setGenrePreset] = useState<(typeof GENRE_VOICING_PRESETS)[number]["id"]>("folk-open");
+  const [presetMessage, setPresetMessage] = useState("");
 
   useEffect(() => {
     try {
@@ -125,6 +145,26 @@ export default function ChordPracticePlanner({
     }
   }, [videoLinks]);
 
+  useEffect(() => {
+    try {
+      const stored = window.localStorage.getItem(TRANSITION_DRILLS_STORAGE_KEY);
+      if (stored) setTransitionDrills(normalizeTransitionDrills(JSON.parse(stored), CHORD_LIBRARY));
+      const notificationStored = window.localStorage.getItem(NOTIFICATION_SETTINGS_STORAGE_KEY);
+      if (notificationStored) setNotificationSettings((current) => ({ ...current, ...JSON.parse(notificationStored) }));
+    } catch {
+      // Optional practice preferences must never block the library.
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(TRANSITION_DRILLS_STORAGE_KEY, JSON.stringify(transitionDrills.slice(0, 24)));
+      window.localStorage.setItem(NOTIFICATION_SETTINGS_STORAGE_KEY, JSON.stringify(notificationSettings));
+    } catch {
+      // Keep the current session usable when storage is unavailable.
+    }
+  }, [notificationSettings, transitionDrills]);
+
   const comparisonEntry = useMemo(
     () => entries.find((entry) => entry.id === comparisonId) ?? entries.find((entry) => entry.id !== selectedEntry?.id) ?? null,
     [comparisonId, entries, selectedEntry?.id]
@@ -142,7 +182,10 @@ export default function ChordPracticePlanner({
   const easierSteps = useMemo(() => getEasierNextSteps(selectedEntry, entries), [entries, selectedEntry]);
   const keyChange = useMemo(() => simulateKeyChange(path.roles, simulatorKey, entries), [entries, path.roles, simulatorKey]);
   const practiceToday = useMemo(() => buildPracticeToday(entries, practiceStats, genre), [entries, genre, practiceStats]);
+  const coverage = useMemo(() => getVoicingCoverage(selectedEntry), [selectedEntry]);
   const milestones = useMemo(() => buildRepertoireMilestones(entries, practiceStats), [entries, practiceStats]);
+  const familyDependencies = useMemo(() => buildChordFamilyDependencyMap(entries, practiceStats), [entries, practiceStats]);
+  const weeklyPlan = useMemo(() => buildWeeklyPracticePlan(entries, practiceStats, assignments.filter((assignment) => assignment.studentId === activeStudentId), genre), [activeStudentId, assignments, entries, genre, practiceStats]);
   const selectedDrill = FOCUSED_FIVE_MINUTE_DRILLS.find((drill) => drill.id === selectedDrillId) ?? FOCUSED_FIVE_MINUTE_DRILLS[0];
   const sightOptions = useMemo(() => {
     if (!selectedEntry) return [];
@@ -177,6 +220,54 @@ export default function ChordPracticePlanner({
     if (!selectedEntry || !comparisonEntry || !transition) return;
     const label = `${selectedEntry.chord.name} -> ${comparisonEntry.chord.name}`;
     setTransitionHistory((history) => [{ id: `${label}-${Date.now()}`, label, score: transition.cost.score, recordedAt: new Date().toISOString() }, ...history].slice(0, 12));
+  };
+
+  const saveTransitionDrill = () => {
+    if (!selectedEntry || !comparisonEntry || !drillName.trim()) return;
+    const ids = [selectedEntry.id, comparisonEntry.id];
+    setTransitionDrills((drills) => [{ id: `drill-${Date.now()}`, name: drillName.trim().slice(0, 80), chordIds: ids, tempo: Math.max(40, Math.min(180, drillTempo)), targetReps: Math.max(1, Math.min(50, drillReps)), createdAt: new Date().toISOString() }, ...drills].slice(0, 24));
+    setDrillName("");
+  };
+
+  const runTransitionDrill = (drill: TransitionDrill) => {
+    const first = entries.find((entry) => entry.id === drill.chordIds[0]);
+    if (first) onSelectEntry(first.id);
+    setDrillTempo(drill.tempo);
+    setDrillReps(drill.targetReps);
+  };
+
+  const requestPracticeNotifications = async () => {
+    if (!("Notification" in window)) {
+      setNotificationMessage("This browser does not expose notifications; due reviews remain visible in the planner.");
+      return;
+    }
+    try {
+      const permission = await Notification.requestPermission();
+      setNotificationMessage(permission === "granted" ? "Permission granted. The planner will show due reviews when you open it; it does not schedule background alerts." : "Permission not granted. Due reviews remain available in the planner.");
+    } catch {
+      setNotificationMessage("Notifications are unavailable here; due reviews remain visible in the planner.");
+    }
+  };
+
+  const chooseRandomChord = () => {
+    const picked = pickRandomPracticalChord(entries, { seed: Date.now() });
+    if (picked) {
+      setRandomEntryId(picked.id);
+      onSelectEntry(picked.id);
+    }
+  };
+
+  const applyGenrePreset = (id: (typeof GENRE_VOICING_PRESETS)[number]["id"]) => {
+    const preset = GENRE_VOICING_PRESETS.find((candidate) => candidate.id === id) ?? GENRE_VOICING_PRESETS[0];
+    const entry = findGenrePresetEntry(entries, id);
+    setGenrePreset(id);
+    setGenre(preset.genre);
+    if (entry) {
+      onSelectEntry(entry.id);
+      setPresetMessage(`${preset.label}: selected ${entry.chord.name} without changing the active library filters.`);
+    } else {
+      setPresetMessage(`${preset.label}: no matching shape is in the current result set, so your existing results were preserved.`);
+    }
   };
 
   const addVideoReference = () => {
@@ -248,6 +339,8 @@ export default function ChordPracticePlanner({
           <div className="planner-panel-heading"><div><span className="label">Genre path</span><h4>{path.label} practice route</h4></div><label>Style<select value={genre} onChange={(event) => setGenre(event.target.value as GenrePracticePath["id"])}>{["folk", "pop", "blues", "jazz", "worship"].map((id) => <option key={id} value={id}>{getGenrePracticePath(id as GenrePracticePath["id"]).label}</option>)}</select></label></div>
           <p>{path.focus}</p><div className="planner-role-strip">{path.roles.map((role) => <span key={role}>{role}</span>)}</div>
           <ol className="planner-step-list">{path.steps.map((step, index) => <li key={step}><strong>{index + 1}</strong><span>{step}</span></li>)}</ol>
+          <div className="planner-preset-list" aria-label="Genre voicing presets">{GENRE_VOICING_PRESETS.map((preset) => <button key={preset.id} type="button" className={preset.id === genrePreset ? "active" : ""} onClick={() => applyGenrePreset(preset.id)}><strong>{preset.label}</strong><small>{preset.description}</small></button>)}</div>
+          {presetMessage ? <p className="planner-note" role="status">{presetMessage}</p> : null}
         </section>
       </div>
 
@@ -284,13 +377,28 @@ export default function ChordPracticePlanner({
         <section className="planner-panel">
           <div className="planner-panel-heading"><div><span className="label">Transition inspector</span><h4>See the fingers that move</h4></div></div>
           <label>Compare with<select value={comparisonEntry?.id ?? ""} onChange={(event) => setComparisonId(event.target.value)}>{entries.filter((entry) => entry.id !== selectedEntry?.id).slice(0, 80).map((entry) => <option key={entry.id} value={entry.id}>{entry.chord.name} · {entry.position}</option>)}</select></label>
-          {selectedEntry && comparisonEntry && transition ? <><p className="planner-transition-summary"><strong>{selectedEntry.chord.name} → {comparisonEntry.chord.name}</strong> · {transition.summary}</p><div className="planner-stat-row"><span>{transition.sharedFingerCount} shared fingers</span><span>{transition.cost.fretMovement} fret movement</span><span>{transition.cost.barreDifficulty} barre load</span></div><ul className="planner-move-list">{transition.fingerMoves.map((move) => <li key={move.finger}><strong>Finger {move.finger}</strong><span>{move.kind} {move.fromString ? `string ${move.fromString}, fret ${move.fromFret}` : ""}{move.toString ? ` → string ${move.toString}, fret ${move.toFret}` : ""}</span></li>)}</ul></> : <p className="planner-note">Select a chord and a second voicing in the library to inspect the transition.</p>}
+          {selectedEntry && comparisonEntry && transition ? <><p className="planner-transition-summary"><strong>{selectedEntry.chord.name} → {comparisonEntry.chord.name}</strong> · {transition.summary}</p><div className="planner-stat-row"><span>{transition.sharedFingerCount} shared fingers</span><span>{transition.cost.fretMovement} fret movement</span><span>{transition.cost.barreDifficulty} barre load</span></div><div className="planner-compact-comparison"><span>Bass: {selectedEntry.chord.frets[0] < 0 ? "muted" : selectedEntry.chord.name.split("/")[1] ?? "root"}</span><span>High: {selectedEntry.chord.frets.at(-1) === 0 ? "open" : `${selectedEntry.chord.frets.at(-1)}fr`}</span><span>Fret range: {getFretRangeLabel(selectedEntry.chord.frets)}</span><span>Barre: {selectedEntry.chord.barre ? `yes, ${selectedEntry.chord.barre.fret}fr` : "no"}</span><span>Stretch: {selectedEntry.difficultyTags.includes("stretch") ? "high" : "low"}</span><span>Cost: {transition.cost.score}/100</span></div><ul className="planner-move-list">{transition.fingerMoves.map((move) => <li key={move.finger}><strong>Finger {move.finger}</strong><span>{move.kind} {move.fromString ? `string ${move.fromString}, fret ${move.fromFret}` : ""}{move.toString ? ` → string ${move.toString}, fret ${move.toFret}` : ""}</span></li>)}</ul></> : <p className="planner-note">Select a chord and a second voicing in the library to inspect the transition.</p>}
         </section>
 
         <section className="planner-panel">
           <div className="planner-panel-heading"><div><span className="label">Adaptive rhythm</span><h4>Count in, then earn tempo</h4></div><span className="planner-score">{rhythm.recommendedBpm} BPM</span></div>
           <div className="planner-form-grid"><label>Practice BPM<input type="number" min="40" max="180" value={currentBpm} onChange={(event) => setCurrentBpm(Math.max(40, Math.min(180, Number(event.target.value) || 78)))} /></label><label>Clean reps<input type="number" min="0" max="20" value={cleanReps} onChange={(event) => setCleanReps(Math.max(0, Math.min(20, Number(event.target.value) || 0)))} /></label><label>Timing score<input type="number" min="0" max="100" value={timingScore} onChange={(event) => setTimingScore(Math.max(0, Math.min(100, Number(event.target.value) || 0)))} /></label></div>
           <p>{rhythm.explanation}</p><div className="planner-stat-row"><span>Count-in: {rhythm.countInBeats} beats</span><span>Next: {rhythm.nextBpm} BPM</span><span>{rhythm.canAdvance ? "Ready to advance" : `${rhythm.cleanRepsNeeded} clean reps left`}</span></div>
+        </section>
+      </div>
+
+      <div className="planner-grid">
+        <section className="planner-panel">
+          <div className="planner-panel-heading"><div><span className="label">Chord-tone coverage</span><h4>{coverage.percent}% of tones present</h4></div><span className="planner-score">{coverage.present.length}/{coverage.total}</span></div>
+          <div className="planner-coverage-meter" aria-label={`${coverage.percent} percent chord tone coverage`}><span style={{ width: `${coverage.percent}%` }} /></div>
+          <p className="planner-note">{coverage.explanation}</p>
+          <div className="planner-chip-list"><span className="chip active">Present: {coverage.present.join(", ") || "none"}</span><span className="chip">Omitted: {coverage.omitted.join(", ") || "none"}</span></div>
+        </section>
+
+        <section className="planner-panel">
+          <div className="planner-panel-heading"><div><span className="label">Named transition drills</span><h4>Save this change</h4></div><span className="planner-badge">Local only</span></div>
+          <div className="planner-drill-form"><input value={drillName} onChange={(event) => setDrillName(event.target.value)} placeholder="G -> C -> D" aria-label="Transition drill name" /><input type="number" min="40" max="180" value={drillTempo} onChange={(event) => setDrillTempo(Math.max(40, Math.min(180, Number(event.target.value) || 72)))} aria-label="Transition drill tempo" /><input type="number" min="1" max="50" value={drillReps} onChange={(event) => setDrillReps(Math.max(1, Math.min(50, Number(event.target.value) || 5)))} aria-label="Transition drill target repetitions" /><button className="btn" type="button" onClick={saveTransitionDrill} disabled={!selectedEntry || !comparisonEntry || !drillName.trim()}>Save</button></div>
+          {transitionDrills.length ? <div className="planner-saved-drills">{transitionDrills.map((drill) => <div key={drill.id}><span><strong>{drill.name}</strong><small>{drill.tempo} BPM · {drill.targetReps} reps</small></span><button className="btn ghost" type="button" onClick={() => runTransitionDrill(drill)}>Run</button><button className="text-button" type="button" onClick={() => setTransitionDrills((items) => items.filter((item) => item.id !== drill.id))}>Delete</button></div>)}</div> : <p className="planner-note">Choose two voicings above, name the change, and save it for a future session.</p>}
         </section>
       </div>
 
@@ -303,6 +411,28 @@ export default function ChordPracticePlanner({
         <section className="planner-panel">
           <div className="planner-panel-heading"><div><span className="label">Family achievements</span><h4>Build range, not just reps</h4></div></div>
           <div className="planner-achievement-list">{achievements.map((item) => <button key={item.family} type="button" onClick={() => item.nextChordId && onSelectEntry(item.nextChordId)}><span><strong>{item.family}</strong><small>{item.detail}</small></span><b>{item.completed}/{item.total}</b><i><em style={{ width: `${item.percent}%` }} /></i></button>)}</div>
+        </section>
+      </div>
+
+      <section className="planner-panel planner-dependency-panel">
+        <div className="planner-panel-heading"><div><span className="label">Chord-family dependency map</span><h4>Move from reliable shapes to richer colors</h4></div><span className="planner-badge">Current library set</span></div>
+        <p className="planner-note">Each stage explains what prepares the next one. Select a suggested shape to continue without changing your active filters.</p>
+        <div className="planner-dependency-map">{familyDependencies.map((item, index) => <article key={item.id} className={item.unlocked ? "unlocked" : "locked"}><span className="planner-dependency-step">{index + 1}</span><div><strong>{item.label}</strong><small>{item.explanation}</small><span>{item.completed}/{item.total} practiced</span></div><button className="btn ghost" type="button" disabled={!item.nextChordId || !item.unlocked} onClick={() => item.nextChordId && onSelectEntry(item.nextChordId)}>{item.nextChordId ? "Choose next shape" : "No shape in set"}</button></article>)}</div>
+      </section>
+
+      <div className="planner-grid">
+        <section className="planner-panel">
+          <div className="planner-panel-heading"><div><span className="label">Random practical chord</span><h4>Practice the active filter</h4></div><span className="planner-badge">Current results only</span></div>
+          <p className="planner-note">Picks from the current key, function, difficulty, and search result set instead of showing an arbitrary shape.</p>
+          <button className="btn primary" type="button" onClick={chooseRandomChord} disabled={!entries.length}>Choose random voicing</button>
+          {randomEntryId ? <p className="planner-random-result" role="status">Selected: {entries.find((entry) => entry.id === randomEntryId)?.chord.name ?? "voicing"}</p> : null}
+        </section>
+
+        <section className="planner-panel">
+          <div className="planner-panel-heading"><div><span className="label">Practice notifications</span><h4>Keep reviews visible</h4></div><span className="planner-badge">No background scheduling</span></div>
+          <div className="planner-notification-options"><label><input type="checkbox" checked={notificationSettings.dueReviews} onChange={(event) => setNotificationSettings((current) => ({ ...current, dueReviews: event.target.checked }))} /> Due reviews</label><label><input type="checkbox" checked={notificationSettings.activeGoals} onChange={(event) => setNotificationSettings((current) => ({ ...current, activeGoals: event.target.checked }))} /> Active goals</label></div>
+          <button className="btn" type="button" onClick={() => void requestPracticeNotifications()}>Allow browser permission</button>
+          {notificationMessage ? <p className="planner-note" role="status">{notificationMessage}</p> : null}
         </section>
       </div>
 
@@ -339,6 +469,12 @@ export default function ChordPracticePlanner({
         <div className="planner-recording-grid"><label>Teacher reference<input type="file" accept="audio/*" disabled={isAnalyzing} onChange={(event) => { const file = event.target.files?.[0]; if (file) void analyzeFile(file, "teacher"); event.currentTarget.value = ""; }} /></label><label>Your take<input type="file" accept="audio/*" disabled={isAnalyzing} onChange={(event) => { const file = event.target.files?.[0]; if (file) void analyzeFile(file, "student"); event.currentTarget.value = ""; }} /></label></div>
         {reference || studentTake ? <div className="planner-recording-status"><span>Teacher: {reference ? `${reference.label} · ${formatBytes(reference.sizeBytes)}` : "not selected"}</span><span>Student: {studentTake ? `${studentTake.label} · ${formatBytes(studentTake.sizeBytes)}` : "not selected"}</span></div> : null}
         {comparison ? <p className="planner-comparison-result"><strong>{comparison.summary}</strong> Consistency delta: {comparison.consistencyDelta >= 0 ? "+" : ""}{comparison.consistencyDelta}.</p> : <p className="planner-note">Files stay in memory for this comparison and are never uploaded or persisted by the planner.</p>}
+      </section>
+
+      <section className="planner-panel planner-weekly-panel">
+        <div className="planner-panel-heading"><div><span className="label">Weekly practice plan</span><h4>{weeklyPlan.totalMinutes} minutes across seven short sessions</h4></div><button className="btn primary" type="button" onClick={() => window.print()}>Print weekly plan</button></div>
+        <p className="planner-note">{weeklyPlan.summary}</p>
+        <div className="planner-weekly-grid">{weeklyPlan.days.map((day) => <article key={day.day}><strong>{day.day}</strong><span>{day.focus} · {day.minutes}m</span><small>{day.detail}</small></article>)}</div>
       </section>
 
       <div className="planner-grid">

@@ -709,8 +709,8 @@ export default function RightHandPage() {
             </div>
             <span className="exercise-position">{selectedIndex + 1} / {exercises.length}</span>
           </header>
+          <RightHandLiveCoach technique={selectedExercise.technique} step={activeStep} strings={currentStep.strings} run={status === "running"} id={selectedExercise.id} loop={loopsCompleted} chordName={chordProgression[loopsCompleted % Math.max(1, chordProgression.length)]} />
           <RightHandFollowAlong status={status} technique={technique} demoSpeed={modes.demoSpeed} noLook={modes.noLook} countIn={countIn} activeStep={activeStep} loopsCompleted={loopsCompleted} selectedExercise={selectedExercise} currentStep={currentStep} describedPattern={describedPattern} troubleLoop={troubleLoop} />
-          <RightHandLiveCoach technique={selectedExercise.technique} step={activeStep} strings={currentStep.strings} run={status === "running"} autoOpen={status === "countin" || status === "running"} id={selectedExercise.id} loop={loopsCompleted} chordName={chordProgression[loopsCompleted % Math.max(1, chordProgression.length)]} />
           <div className="session-setup" aria-label="Practice round settings">
             <div>
               <span className="label">Round</span>

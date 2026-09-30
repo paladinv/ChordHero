@@ -1,4 +1,10 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
+
+type PinnedChart = { id: string; name: string; selectedIds?: unknown[]; pinned?: boolean };
+const CHART_STORAGE_KEY = "chord-hero:chart-builder:v1";
 
 const dashboardCards = [
   {
@@ -34,10 +40,18 @@ const dashboardCards = [
     meta: ["Tempo slider", "Metronome", "Chord tips"]
   },
   {
+    href: "/song-builder",
+    eyebrow: "Original music",
+    title: "Song Builder",
+    symbol: "04",
+    description: "Write guitar, ukulele, and bass parts, hear the arrangement, and export notation.",
+    meta: ["Tab and notation", "Play along", "PNG and PDF"]
+  },
+  {
     href: "/library",
     eyebrow: "Explore",
     title: "Chord Library",
-    symbol: "04",
+    symbol: "05",
     description: "Search voicings, compare shapes, save favorites, schedule reviews, and preview audio.",
     meta: ["Filters", "Compare", "Ear training"]
   },
@@ -45,7 +59,7 @@ const dashboardCards = [
     href: "/chords",
     eyebrow: "Reference",
     title: "Chord Chart",
-    symbol: "05",
+    symbol: "06",
     description: "Browse and print chord diagrams by level and root for music-stand reference.",
     meta: ["Printable", "By level", "By root"]
   },
@@ -53,13 +67,26 @@ const dashboardCards = [
     href: "/about",
     eyebrow: "Project",
     title: "About",
-    symbol: "06",
+    symbol: "07",
     description: "Read the practice philosophy, project notes, and GPL license summary.",
     meta: ["Purpose", "License", "Method"]
   }
 ];
 
 export default function HomePage() {
+  const [pinnedCharts, setPinnedCharts] = useState<PinnedChart[]>([]);
+  useEffect(() => {
+    try {
+      const parsed: unknown = JSON.parse(window.localStorage.getItem(CHART_STORAGE_KEY) ?? "[]");
+      if (Array.isArray(parsed)) setPinnedCharts(parsed.flatMap((value) => {
+        if (!value || typeof value !== "object") return [];
+        const chart = value as Partial<PinnedChart>;
+        return chart.pinned === true && typeof chart.id === "string" && typeof chart.name === "string"
+          ? [{ id: chart.id, name: chart.name, selectedIds: Array.isArray(chart.selectedIds) ? chart.selectedIds : [] }]
+          : [];
+      }).slice(0, 6));
+    } catch { setPinnedCharts([]); }
+  }, []);
   return (
     <main className="page dashboard-page">
       <section className="dashboard-hero studio-heading">
@@ -96,6 +123,7 @@ export default function HomePage() {
           </Link>
         ))}
       </section>
+      {pinnedCharts.length ? <section className="dashboard-pinned-charts" aria-label="Pinned chord charts"><div><span className="label">Quick rehearsal</span><h2>Pinned chord charts</h2><p>Saved locally in this browser for one-tap access.</p></div><div className="dashboard-pinned-list">{pinnedCharts.map((chart) => <Link key={chart.id} className="dashboard-pinned-card" href={`/chords?chart=${encodeURIComponent(chart.id)}`}><strong>{chart.name}</strong><span>{chart.selectedIds?.length ?? 0} selected cards</span><span aria-hidden="true">›</span></Link>)}</div></section> : null}
     </main>
   );
 }

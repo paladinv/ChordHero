@@ -219,6 +219,48 @@ export type KeyChangeVoicing = {
   reason: string;
 };
 
+export type VoicingCoverage = {
+  present: string[];
+  omitted: string[];
+  total: number;
+  percent: number;
+  explanation: string;
+};
+
+export type TransitionDrill = {
+  id: string;
+  name: string;
+  chordIds: string[];
+  tempo: number;
+  targetReps: number;
+  createdAt: string;
+};
+
+export type WeeklyPracticePlan = {
+  days: Array<{ day: string; focus: string; minutes: number; detail: string; chordIds: string[] }>;
+  totalMinutes: number;
+  summary: string;
+};
+
+export type GenreVoicingPreset = {
+  id: "folk-open" | "blues-seventh" | "jazz-shell" | "worship-capo";
+  label: string;
+  genre: GenrePracticePath["id"];
+  description: string;
+  matches: (entry: ChordLibraryItem) => boolean;
+};
+
+export type ChordFamilyDependency = {
+  id: AchievementFamily;
+  label: string;
+  prerequisite: AchievementFamily | null;
+  explanation: string;
+  completed: number;
+  total: number;
+  unlocked: boolean;
+  nextChordId: string | null;
+};
+
 export type FocusedDrill = {
   id: "f-barre" | "bm" | "clean-muting" | "fast-iv-v";
   title: string;
@@ -347,6 +389,22 @@ export function getGenrePracticePath(id: GenrePracticePath["id"]): GenrePractice
   return GENRE_PRACTICE_PATHS.find((path) => path.id === id) ?? GENRE_PRACTICE_PATHS[0];
 }
 
+export const GENRE_VOICING_PRESETS: GenreVoicingPreset[] = [
+  { id: "folk-open", label: "Folk open", genre: "folk", description: "Beginner-friendly open shapes with ringing strings.", matches: (entry) => entry.position.toLowerCase().includes("open") && (entry.difficultyTags.includes("beginner") || entry.difficultyTags.includes("fast-change friendly")) },
+  { id: "blues-seventh", label: "Blues seventh", genre: "blues", description: "Dominant seventh colors for compact I-IV-V movement.", matches: (entry) => entry.quality === "dominant7" },
+  { id: "jazz-shell", label: "Jazz shell", genre: "jazz", description: "Compact seventh shapes that foreground guide tones.", matches: (entry) => ["major7", "minor7", "dominant7"].includes(entry.quality) && !entry.difficultyTags.includes("stretch") },
+  { id: "worship-capo", label: "Worship / capo", genre: "worship", description: "Open, fast-change shapes suited to capo-friendly accompaniment.", matches: (entry) => entry.difficultyTags.includes("fast-change friendly") || entry.nearbyAlternatives.some((alternative) => alternative.type === "capo") }
+];
+
+export function getGenreVoicingPreset(id: GenreVoicingPreset["id"]): GenreVoicingPreset {
+  return GENRE_VOICING_PRESETS.find((preset) => preset.id === id) ?? GENRE_VOICING_PRESETS[0];
+}
+
+export function findGenrePresetEntry(entries: ChordLibraryItem[], id: GenreVoicingPreset["id"]): ChordLibraryItem | null {
+  const preset = getGenreVoicingPreset(id);
+  return entries.find(preset.matches) ?? entries.find((entry) => entry.difficultyTags.includes("fast-change friendly")) ?? entries[0] ?? null;
+}
+
 export function recommendCapoPositions(
   songKey: HarmonyNote,
   vocalRange: VocalRange,
@@ -466,6 +524,31 @@ export function buildAchievementMap(entries: ChordLibraryItem[], practiceStats: 
     const next = familyEntries.find((entry) => (practiceStats[entry.id]?.reps ?? 0) < 3) ?? null;
     return { family, completed, total: familyEntries.length, percent: familyEntries.length ? Math.round(completed / familyEntries.length * 100) : 0, nextChordId: next?.id ?? null, detail: next ? `Next: ${next.chord.name} · ${next.position}` : "Family complete for this library set." };
   });
+}
+
+export function buildChordFamilyDependencyMap(entries: ChordLibraryItem[], practiceStats: PracticeStats): ChordFamilyDependency[] {
+  const stages: Array<{ id: AchievementFamily; label: string; prerequisite: AchievementFamily | null; explanation: string }> = [
+    { id: "open chords", label: "Open shapes", prerequisite: null, explanation: "Build clean fretting and ringing-string control first." },
+    { id: "barre chords", label: "Barre shapes", prerequisite: "open chords", explanation: "Transfer the open-shape geometry into movable forms." },
+    { id: "inversions", label: "Inversions", prerequisite: "barre chords", explanation: "Keep the function while changing the bass note and voice leading." },
+    { id: "jazz colors", label: "Extensions", prerequisite: "inversions", explanation: "Add sevenths, suspensions, and extensions after the core shapes are reliable." }
+  ];
+  const completedFor = (family: AchievementFamily) => entries.filter((entry) => familyFor(entry) === family && (practiceStats[entry.id]?.reps ?? 0) >= 3).length;
+  return stages.map((stage) => {
+    const familyEntries = entries.filter((entry) => familyFor(entry) === stage.id);
+    const completed = completedFor(stage.id);
+    const prerequisiteComplete = !stage.prerequisite || completedFor(stage.prerequisite) > 0;
+    const next = familyEntries.find((entry) => (practiceStats[entry.id]?.reps ?? 0) < 3) ?? familyEntries[0] ?? null;
+    return { ...stage, completed, total: familyEntries.length, unlocked: prerequisiteComplete, nextChordId: next?.id ?? null };
+  });
+}
+
+export function getFretRangeLabel(frets: number[]): string {
+  const positive = frets.filter((fret) => fret > 0);
+  if (!positive.length) return frets.some((fret) => fret === 0) ? "open" : "muted";
+  const low = Math.min(...positive);
+  const high = Math.max(...positive);
+  return low === high ? `${low}fr` : `${low}-${high}fr`;
 }
 
 export function getOfflineLibraryStatus(selection: OfflinePackSelection, entries: ChordLibraryItem[] = CHORD_LIBRARY, bytesPerSample = 850_000): OfflineLibraryStatus {
@@ -657,4 +740,94 @@ export function buildRepertoireMilestones(entries: ChordLibraryItem[], stats: Pr
       detail: required === 0 ? "No matching shapes in the current filtered set." : unlocked ? `Unlocked: apply the family in ${song}.` : `${required - completed} more mastered voicing${required - completed === 1 ? "" : "s"} to unlock ${song}.`
     };
   });
+}
+
+const NOTE_PITCHES: Record<string, number> = {
+  C: 0, "C#": 1, Db: 1, D: 2, "D#": 3, Eb: 3, E: 4, F: 5, "F#": 6, Gb: 6,
+  G: 7, "G#": 8, Ab: 8, A: 9, "A#": 10, Bb: 10, B: 11
+};
+const STANDARD_OPEN_PITCHES = [4, 9, 2, 7, 11, 4];
+const CHORD_QUALITY_INTERVALS: Record<string, number[]> = {
+  major: [0, 4, 7],
+  minor: [0, 3, 7],
+  diminished: [0, 3, 6],
+  dominant7: [0, 4, 7, 10],
+  major7: [0, 4, 7, 11],
+  minor7: [0, 3, 7, 10],
+  sus2: [0, 2, 7],
+  sus4: [0, 5, 7],
+  add9: [0, 4, 7, 2]
+};
+
+export function getVoicingCoverage(entry: ChordLibraryItem | null): VoicingCoverage {
+  if (!entry) return { present: [], omitted: [], total: 0, percent: 0, explanation: "Choose a voicing to see its chord-tone coverage." };
+  const intervals = CHORD_QUALITY_INTERVALS[entry.quality] ?? CHORD_QUALITY_INTERVALS.major;
+  const rootPitch = NOTE_PITCHES[entry.root] ?? 0;
+  const toneNames = intervals.map((interval) => HARMONY_NOTES[(rootPitch + interval) % 12]);
+  const playedPitches = new Set(entry.chord.frets.flatMap((fret, index) => fret >= 0 ? [(STANDARD_OPEN_PITCHES[index] + fret) % 12] : []));
+  const present = toneNames.filter((name) => playedPitches.has(NOTE_PITCHES[name] ?? 0));
+  const omitted = toneNames.filter((name) => !present.includes(name));
+  const percent = Math.round(present.length / Math.max(1, toneNames.length) * 100);
+  return {
+    present,
+    omitted,
+    total: toneNames.length,
+    percent,
+    explanation: omitted.length ? `${present.join(", ")} are present; ${omitted.join(", ")} ${omitted.length === 1 ? "is" : "are"} omitted.` : `All ${toneNames.join(", ")} chord tones are present.`
+  };
+}
+
+export function pickRandomPracticalChord(
+  entries: ChordLibraryItem[],
+  options: { key?: string; role?: string; difficulty?: string; seed?: number } = {}
+): ChordLibraryItem | null {
+  const candidates = entries.filter((entry) => {
+    if (options.difficulty && options.difficulty !== "all" && !entry.difficultyTags.includes(options.difficulty as ChordLibraryItem["difficultyTags"][number])) return false;
+    if (options.key && options.key !== "any" && !entry.functionContexts.some((context) => context.key === options.key)) return false;
+    if (options.role && options.role !== "any" && !entry.functionContexts.some((context) => context.roles.includes(options.role as HarmonicRole))) return false;
+    return true;
+  });
+  if (!candidates.length) return null;
+  const seed = Number.isFinite(options.seed) ? Math.abs(options.seed as number) : Date.now();
+  return candidates[Math.floor(seed % candidates.length)] ?? candidates[0];
+}
+
+export function normalizeTransitionDrills(input: unknown, entries: ChordLibraryItem[]): TransitionDrill[] {
+  if (!Array.isArray(input)) return [];
+  const validIds = new Set(entries.map((entry) => entry.id));
+  return input.flatMap((item): TransitionDrill[] => {
+    if (!item || typeof item !== "object") return [];
+    const value = item as Partial<TransitionDrill>;
+    const chordIds = Array.isArray(value.chordIds) ? value.chordIds.filter((id): id is string => typeof id === "string" && validIds.has(id)).slice(0, 8) : [];
+    if (typeof value.name !== "string" || !value.name.trim() || chordIds.length < 2) return [];
+    return [{
+      id: typeof value.id === "string" ? value.id.slice(0, 80) : `drill-${chordIds.join("-")}`,
+      name: value.name.trim().slice(0, 80),
+      chordIds,
+      tempo: clamp(Number(value.tempo) || 72, 40, 180),
+      targetReps: clamp(Math.round(Number(value.targetReps) || 5), 1, 50),
+      createdAt: typeof value.createdAt === "string" ? value.createdAt : new Date().toISOString()
+    }];
+  }).slice(0, 24);
+}
+
+export function buildWeeklyPracticePlan(
+  entries: ChordLibraryItem[],
+  stats: PracticeStats,
+  assignments: TeacherAssignment[],
+  genre: GenrePracticePath["id"]
+): WeeklyPracticePlan {
+  const session = buildSessionPlan(entries, stats, assignments, genre, 18);
+  const weakIds = entries.filter((entry) => (stats[entry.id]?.strength ?? 0) < 3 || (stats[entry.id]?.misses ?? 0) > 1).slice(0, 4).map((entry) => entry.id);
+  const targetIds = session.items.flatMap((item) => item.chordIds).slice(0, 4);
+  const days = [
+    { day: "Mon", focus: "Warmup", minutes: 8, detail: session.items[0]?.detail ?? "Open-string clarity", chordIds: session.items[0]?.chordIds ?? [] },
+    { day: "Tue", focus: "Weak transitions", minutes: 10, detail: "Repeat the two least stable voicings slowly.", chordIds: weakIds },
+    { day: "Wed", focus: "Genre route", minutes: 12, detail: `${getGenrePracticePath(genre).label} roles at a relaxed tempo.`, chordIds: targetIds },
+    { day: "Thu", focus: "Review", minutes: 8, detail: "Return to due reviews and log clean repetitions.", chordIds: weakIds },
+    { day: "Fri", focus: "Repertoire", minutes: 14, detail: "Apply the mastered family to a song excerpt.", chordIds: targetIds },
+    { day: "Sat", focus: "Compare", minutes: 10, detail: "Compare one practical voicing with an alternate shape.", chordIds: targetIds.slice(0, 2) },
+    { day: "Sun", focus: "Snapshot", minutes: 5, detail: "Review progress and choose next week's family.", chordIds: [] }
+  ];
+  return { days, totalMinutes: days.reduce((sum, day) => sum + day.minutes, 0), summary: `${getGenrePracticePath(genre).label} week: ${days.length} short sessions covering due reviews, weak transitions, and repertoire.` };
 }

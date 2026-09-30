@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 // iOS SwiftData export, and Android Room export. Keep this test dependency-free
 // so it can run in CI without a browser, Xcode, or Gradle runtime.
 const fixture = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   songs: [{ id: 'traditional:amazing-grace', title: 'Amazing Grace', artist: 'Traditional', origin: 'public-domain' }],
   collections: [{ id: 'library:practice', name: 'Practice', songIDs: ['traditional:amazing-grace'], orderedSongIDs: ['traditional:amazing-grace'] }],
   progress: [{ songId: 'traditional:amazing-grace', sectionMastery: { verse: 0.75 }, streak: 2 }],
@@ -30,10 +30,17 @@ const fixture = {
   equipmentNotes: [{ songId: 'traditional:amazing-grace', instrument: 'Acoustic guitar', pickup: 'Blend 60/40', effects: 'Light room', microphone: 'Small diaphragm', backingTrackMix: 'Vocal -2 dB', updatedAt: '2026-08-09T17:00:00.000Z' }],
   recordingTargets: [{ songId: 'traditional:amazing-grace', targetBpm: 82, referenceLabel: 'Rehearsal reference', updatedAt: '2026-08-09T17:00:00.000Z' }],
   auditionSessions: [{ id: 'audition:1', songId: 'traditional:amazing-grace', sectionIds: ['verse'], answered: 1, correct: 1, startedAt: '2026-08-09T17:00:00.000Z', completedAt: '2026-08-09T17:01:00.000Z' }],
+  rehearsalRoles: [{ id: 'role:1', name: 'Maya', role: 'vocals', createdAt: '2026-08-09T17:00:00.000Z', updatedAt: '2026-08-09T17:00:00.000Z' }],
+  rehearsalAssignments: [{ id: 'assignment:role:1', roleId: 'role:1', resourceType: 'song', resourceId: 'traditional:amazing-grace', assignedBy: 'account:owner', createdAt: '2026-08-09T17:00:00.000Z', updatedAt: '2026-08-09T17:00:00.000Z' }],
+  rehearsalEvents: [{ id: 'event:1', songId: 'traditional:amazing-grace', kind: 'rehearsed', summary: 'Clean first verse entrance', createdAt: '2026-08-09T17:00:00.000Z' }],
+  arrangementSnapshots: [{ id: 'snapshot:1', songId: 'traditional:amazing-grace', variationId: 'variation:open', label: 'Original rehearsal', notes: 'Keep the pickup gentle.', variation: { name: 'Open', technique: 'strumming', key: 'G', timeSignature: '3/4', bpm: 82, tuningId: 'standard', capo: 0, pattern: 'D - D U', feel: 'Steady' }, createdAt: '2026-08-09T17:00:00.000Z' }],
+  stageCues: [{ id: 'cue:1', songId: 'traditional:amazing-grace', sectionId: 'verse', kind: 'count-in', text: 'Four-count, then vocal pickup.', createdAt: '2026-08-09T17:00:00.000Z', updatedAt: '2026-08-09T17:00:00.000Z' }],
+  referenceLinks: [{ id: 'reference:1', songId: 'traditional:amazing-grace', kind: 'tutorial', title: 'Picking tutorial', url: 'https://example.com/tutorial', source: 'Example source', license: 'Verify rights at source', createdAt: '2026-08-09T17:00:00.000Z', updatedAt: '2026-08-09T17:00:00.000Z' }],
+  concertOverrides: [{ id: 'override:1', songId: 'traditional:amazing-grace', name: 'Tonight fallback', variation: { name: 'Simplified', technique: 'strumming', key: 'G', timeSignature: '3/4', bpm: 70, tuningId: 'standard', capo: 0, pattern: 'D - D -', feel: 'Steady fallback', arrangementKind: 'concert' }, createdAt: '2026-08-09T17:00:00.000Z' }],
 };
 
-const requiredArrays = ['songs', 'collections', 'progress', 'queues', 'recordings', 'sharedAccess', 'songFamilies', 'sectionBookmarks', 'voicingPreferences', 'equipmentNotes', 'recordingTargets', 'auditionSessions'];
-assert.equal(fixture.schemaVersion, 6);
+const requiredArrays = ['songs', 'collections', 'progress', 'queues', 'recordings', 'sharedAccess', 'songFamilies', 'sectionBookmarks', 'voicingPreferences', 'equipmentNotes', 'recordingTargets', 'auditionSessions', 'rehearsalRoles', 'rehearsalAssignments', 'rehearsalEvents', 'arrangementSnapshots', 'stageCues', 'referenceLinks', 'concertOverrides'];
+assert.equal(fixture.schemaVersion, 7);
 for (const key of requiredArrays) assert.ok(Array.isArray(fixture[key]), `${key} must be an array`);
 
 const encoded = JSON.stringify(fixture);
@@ -67,15 +74,21 @@ assert.ok(decoded.voicingPreferences.every((preference) => ['open', 'barre', 'pa
 assert.ok(decoded.equipmentNotes.every((notes) => Object.values(notes).every((value) => typeof value !== 'string' || value.length <= 240)), 'equipment notes must be bounded text');
 assert.ok(decoded.recordingTargets.every((target) => target.targetBpm === undefined || (target.targetBpm >= 40 && target.targetBpm <= 240)), 'recording targets must be clamped');
 assert.ok(decoded.auditionSessions.length <= 100 && decoded.auditionSessions.every((session) => session.sectionIds.length <= 64), 'audition sessions must be bounded');
+assert.ok(decoded.rehearsalRoles.length <= 100 && decoded.rehearsalRoles.every((role) => ['vocals', 'guitar', 'cues', 'gear', 'custom'].includes(role.role)), 'rehearsal roles must be bounded and typed');
+assert.ok(decoded.rehearsalEvents.length <= 500 && decoded.rehearsalEvents.every((event) => event.summary.length <= 240 && !('media' in event) && !('blob' in event)), 'rehearsal events must be concise metadata');
+assert.ok(decoded.arrangementSnapshots.length <= 200 && decoded.arrangementSnapshots.every((snapshot) => snapshot.label.length <= 100), 'arrangement snapshots must be bounded');
+assert.ok(decoded.stageCues.length <= 500 && decoded.stageCues.every((cue) => cue.text.length <= 180 && (!cue.atSeconds || cue.atSeconds <= 86400)), 'stage cues must be bounded');
+assert.ok(decoded.referenceLinks.every((reference) => /^https?:\/\//i.test(reference.url) && reference.license.length <= 240), 'reference links must be validated metadata');
+assert.ok(decoded.concertOverrides.length <= 100 && decoded.concertOverrides.every((override) => override.variation && override.name.length <= 100), 'concert overrides must be reversible compact snapshots');
 for (const draft of decoded.drafts) assert.ok(!('blob' in draft) && !('data' in draft), 'drafts must contain text metadata only');
 for (const comment of decoded.assignmentComments) assert.ok(['shared', 'teacher-only'].includes(comment.visibility), 'assignment comment visibility must be explicit');
 
-// v1-v6 acceptance: each prior envelope version is explicitly accepted by the
+// v1-v7 acceptance: each envelope version is explicitly accepted by the
 // additive migration gate and upgrades to the current wire version.
-for (const version of [1, 2, 3, 4, 5, 6]) {
+for (const version of [1, 2, 3, 4, 5, 6, 7]) {
   const legacy = { ...fixture, schemaVersion: version };
-  assert.ok([1, 2, 3, 4, 5, 6].includes(legacy.schemaVersion), `v${version} migration gate must remain accepted`);
+  assert.ok([1, 2, 3, 4, 5, 6, 7].includes(legacy.schemaVersion), `v${version} migration gate must remain accepted`);
   assert.equal(JSON.parse(JSON.stringify(legacy)).schemaVersion, version, `v${version} envelope must round-trip`);
 }
 
-console.log(`Song Library compatibility contract is valid: schema v${decoded.schemaVersion}, v1-v6 migration gate, ${decoded.songs.length} song, ${decoded.recordings.length} recording.`);
+console.log(`Song Library compatibility contract is valid: schema v${decoded.schemaVersion}, v1-v7 migration gate, ${decoded.songs.length} song, ${decoded.recordings.length} recording.`);

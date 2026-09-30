@@ -1,15 +1,9 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RIGHT_HAND_EXERCISES, type RightHandExercise } from "../lib/rightHandExercises";
 import { describeRightHandStep, type ExerciseProgress } from "../lib/rightHandPracticeRuntime";
 import type { RecordingAnalysis } from "../lib/songRecordingAnalysis";
-
-const RightHandTechnique3D = dynamic(() => import("./RightHandTechnique3D"), {
-  ssr: false,
-  loading: () => <div className="guitar-technique-3d-loading" role="status">Loading the 3D hand coach…</div>
-});
 
 export type CoachingFocus = "rhythm" | "strings" | "muting";
 export type DynamicsProfile = "even" | "accent-map" | "backbeat" | "crescendo";
@@ -101,7 +95,6 @@ function downloadJson(value: unknown, name: string) {
 
 export default function RightHandCoachingStudio(props: Props) {
   const { exercise, onSelectExercise, onSetRoundSeconds, onToggleRound } = props;
-  const [show3D, setShow3D] = useState(false);
   const [routeIndex, setRouteIndex] = useState(0);
   const [setup, setSetup] = useState(DEFAULT_SETUP);
   const [takes, setTakes] = useState<TakeSummary[]>([]);
@@ -280,9 +273,8 @@ export default function RightHandCoachingStudio(props: Props) {
       <div><button type="button" onClick={() => props.onSelectExercise(todayWarmup)}><span>Warmup</span><strong>{todayWarmup.title}</strong></button><button type="button" onClick={() => props.onSelectExercise(props.exercise)}><span>Technical</span><strong>{props.exercise.title}</strong></button><button type="button" onClick={() => props.onSelectExercise(musicalExercise)}><span>Apply</span><strong>{musicalExercise.title}</strong><small>{currentChord}</small></button></div>
     </section>
 
-    <details><summary>3D right-hand coach & string-hit feedback</summary><div className="three-d-coach-intro"><div><strong>{props.exercise.technique === "fingerpicking" ? "Finger assignment at the soundhole" : props.exercise.technique === "plectrum" ? "Pick path across the strings" : "Strum path across the strings"}</strong><p>The right hand plays the strings near the soundhole or bridge. <b>{currentChord}</b> names the chord context; its frets are held by the left hand.</p></div><button type="button" aria-expanded={show3D} onClick={() => setShow3D((value) => !value)}>{show3D ? "Close 3D coach" : "Open 3D coach"}</button></div>
+    <details><summary>Alternate string routes & hit feedback</summary><div className="three-d-coach-intro"><div><strong>{props.exercise.technique === "fingerpicking" ? "Finger assignment at the soundhole" : props.exercise.technique === "plectrum" ? "Pick path across the strings" : "Strum path across the strings"}</strong><p>Choose an alternate route here. The primary player&apos;s clearly labelled 3D right-hand display follows the selected exercise step.</p></div></div>
       <div className="route-picker" aria-label="Alternate string routes">{routes.map((strings, index) => <button type="button" key={strings.join("-")} className={routeIndex === index ? "active" : ""} aria-pressed={routeIndex === index} onClick={() => setRouteIndex(index)}>Route {index + 1}: {strings.join("–")}</button>)}</div>
-      {show3D ? <RightHandTechnique3D technique={props.exercise.technique} step={props.activeStep} strings={route} run={props.status === "running"} id={props.exercise.id} loop={props.loopsCompleted} chordName={currentChord} /> : null}
       <div className="string-hit-feedback"><div><span className="label">Target strings</span><div className="string-lanes">{[1, 2, 3, 4, 5, 6].map((string) => <i key={string} className={route.includes(string) ? "target" : ""}><b>{string}</b></i>)}</div></div><div><span className="label">Observed after latest take</span><div className="string-lanes">{[1, 2, 3, 4, 5, 6].map((string) => <i key={string} className={possibleObserved.includes(string) ? "observed" : ""}><b>{string}</b></i>)}</div></div><p>{observed?.detectedPitch ? `Estimated possible string route from ${observed.detectedPitch.note} pitch evidence (${Math.min(60, observed.detectedPitch.confidence)}% display confidence). Fretted notes are ambiguous across strings.` : "No pitch evidence yet. The live onset guide can detect an attack, but it cannot identify an individual string."}</p></div>
     </details>
 

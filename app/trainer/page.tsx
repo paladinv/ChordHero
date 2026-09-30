@@ -31,6 +31,8 @@ type VoicingLock = "any" | "open" | "closed";
 type InstrumentProfile = "acoustic" | "electric" | "classical" | "reducedString";
 type CurriculumId = "firstChords" | "rhythmBuilder" | "barreReady" | "performanceReady";
 type VocabularyPrompt = "name" | "diagram" | "function" | "sound";
+type CameraAngle = "fretting" | "strumming" | "neck";
+type RescueScenario = "lostPlace" | "badChange" | "brokenRhythm" | "restart";
 
 type TransitionRecipe = {
   id: string;
@@ -68,6 +70,9 @@ type Reflection = { date: string; answer: string };
 type RealWorldGoal = { label: string; target: number; progress: number };
 type SongReadiness = { label: string; checks: Record<"chords" | "transitions" | "rhythm" | "runThrough", boolean> };
 type SessionSummary = { id: string; date: string; accuracy: number; pace: number | null; confidence: number; tension: string };
+type PerformanceReflection = { id: string; date: string; wentWell: string; lostTime: string; revisitTransition: string };
+type DatedPracticeGoal = { date: string; label: string } | null;
+type ProgressSnapshot = { id: string; date: string; period: "week" | "month"; accuracy: number; clean: number; pace: number | null; confidence: number; readiness: number };
 type SpeedLadder = { unlockedIndex: number; cleanRoundsAtRung: number };
 type RecorderTake = { id: string; kind: CaptureKind; url: string; createdAt: number; durationSeconds: number; bytes: number };
 type Milestone = { id: MilestoneId; date: string };
@@ -77,7 +82,7 @@ type AchievementSettings = { enabled: boolean; cleanRound: boolean; mastery: boo
 type TransitionMastery = { key: string; streak: number; mastered: boolean };
 
 type TrainerPersistence = {
-  version: 6;
+  version: 8;
   transitions: Record<string, TransitionRecord>;
   chords: Record<string, ChordRecord>;
   stats: TrainerStats;
@@ -89,6 +94,9 @@ type TrainerPersistence = {
   mistakePatterns: Record<MistakePattern, number>;
   readiness: SongReadiness;
   sessions: SessionSummary[];
+  performanceReflections: PerformanceReflection[];
+  datedPracticeGoal: DatedPracticeGoal;
+  snapshots: ProgressSnapshot[];
   speedLadder: SpeedLadder;
   milestones: Milestone[];
   performanceChecklist: Record<ChecklistKey, boolean>;
@@ -119,7 +127,7 @@ const DEFAULT_STATS: TrainerStats = {
   recoveries: 0
 };
 const DEFAULT_PERSISTENCE: TrainerPersistence = {
-  version: 6,
+  version: 8,
   transitions: {},
   chords: {},
   stats: DEFAULT_STATS,
@@ -131,6 +139,9 @@ const DEFAULT_PERSISTENCE: TrainerPersistence = {
   mistakePatterns: { late: 0, muted: 0, barreFatigue: 0, tension: 0 },
   readiness: { label: "Current song", checks: { chords: false, transitions: false, rhythm: false, runThrough: false } },
   sessions: [],
+  performanceReflections: [],
+  datedPracticeGoal: null,
+  snapshots: [],
   speedLadder: { unlockedIndex: 0, cleanRoundsAtRung: 0 },
   milestones: [],
   performanceChecklist: { tuning: false, capo: false, warmUp: false, songOrder: false, difficultTransition: false },
@@ -367,6 +378,22 @@ function parsePersistence(raw: string | null): TrainerPersistence {
         tension: item.tension.slice(0, 120)
       }];
     }) : [];
+    const performanceReflections = Array.isArray(source.performanceReflections) ? source.performanceReflections.slice(0, 30).flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return [];
+      const item = entry as Partial<PerformanceReflection>;
+      if (typeof item.id !== "string" || typeof item.date !== "string" || typeof item.wentWell !== "string" || typeof item.lostTime !== "string" || typeof item.revisitTransition !== "string") return [];
+      return [{ id: item.id.slice(0, 80), date: item.date.slice(0, 10), wentWell: item.wentWell.slice(0, 300), lostTime: item.lostTime.slice(0, 300), revisitTransition: item.revisitTransition.slice(0, 80) }];
+    }) : [];
+    const datedGoalSource = source.datedPracticeGoal && typeof source.datedPracticeGoal === "object" ? source.datedPracticeGoal : null;
+    const datedPracticeGoal: DatedPracticeGoal = datedGoalSource && typeof datedGoalSource.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(datedGoalSource.date) && typeof datedGoalSource.label === "string"
+      ? { date: datedGoalSource.date, label: datedGoalSource.label.trim().slice(0, 120) }
+      : null;
+    const snapshots = Array.isArray(source.snapshots) ? source.snapshots.slice(0, 48).flatMap((entry) => {
+      if (!entry || typeof entry !== "object") return [];
+      const item = entry as Partial<ProgressSnapshot>;
+      if (typeof item.id !== "string" || typeof item.date !== "string" || (item.period !== "week" && item.period !== "month")) return [];
+      return [{ id: item.id.slice(0, 80), date: item.date.slice(0, 10), period: item.period, accuracy: clampNumber(item.accuracy, 0, 100, 0), clean: clampNumber(item.clean, 0, 1_000_000, 0), pace: item.pace === null ? null : clampNumber(item.pace, 2, 8, 3), confidence: clampNumber(item.confidence, 0, 100, 0), readiness: clampNumber(item.readiness, 0, 5, 0) }];
+    }) : [];
     const ladderSource = source.speedLadder && typeof source.speedLadder === "object" ? source.speedLadder : DEFAULT_PERSISTENCE.speedLadder;
     const speedLadder: SpeedLadder = {
       unlockedIndex: clampNumber(ladderSource.unlockedIndex, 0, SPEED_LADDER.length - 1, 0),
@@ -425,7 +452,7 @@ function parsePersistence(raw: string | null): TrainerPersistence {
     const instrumentIds: InstrumentProfile[] = ["acoustic", "electric", "classical", "reducedString"];
     const instrumentProfile = instrumentIds.includes(source.instrumentProfile as InstrumentProfile) ? source.instrumentProfile as InstrumentProfile : "acoustic";
     const cloudBackupConsent = source.cloudBackupConsent === true;
-    return { version: 6, transitions, chords, stats, history, notes, rotation, reflections, realWorldGoal, mistakePatterns, readiness, sessions, speedLadder, milestones, performanceChecklist, rehearsalNotes, recoveryHistory, achievementSettings, mastery, recipes, instrumentProfile, cloudBackupConsent };
+    return { version: 8, transitions, chords, stats, history, notes, rotation, reflections, realWorldGoal, mistakePatterns, readiness, sessions, performanceReflections, datedPracticeGoal, snapshots, speedLadder, milestones, performanceChecklist, rehearsalNotes, recoveryHistory, achievementSettings, mastery, recipes, instrumentProfile, cloudBackupConsent };
   } catch {
     return DEFAULT_PERSISTENCE;
   }
@@ -493,6 +520,32 @@ function buzzingDiagnostic(chord: Chord) {
 
 function localDateKey(date = new Date()) {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function chordRoot(name: string) {
+  return name.match(/^[A-G](?:#|b)?/)?.[0] ?? name;
+}
+
+function scaleFragmentForChord(chord: Chord | null) {
+  if (!chord) return null;
+  const root = chordRoot(chord.name);
+  const majorRoots: Record<string, string> = {
+    C: "C · D · E · G · A",
+    D: "D · E · F# · A · B",
+    E: "E · F# · G# · B · C#",
+    F: "F · G · A · C · D",
+    G: "G · A · B · D · E",
+    A: "A · B · C# · E · F#",
+    B: "B · C# · D# · F# · G#"
+  };
+  return { label: `${root} pentatonic fragment`, notes: majorRoots[root.replace(/[#b]$/, "")] ?? `${root} · 2 · 3 · 5 · 6` };
+}
+
+function snapshotWeekKey(date = new Date()) {
+  const cursor = new Date(date);
+  const day = cursor.getDay() || 7;
+  cursor.setDate(cursor.getDate() - day + 1);
+  return localDateKey(cursor);
 }
 
 function hasConsecutivePracticeDays(history: PracticeDay[], count: number) {
@@ -785,6 +838,26 @@ export default function TrainerPage() {
   const [breakdownVisible, setBreakdownVisible] = useState(false);
   const [recoveryMethod, setRecoveryMethod] = useState<RecoveryMethod>("rest");
   const [recoveryOutcome, setRecoveryOutcome] = useState("");
+  const [threeDPreviewChordName, setThreeDPreviewChordName] = useState("");
+  const [cameraAngle, setCameraAngle] = useState<CameraAngle>("fretting");
+  const [rehearsalDate, setRehearsalDate] = useState("");
+  const [relaxationBefore, setRelaxationBefore] = useState(3);
+  const [relaxationAfter, setRelaxationAfter] = useState(3);
+  const [memoryAnswer, setMemoryAnswer] = useState("");
+  const [memoryResult, setMemoryResult] = useState("");
+  const [fingeringScores, setFingeringScores] = useState({ standard: 0, alternate: 0 });
+  const [rescueScenario, setRescueScenario] = useState<RescueScenario>("lostPlace");
+  const [personalVocabulary, setPersonalVocabulary] = useState<string[]>([]);
+  const [vocabularyOnly, setVocabularyOnly] = useState(false);
+  const [coachPointer, setCoachPointer] = useState<"text" | "audio" | "visual">("text");
+  const [coachAttachment, setCoachAttachment] = useState<{ name: string; type: string; bytes: number } | null>(null);
+  const [mistakeReplayIndex, setMistakeReplayIndex] = useState(0);
+  const [footswitchMode, setFootswitchMode] = useState(false);
+  const [rebuildPrompt, setRebuildPrompt] = useState<{ index: number; beat: number; rejoin: "current" | "next" }>({ index: -1, beat: 1, rejoin: "current" });
+  const [performanceWentWell, setPerformanceWentWell] = useState("");
+  const [performanceLostTime, setPerformanceLostTime] = useState("");
+  const [performanceRevisit, setPerformanceRevisit] = useState("");
+  const [warmUpTemplate, setWarmUpTemplate] = useState<InstrumentProfile>("acoustic");
 
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const deadlineRef = useRef(0);
@@ -808,6 +881,7 @@ export default function TrainerPage() {
   const offlinePackFileRef = useRef<HTMLInputElement | null>(null);
   const setlistFileRef = useRef<HTMLInputElement | null>(null);
   const handPhotoFileRef = useRef<HTMLInputElement | null>(null);
+  const coachPointerFileRef = useRef<HTMLInputElement | null>(null);
   const handPhotoUrlRef = useRef("");
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
@@ -820,6 +894,7 @@ export default function TrainerPage() {
   const silentPracticeRef = useRef(false);
   const benchmarkCleanRef = useRef(0);
   const benchmarkDeadlineRef = useRef(0);
+  const rateAndAdvanceRef = useRef<(rating: FeedbackRating) => void>(() => undefined);
 
   const activeLevel = LEVELS[levelIndex];
   const chordNames = useMemo(() => activeLevel.chords.map((chord) => chord.name), [activeLevel.chords]);
@@ -843,6 +918,10 @@ export default function TrainerPage() {
   const selectedChord = selectedHistoryIndex === null ? null : sequence[selectedHistoryIndex] ?? null;
   const settingsLocked = status !== "idle";
   const selectedSongSet = songSets.find((set) => set.id === songSetId) ?? songSets[0] ?? null;
+  const threeDGuideChord = currentChord
+    ?? activeLevel.chords.find((chord) => chord.name === threeDPreviewChordName)
+    ?? activeLevel.chords[0]
+    ?? null;
   const technique = useMemo(() => currentChord ? techniqueFor(currentChord, nextChord) : null, [currentChord, nextChord]);
   const chordRecord = currentChord ? persistence.chords[currentChord.name] : null;
   const chordAttempts = chordRecord ? chordRecord.clean + chordRecord.missed + chordRecord.needsWork : 0;
@@ -924,6 +1003,90 @@ export default function TrainerPage() {
       return 22 + (seed % 72);
     });
   }, [takes]);
+  const personalVocabularyChords = useMemo(
+    () => activeLevel.chords.filter((chord) => personalVocabulary.includes(chord.name)),
+    [activeLevel.chords, personalVocabulary]
+  );
+  const practicePath = useMemo(() => {
+    const weak = transitionMap.weak[0]?.[0] ?? `${effectivePairFrom} → ${effectivePairTo}`;
+    const fatigue = persistence.sessions.slice(0, 7).some((session) => /tens|sore|tight|fatigue|pain/i.test(session.tension));
+    const songGoal = persistence.readiness.label || "your current song";
+    return [
+      { day: "Day 1", focus: fatigue ? "Recovery reset · silent shapes" : "Baseline · relaxed chord shapes" },
+      { day: "Day 2", focus: `Target ${weak} at a comfortable pace` },
+      { day: "Day 3", focus: `Rhythm displacement · changes on beat ${changeBeat}` },
+      { day: "Day 4", focus: fatigue ? "Rest or five-minute technique check" : "Alternate-fingering A/B round" },
+      { day: "Day 5", focus: `Apply the transition inside ${songGoal}` },
+      { day: "Day 6", focus: "Performance-rescue rehearsal" },
+      { day: "Day 7", focus: "Short review, reflection, and next-week reset" }
+    ];
+  }, [changeBeat, effectivePairFrom, effectivePairTo, persistence.readiness.label, persistence.sessions, transitionMap.weak]);
+  const rehearsalDaysLeft = useMemo(() => {
+    if (!rehearsalDate) return null;
+    const target = new Date(`${rehearsalDate}T12:00:00`);
+    if (Number.isNaN(target.getTime())) return null;
+    return Math.ceil((target.getTime() - Date.now()) / 86_400_000);
+  }, [rehearsalDate]);
+  const mistakeReplayItems = useMemo(() => Object.entries(feedback)
+    .filter(([, rating]) => rating !== "clean")
+    .map(([rawIndex, rating]) => {
+      const index = Number(rawIndex);
+      const start = Math.max(0, index - 1);
+      const end = Math.min(sequence.length, index + 2);
+      return {
+        index,
+        rating,
+        window: sequence.slice(start, end),
+        plannedSeconds: roundConfig.pacePlan[index] ?? (typeof roundConfig.pace === "number" ? roundConfig.pace : null)
+      };
+    }), [feedback, roundConfig.pace, roundConfig.pacePlan, sequence]);
+  const activeMistakeReplay = mistakeReplayItems[mistakeReplayIndex] ?? mistakeReplayItems[0] ?? null;
+  const activeLibraryItem = threeDGuideChord ? libraryItemForChord(threeDGuideChord) : null;
+  const alternateFingering = activeLibraryItem?.alternateFingerings?.[0] ?? "Try the same shape with the closest comfortable finger assignment, without changing its notes.";
+  const barrePressureCue = currentChord?.barre
+    ? `Use the minimum pressure that keeps ${currentChord.name} clear. Place the index close behind fret ${currentChord.barre.fret}, test once, then soften until the note nearly buzzes and add only a little pressure back.`
+    : "No barre in the current shape. Keep the thumb light and use only enough fingertip pressure for a clear note.";
+  const liveFeedbackSummary = useMemo(() => summarizeFeedback(feedback), [feedback]);
+  const performanceConfidence = useMemo(() => {
+    const rated = liveFeedbackSummary.clean + liveFeedbackSummary.needsWork + liveFeedbackSummary.missed;
+    const transition = rated ? (liveFeedbackSummary.clean / rated) * 100 : Math.min(100, persistence.stats.bestCleanRound * 10);
+    const rhythmSession = persistence.sessions.find((session) => session.id.startsWith("rhythm-") || /rhythm|strum/i.test(session.tension));
+    const rhythm = rhythmAware || strummingPrompt !== "none" ? (rated ? ((liveFeedbackSummary.clean + liveFeedbackSummary.needsWork * 0.45) / rated) * 100 : 50) : rhythmSession?.accuracy ?? 50;
+    const tensionPenalty = discomfort === "strong" ? 80 : discomfort === "moderate" ? 55 : discomfort === "mild" ? 25 : persistence.mistakePatterns.tension ? Math.min(60, persistence.mistakePatterns.tension * 8) : 0;
+    const tension = Math.max(0, 100 - tensionPenalty);
+    const checklist = (Object.values(persistence.performanceChecklist).filter(Boolean).length / 5) * 100;
+    const score = Math.round(transition * 0.35 + rhythm * 0.25 + tension * 0.15 + checklist * 0.25);
+    return { score, transition: Math.round(transition), rhythm: Math.round(rhythm), tension: Math.round(tension), checklist: Math.round(checklist) };
+  }, [discomfort, liveFeedbackSummary, persistence.mistakePatterns.tension, persistence.performanceChecklist, persistence.sessions, persistence.stats.bestCleanRound, rhythmAware, strummingPrompt]);
+  const voicingMapEntries = useMemo(() => {
+    const target = currentChord ?? threeDGuideChord ?? activeLevel.chords[0];
+    if (!target) return [];
+    const libraryTarget = libraryItemForChord(target);
+    if (!libraryTarget) return [];
+    return CHORD_LIBRARY.filter((item) => item.root === libraryTarget.root && item.quality === libraryTarget.quality).slice(0, 6);
+  }, [activeLevel.chords, currentChord, threeDGuideChord]);
+  const bandContext = useMemo(() => {
+    const chord = currentChord ?? threeDGuideChord;
+    if (!chord) return null;
+    const item = libraryItemForChord(chord);
+    const role = item?.functionContexts[0]?.label ?? "Use the root as the band anchor and keep the rhythm pocket steady.";
+    return { root: chordRoot(chord.name), role };
+  }, [currentChord, threeDGuideChord]);
+  const explainChange = useMemo(() => {
+    const from = previousChord ?? activeLevel.chords[0];
+    const to = currentChord ?? nextChord;
+    if (!from || !to) return null;
+    const shared = sharedFrettedPositions(from, to).length;
+    const movement = chordRoot(from.name) === chordRoot(to.name) ? "same-root color change" : `${chordRoot(from.name)} resolves toward ${chordRoot(to.name)}`;
+    return { from: from.name, to: to.name, movement, pivot: shared ? `Keep ${shared} shared fretted position${shared === 1 ? "" : "s"} planted as a pivot.` : "No shared fretted position is obvious; hover fingers close and move together." };
+  }, [activeLevel.chords, currentChord, nextChord, previousChord]);
+  const scaleFragment = useMemo(() => scaleFragmentForChord(currentChord ?? nextChord), [currentChord, nextChord]);
+  const sectionSpacing = useMemo(() => {
+    const weak = transitionMap.weak.length;
+    return weak >= 2 ? "Repeat the difficult chorus twice for every comfortable verse." : weak === 1 ? "Give the chorus one extra pass, then keep the verse at normal spacing." : "Keep verse and chorus spacing even until more transition evidence is available.";
+  }, [transitionMap.weak.length]);
+  const latestSnapshot = persistence.snapshots[0] ?? null;
+  const previousSnapshot = persistence.snapshots.find((snapshot) => snapshot.id !== latestSnapshot?.id) ?? null;
 
   useEffect(() => {
     metronomeRef.current = { on: metronomeOn, subdivision, volume };
@@ -953,7 +1116,7 @@ export default function TrainerPage() {
   const savePersistence = useCallback((next: TrainerPersistence) => {
     const bounded: TrainerPersistence = {
       ...next,
-      version: 6,
+      version: 8,
       transitions: Object.fromEntries(Object.entries(next.transitions).slice(-500)),
       chords: Object.fromEntries(Object.entries(next.chords).slice(-250)),
       history: next.history.slice(0, 60),
@@ -961,6 +1124,17 @@ export default function TrainerPage() {
       rotation: Object.fromEntries(Object.entries(next.rotation).slice(0, 7)),
       reflections: next.reflections.slice(0, 30),
       sessions: next.sessions.slice(0, 30),
+      performanceReflections: next.performanceReflections.slice(0, 30).map((item) => ({
+        id: item.id.slice(0, 80),
+        date: item.date.slice(0, 10),
+        wentWell: item.wentWell.trim().slice(0, 300),
+        lostTime: item.lostTime.trim().slice(0, 300),
+        revisitTransition: item.revisitTransition.trim().slice(0, 80)
+      })),
+      datedPracticeGoal: next.datedPracticeGoal && /^\d{4}-\d{2}-\d{2}$/.test(next.datedPracticeGoal.date)
+        ? { date: next.datedPracticeGoal.date, label: next.datedPracticeGoal.label.trim().slice(0, 120) }
+        : null,
+      snapshots: next.snapshots.slice(0, 48),
       milestones: next.milestones.slice(0, 3).filter((item, index, list) => list.findIndex((candidate) => candidate.id === item.id) === index),
       rehearsalNotes: next.rehearsalNotes.slice(0, 40),
       recoveryHistory: next.recoveryHistory.slice(0, 30),
@@ -1139,6 +1313,16 @@ export default function TrainerPage() {
           : Math.min(current.stats.bestPaceSeconds, roundConfig.pace)
         : current.stats.bestPaceSeconds;
     const nextHistory = [nextDay, ...current.history.filter((item) => item.date !== day)].slice(0, 60);
+    const snapshotAccuracy = Object.keys(feedbackRef.current).length ? Math.round((summary.clean / Object.keys(feedbackRef.current).length) * 100) : 0;
+    const snapshotConfidence = Math.round(snapshotAccuracy * 0.55 + (rhythmRef.current.aware || strummingPrompt !== "none" ? snapshotAccuracy : 50) * 0.2 + (Object.values(current.performanceChecklist).filter(Boolean).length / 5) * 25);
+    const weekId = `week:${snapshotWeekKey()}`;
+    const monthId = `month:${day.slice(0, 7)}`;
+    const snapshotBase = { date: day, accuracy: snapshotAccuracy, clean: summary.clean, pace: typeof roundConfig.pace === "number" ? roundConfig.pace : null, confidence: snapshotConfidence, readiness: Object.values(current.readiness.checks).filter(Boolean).length };
+    const nextSnapshots = [
+      ...(!current.snapshots.some((snapshot) => snapshot.id === weekId) ? [{ id: weekId, period: "week" as const, ...snapshotBase }] : []),
+      ...(!current.snapshots.some((snapshot) => snapshot.id === monthId) ? [{ id: monthId, period: "month" as const, ...snapshotBase }] : []),
+      ...current.snapshots
+    ].slice(0, 48);
     const milestoneCandidates: MilestoneId[] = [];
     if (perfect && sequence.some((chord) => Boolean(chord.barre))) milestoneCandidates.push("firstCleanBarre");
     if (hasConsecutivePracticeDays(nextHistory, 7)) milestoneCandidates.push("sevenDayStreak");
@@ -1154,10 +1338,11 @@ export default function TrainerPage() {
         cleanRoundsAtRung: unlockNext ? 0 : Math.min(2, ladderCleanRounds)
       },
       history: nextHistory,
+      snapshots: nextSnapshots,
       milestones: mergeMilestones(current.milestones, milestoneCandidates)
     });
     if (Date.now() - sessionStartedAtRef.current >= 20 * 60 * 1000) setRestPrompt("You have practiced for about 20 minutes. Take two minutes to loosen your hands and shoulders.");
-  }, [roundConfig.length, roundConfig.pace, savePersistence, sequence, status]);
+  }, [roundConfig.length, roundConfig.pace, savePersistence, sequence, status, strummingPrompt]);
 
   useEffect(() => {
     clearTimer();
@@ -1272,7 +1457,11 @@ export default function TrainerPage() {
     if (!silentPractice && (metronomeOn || backingGroove)) await ensureAudioContext();
     const barreChords = activeLevel.chords.filter((chord) => Boolean(chord.barre));
     const familyChords = activeLevel.chords.filter((chord) => chordFamilyMatches(chord, chordFamily));
-    const drillChords = drillMode === "barre" && barreChords.length
+    const vocabularyChords = activeLevel.chords.filter((chord) => personalVocabulary.includes(chord.name));
+    const vocabularyRound = vocabularyOnly && vocabularyChords.length >= 2;
+    const drillChords = vocabularyRound
+      ? vocabularyChords
+      : drillMode === "barre" && barreChords.length
       ? barreChords
       : drillMode === "family" && familyChords.length ? familyChords : activeLevel.chords;
     const fromChord = activeLevel.chords.find((chord) => chord.name === effectivePairFrom);
@@ -1287,7 +1476,9 @@ export default function TrainerPage() {
     const goalPair = transitionGoalOn && drillMode === "random" && goalFromChord && goalToChord ? ([goalFromChord, goalToChord] as [Chord, Chord]) : null;
     const transposed = drillMode === "progression" && randomKey ? transposeProgression(activeLevel.chords, progressionId, roundLength) : null;
     const genreSequence = drillMode === "genre" ? buildNamedSequence(activeLevel.chords, GENRE_PACKS[genrePack].names, roundLength) : null;
-    const nextSequence = drillMode === "progression"
+    const nextSequence = vocabularyRound
+      ? buildSequence(vocabularyChords, roundLength, saved.transitions, null)
+      : drillMode === "progression"
       ? transposed?.sequence ?? buildProgression(activeLevel.chords, progressionId, roundLength)
       : drillMode === "genre"
         ? genreSequence ?? buildSequence(activeLevel.chords, roundLength, saved.transitions, null)
@@ -1296,8 +1487,9 @@ export default function TrainerPage() {
       : drillMode === "song" && selectedSongSet
         ? buildSequence(selectedSongSet.chords, roundLength, saved.transitions, null)
         : buildSequence(drillChords, roundLength, saved.transitions, pair ?? keepDrillPair ?? goalPair);
-    const drillLabel =
-      drillMode === "pair"
+    const drillLabel = vocabularyRound
+      ? `Personal vocabulary · ${vocabularyChords.map((chord) => chord.name).join(", ")}`
+      : drillMode === "pair"
         ? `${effectivePairFrom} → ${effectivePairTo}`
         : drillMode === "barre"
           ? barreChords.length
@@ -1341,13 +1533,12 @@ export default function TrainerPage() {
     setPostConfidence(3);
     setRecallRevealed(false);
     setGuideVisible(false);
-    setThreeDHandVisible(false);
     setSessionSaved(false);
     setSelectedHistoryIndex(null);
     setSecondsLeft(0);
     if (previewEnabled) setStatus("preview");
     else beginCountIn();
-  }, [activeLevel.chords, backingGroove, beginCountIn, chordFamily, drillMode, effectiveGoalFrom, effectiveGoalTo, effectiveKeepFrom, effectiveKeepTo, effectivePairFrom, effectivePairTo, ensureAudioContext, ensurePersistenceLoaded, genrePack, metronomeOn, pace, previewEnabled, progressionId, randomKey, roundLength, selectedSongSet, silentPractice, transitionGoalOn, warmUp]);
+  }, [activeLevel.chords, backingGroove, beginCountIn, chordFamily, drillMode, effectiveGoalFrom, effectiveGoalTo, effectiveKeepFrom, effectiveKeepTo, effectivePairFrom, effectivePairTo, ensureAudioContext, ensurePersistenceLoaded, genrePack, metronomeOn, pace, personalVocabulary, previewEnabled, progressionId, randomKey, roundLength, selectedSongSet, silentPractice, transitionGoalOn, vocabularyOnly, warmUp]);
 
   const applyEmergencyWarmUp = useCallback(() => {
     if (settingsLocked) return;
@@ -1359,6 +1550,31 @@ export default function TrainerPage() {
     setAdaptivePacing(true);
     setShareMessage("One-minute warm-up loaded: 20 quick shapes with a gentle pace ramp.");
   }, [settingsLocked]);
+
+  const applyLast10Minutes = useCallback(() => {
+    if (settingsLocked) return;
+    const weakKey = transitionMap.weak[0]?.[0] ?? "";
+    const [from, to] = weakKey.split(" → ");
+    const canUsePair = from && to && activeLevel.chords.some((chord) => chord.name === from) && activeLevel.chords.some((chord) => chord.name === to);
+    setRoundLength(5);
+    setPace(performanceConfidence.score < 55 ? 6 : 4);
+    setWarmUp(true);
+    setAdaptivePacing(true);
+    if (canUsePair) { setPairFrom(from); setPairTo(to); setDrillMode("pair"); }
+    else if (selectedSongSet && sessionIntent !== "barre") setDrillMode("song");
+    else setDrillMode(sessionIntent === "barre" ? "barre" : "random");
+    setShareMessage(`Last 10 minutes loaded: ${canUsePair ? `${from} → ${to}` : selectedSongSet ? selectedSongSet.title : "a gentle adaptive warm-up"}.`);
+  }, [activeLevel.chords, performanceConfidence.score, selectedSongSet, sessionIntent, settingsLocked, transitionMap.weak]);
+
+  const applyWarmUpTemplate = useCallback((profile: InstrumentProfile) => {
+    if (settingsLocked) return;
+    setWarmUpTemplate(profile);
+    setRoundLength(5);
+    setWarmUp(true);
+    setPace(profile === "classical" ? 8 : profile === "electric" ? 5 : profile === "reducedString" ? 7 : 6);
+    setDrillMode(profile === "electric" ? "barre" : "random");
+    setShareMessage(`${INSTRUMENT_PROFILES[profile].label} warm-up loaded for ${tuningLabel}.`);
+  }, [settingsLocked, tuningLabel]);
 
   const startBenchmark = useCallback(() => {
     if (settingsLocked || !activeLevel.chords.length) return;
@@ -1486,7 +1702,7 @@ export default function TrainerPage() {
     };
     const nextPersistence: TrainerPersistence = {
       ...loaded,
-      version: 6,
+      version: 8,
       transitions: { ...loaded.transitions, [key]: nextRecord },
       chords: { ...loaded.chords, [currentChord.name]: nextChordRecord },
       stats: {
@@ -1539,9 +1755,19 @@ export default function TrainerPage() {
     if (status !== "running" || feedbackRef.current[currentIndex]) return;
     rateCurrentChord(rating);
     setRecallRevealed(false);
+    if (rating === "missed") {
+      resumeRemainingRef.current = Math.max(1, deadlineRef.current - Date.now());
+      setPausedFrom("running");
+      setRebuildPrompt({ index: currentIndex, beat: changeBeat, rejoin: "current" });
+      setStatus("paused");
+      return;
+    }
     if (currentIndex + 1 < sequence.length) setCurrentIndex((index) => index + 1);
     else if (!benchmarkActive) finishRound();
   };
+  // Keep the keyboard/footswitch listener attached to a stable ref while
+  // still reading the latest round state and callback implementations.
+  rateAndAdvanceRef.current = rateAndAdvance;
 
   const saveRoundNote = useCallback(() => {
     const note = roundNote.trim().slice(0, 500);
@@ -1597,6 +1823,36 @@ export default function TrainerPage() {
     setReflection("");
     setRestPrompt("");
   }, [ensurePersistenceLoaded, reflection, savePersistence]);
+
+  const savePerformanceReflection = useCallback(() => {
+    const wentWell = performanceWentWell.trim().slice(0, 300);
+    const lostTime = performanceLostTime.trim().slice(0, 300);
+    const revisitTransition = performanceRevisit.trim().slice(0, 80);
+    if (!wentWell && !lostTime && !revisitTransition) return;
+    const loaded = ensurePersistenceLoaded();
+    const entry: PerformanceReflection = { id: roundIdRef.current || `reflection-${Date.now()}`, date: localDateKey(), wentWell, lostTime, revisitTransition };
+    savePersistence({ ...loaded, performanceReflections: [entry, ...loaded.performanceReflections.filter((item) => item.id !== entry.id)].slice(0, 30) });
+    setPerformanceWentWell("");
+    setPerformanceLostTime("");
+    setPerformanceRevisit("");
+    setShareMessage("Performance reflection saved locally for your next rehearsal plan.");
+  }, [ensurePersistenceLoaded, performanceLostTime, performanceRevisit, performanceWentWell, savePersistence]);
+
+  const saveDatedPracticeGoal = useCallback((date: string, label: string) => {
+    const loaded = ensurePersistenceLoaded();
+    const next = date && label.trim() ? { date, label: label.trim().slice(0, 120) } : null;
+    savePersistence({ ...loaded, datedPracticeGoal: next });
+  }, [ensurePersistenceLoaded, savePersistence]);
+
+  const applyRebuildChoice = useCallback(() => {
+    if (rebuildPrompt.index < 0) return;
+    const targetIndex = rebuildPrompt.rejoin === "next" ? Math.min(sequence.length - 1, rebuildPrompt.index + 1) : rebuildPrompt.index;
+    setCurrentIndex(targetIndex);
+    setRebuildPrompt({ index: -1, beat: 1, rejoin: "current" });
+    setStatus("running");
+    resumeRemainingRef.current = null;
+    setRecoveryNonce((nonce) => nonce + 1);
+  }, [rebuildPrompt, sequence.length]);
 
   const exportTeacherChallenge = useCallback(() => {
     const payload = {
@@ -1850,6 +2106,89 @@ export default function TrainerPage() {
     return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
   }, []);
 
+  const applySongBridge = useCallback(() => {
+    if (settingsLocked) return;
+    if (selectedSongSet) {
+      setDrillMode("song");
+      setSongSetId(selectedSongSet.id);
+      setShareMessage(`Loaded ${selectedSongSet.title} so the mastered movement can be tested in context.`);
+    } else {
+      setDrillMode("progression");
+      setProgressionId("oneFiveSixFour");
+      setShareMessage("No local song set is available, so a common progression was loaded as the context bridge.");
+    }
+    setRoundLength(10);
+  }, [selectedSongSet, settingsLocked]);
+
+  const commitMemoryAnswer = useCallback(() => {
+    if (!nextChord) {
+      setMemoryResult("Start or preview a round to create a next-chord memory prompt.");
+      return;
+    }
+    const answer = memoryAnswer.trim();
+    if (!answer) return;
+    setMemoryResult(answer.localeCompare(nextChord.name, undefined, { sensitivity: "base" }) === 0
+      ? `Correct — ${nextChord.name} is next.`
+      : `You committed to ${answer}. The route calls for ${nextChord.name}; rebuild the progression once, then try again.`);
+  }, [memoryAnswer, nextChord]);
+
+  const loadRescueDrill = useCallback(() => {
+    if (settingsLocked) return;
+    setRoundLength(5);
+    setPace(rescueScenario === "brokenRhythm" ? 4 : "manual");
+    setPreviewEnabled(false);
+    setRehearsalMode(true);
+    setRhythmAware(rescueScenario === "brokenRhythm");
+    if (rescueScenario === "badChange") setDrillMode("pair");
+    else if (rescueScenario === "restart") setDrillMode("progression");
+    else setDrillMode(selectedSongSet ? "song" : "progression");
+    setShareMessage({
+      lostPlace: "Rescue loaded: pause, find the next downbeat, and re-enter on a familiar chord.",
+      badChange: "Rescue loaded: keep the pulse moving through one imperfect change.",
+      brokenRhythm: "Rescue loaded: four-beat bars rebuild the groove before adding speed.",
+      restart: "Rescue loaded: count in and restart from a different point in the progression."
+    }[rescueScenario]);
+  }, [rescueScenario, selectedSongSet, settingsLocked]);
+
+  const selectCoachAttachment = useCallback((file: File | undefined) => {
+    if (!file) return;
+    const allowed = file.type.startsWith("audio/") || file.type.startsWith("video/") || file.type.startsWith("image/");
+    if (!allowed || file.size > CAPTURE_SIZE_LIMIT) {
+      setShareMessage("Coach pointer rejected: choose an image, audio, or video file no larger than 8 MB.");
+    } else {
+      setCoachAttachment({ name: file.name.slice(0, 100), type: file.type.slice(0, 80), bytes: file.size });
+      setShareMessage("Only the attachment name, type, and size are held for this tab. The file is not uploaded or persisted.");
+    }
+    if (coachPointerFileRef.current) coachPointerFileRef.current.value = "";
+  }, []);
+
+  const exportRehearsalSummary = useCallback(() => {
+    const payload = {
+      kind: "chord-hero-rehearsal-summary",
+      version: 1,
+      createdAt: new Date().toISOString(),
+      drill: roundConfig.drillLabel.slice(0, 80),
+      tuning: tuningLabel,
+      capo: capoFret,
+      sequence: (sequence.length ? sequence : activeLevel.chords).slice(0, 40).map((chord) => chord.name),
+      ratings: summarizeFeedback(feedback),
+      confidence: { before: preConfidence, after: postConfidence },
+      relaxation: { before: relaxationBefore, after: relaxationAfter },
+      coachNote: coachNotes.trim().slice(0, 1000),
+      readiness: persistence.readiness,
+      rehearsalDate: rehearsalDate || null,
+      recordingsIncluded: false
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `chord-hero-rehearsal-summary-${localDateKey()}.json`;
+    anchor.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+    setShareMessage("Rehearsal summary exported without audio, video, object URLs, or recording metadata.");
+  }, [activeLevel.chords, capoFret, coachNotes, feedback, persistence.readiness, postConfidence, preConfidence, rehearsalDate, relaxationAfter, relaxationBefore, roundConfig.drillLabel, sequence, tuningLabel]);
+
   useEffect(() => {
     if (!["running", "paused", "countIn"].includes(status)) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -1867,11 +2206,20 @@ export default function TrainerPage() {
       } else if (event.key === "ArrowDown") {
         event.preventDefault();
         recoverCurrent();
+      } else if (footswitchMode && event.key.toLowerCase() === "n") {
+        event.preventDefault();
+        advanceChord();
+      } else if (footswitchMode && event.key.toLowerCase() === "r") {
+        event.preventDefault();
+        recoverCurrent();
+      } else if (footswitchMode && event.key.toLowerCase() === "c") {
+        event.preventDefault();
+        rateAndAdvanceRef.current("clean");
       }
     };
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [advanceChord, inspectPreviousChord, pauseRound, recoverCurrent, resumeRound, status]);
+  }, [advanceChord, footswitchMode, inspectPreviousChord, pauseRound, recoverCurrent, resumeRound, status]);
 
   const feedbackSummary = useMemo(() => summarizeFeedback(feedback), [feedback]);
   const flaggedTransitions = useMemo(
@@ -2096,6 +2444,18 @@ export default function TrainerPage() {
 
         {restPrompt && <aside className="trainer-rest-prompt" role="status"><div><strong>Smart rest prompt</strong><p>{restPrompt}</p><label>After resting, did your hand tension reduce?<input maxLength={120} value={reflection} onChange={(event) => setReflection(event.target.value)} placeholder="Yes—my wrist feels looser" /></label></div><div><button className="btn" type="button" onClick={saveReflection} disabled={!reflection.trim()}>Save reflection</button><button className="btn ghost" type="button" onClick={() => setRestPrompt("")}>Dismiss</button></div></aside>}
 
+        <section className="trainer-3d-launcher" aria-labelledby="trainer-3d-title">
+          <div className="trainer-3d-launcher-copy">
+            <span className="trainer-3d-icon" aria-hidden="true">✋</span>
+            <div><span className="label">3D left-hand guide</span><h3 id="trainer-3d-title">See how to fret {threeDGuideChord?.name ?? "the chord"}</h3><p>The existing interactive hand engine is available before, during, and after a round. It is downloaded only when you open it.</p></div>
+          </div>
+          <div className="trainer-3d-launcher-actions">
+            <label>Guide chord<select value={threeDGuideChord?.name ?? ""} onChange={(event) => setThreeDPreviewChordName(event.target.value)} disabled={Boolean(currentChord)}>{activeLevel.chords.map((chord) => <option key={chord.name} value={chord.name}>{chord.name}</option>)}</select></label>
+            <button className="btn primary" type="button" aria-controls="trainer-3d-hand-panel" aria-expanded={threeDHandVisible} onClick={() => setThreeDHandVisible((visible) => !visible)} disabled={!threeDGuideChord}>{threeDHandVisible ? "Close 3D hand" : "Open 3D hand"}</button>
+          </div>
+          {threeDHandVisible && threeDGuideChord && <div className="trainer-3d-hand-panel" id="trainer-3d-hand-panel"><div><span className="label">Interactive fretting view · {threeDGuideChord.name}</span><p>Use the 3D view to inspect fingertip landing points and relaxed thumb position. The chord follows the live round automatically.</p></div><LazyGuitarTechnique3D chord={threeDGuideChord} handedness={handedness} mode="left-hand" labels={true} className="guitar-technique-3d trainer-3d-hand" /></div>}
+        </section>
+
         {status === "preview" ? (
           <div className="trainer-preview" aria-label="Round preview">
             <div><span className="label">Sequence preview</span><h3>Review the route before the count-in.</h3></div>
@@ -2134,7 +2494,6 @@ export default function TrainerPage() {
           <div><span className="label">Finger-placement animation</span><p>Open either guide only when the shape needs a closer look.</p><div className="trainer-inline-actions"><button className="btn" type="button" onClick={() => setGuideVisible((visible) => !visible)}>{guideVisible ? "Hide guide" : "Show animated guide"}</button><button className="btn" type="button" aria-expanded={threeDHandVisible} onClick={() => setThreeDHandVisible((visible) => !visible)}>{threeDHandVisible ? "Hide 3D hand" : "Show 3D hand"}</button></div></div>
         </div>}
         {currentChord && guideVisible && status === "running" && <FingerPlacementGuide chord={currentChord} orientation={handedness} />}
-        {currentChord && threeDHandVisible && status === "running" && <div className="trainer-3d-hand-panel"><div><span className="label">3D left-hand fretting</span><p>Rotate your attention between the fingertip landing points and the relaxed thumb position. The engine loads only after this panel is opened.</p></div><LazyGuitarTechnique3D chord={currentChord} handedness={handedness} mode="left-hand" labels={false} className="guitar-technique-3d trainer-3d-hand" /></div>}
 
         {currentChord && status !== "preview" && status !== "countIn" && (
           <div className="trainer-feedback" role="group" aria-label={`Rate ${currentChord.name}`}>
@@ -2181,6 +2540,127 @@ export default function TrainerPage() {
         <div><span>Fastest successful pace</span><strong>{persistence.stats.bestPaceSeconds ? `${persistence.stats.bestPaceSeconds}s` : "—"}</strong></div>
         <div><span>Most improved</span><strong>{mostImproved && mostImproved[1].score > mostImproved[1].previousScore ? mostImproved[0] : "Keep rating"}</strong></div>
         <div><span>Recoveries used</span><strong>{persistence.stats.recoveries}</strong></div>
+      </section>
+
+      <section className="panel trainer-guided-path" aria-label="Adaptive practice path and rehearsal tools">
+        <div className="panel-header"><div><p className="eyebrow">Adaptive practice path</p><h2>Carry today&apos;s evidence into the next rehearsal.</h2><p>These suggestions are calculated from capped local ratings, fatigue notes, and the current song goal.</p></div><button className="btn" type="button" onClick={exportRehearsalSummary}>Share summary · no recordings</button></div>
+        <div className="trainer-path-week">{practicePath.map((item) => <article key={item.day}><span>{item.day}</span><strong>{item.focus}</strong></article>)}</div>
+        <div className="trainer-guided-grid">
+          <article>
+            <span className="label">Chord-transition camera guides</span><h3>{cameraAngle === "fretting" ? "Fretting-hand view" : cameraAngle === "strumming" ? "Strumming-hand view" : "Neck-side view"}</h3>
+            <div className={`trainer-camera-placeholder angle-${cameraAngle}`} role="img" aria-label={`${cameraAngle} camera-angle teaching placeholder for ${threeDGuideChord?.name ?? "the current chord"}`}><span>{cameraAngle === "fretting" ? "Watch fingertip order and thumb release" : cameraAngle === "strumming" ? "Keep the pulse while the left hand moves" : "Check fingertip arch and fret-wire distance"}</span></div>
+            <div className="trainer-segmented" role="group" aria-label="Camera angle">{(["fretting", "strumming", "neck"] as CameraAngle[]).map((angle) => <button type="button" key={angle} className={cameraAngle === angle ? "active" : ""} aria-pressed={cameraAngle === angle} onClick={() => setCameraAngle(angle)}>{angle === "neck" ? "Neck-side" : `${angle[0].toUpperCase()}${angle.slice(1)} hand`}</button>)}</div>
+            <small>No unlicensed video is bundled. These angle-specific storyboards provide safe shot/cue placeholders for locally supplied coaching media.</small>
+          </article>
+          <article className={currentChord?.barre ? "trainer-pressure-live" : ""}><span className="label">Live finger-pressure reminder</span><p>{barrePressureCue}</p><small>Technique cue only; the browser does not measure physical pressure.</small></article>
+          <article>
+            <span className="label">Round-to-song bridge</span><p>Move a clean transition into a song section or a common progression while its hand motion is fresh.</p><button className="btn" type="button" onClick={applySongBridge} disabled={settingsLocked}>Load context round</button><small>{selectedSongSet ? `Song context: ${selectedSongSet.title}` : "No imported song set; a common progression will be used."}</small>
+          </article>
+          <article>
+            <span className="label">Rehearsal countdown plan</span><label>Rehearsal date<input type="date" min={localDateKey()} value={rehearsalDate} onChange={(event) => setRehearsalDate(event.target.value)} /></label>
+            {rehearsalDaysLeft === null ? <p>Choose a date to turn the weekly path into a deadline-aware plan.</p> : rehearsalDaysLeft < 0 ? <p>The selected rehearsal date has passed. Choose a new date.</p> : <p><strong>{rehearsalDaysLeft === 0 ? "Rehearsal day" : `${rehearsalDaysLeft} day${rehearsalDaysLeft === 1 ? "" : "s"} remaining`}.</strong> {rehearsalDaysLeft <= 2 ? "Use short confidence rounds; avoid new speed targets." : rehearsalDaysLeft <= 7 ? "Alternate targeted transitions with one full run-through." : "Build accuracy first, then add two performance simulations in the final week."}</p>}
+          </article>
+          <article>
+            <span className="label">Mistake replay</span><p>Reconstructs the local sequence around each flagged change using its planned pace; it does not claim to replay recorded audio.</p>
+            {activeMistakeReplay ? <><div className="trainer-mistake-window">{activeMistakeReplay.window.map((chord, index) => <span key={`${chord.name}-${index}`}>{chord.name}</span>)}</div><p><strong>{RATING_LABEL[activeMistakeReplay.rating]}</strong> at item {activeMistakeReplay.index + 1}{activeMistakeReplay.plannedSeconds ? ` · planned ${activeMistakeReplay.plannedSeconds}s` : " · manual pace"}</p><div className="trainer-inline-actions"><button className="btn" type="button" onClick={() => setMistakeReplayIndex((index) => Math.max(0, index - 1))} disabled={mistakeReplayIndex <= 0}>Previous miss</button><button className="btn" type="button" onClick={() => setMistakeReplayIndex((index) => Math.min(mistakeReplayItems.length - 1, index + 1))} disabled={mistakeReplayIndex >= mistakeReplayItems.length - 1}>Next miss</button></div></> : <p>Mark a change “Needs work” or “Missed” to build a replay window.</p>}
+          </article>
+          <article>
+            <span className="label">Limited coach mode</span><div className="trainer-segmented" role="group" aria-label="Coach pointer type">{(["text", "audio", "visual"] as const).map((kind) => <button type="button" key={kind} className={coachPointer === kind ? "active" : ""} onClick={() => setCoachPointer(kind)}>{kind}</button>)}</div>
+            <textarea maxLength={1000} value={coachNotes} onChange={(event) => setCoachNotes(event.target.value)} placeholder="One transition cue, such as: keep finger 3 planted through G → Cadd9." />
+            {coachPointer !== "text" && <><button className="btn" type="button" onClick={() => coachPointerFileRef.current?.click()}>Choose local {coachPointer} pointer</button><input ref={coachPointerFileRef} className="visually-hidden" type="file" accept={coachPointer === "audio" ? "audio/*" : "image/*,video/*"} onChange={(event) => selectCoachAttachment(event.target.files?.[0])} />{coachAttachment && <small>{coachAttachment.name} · {(coachAttachment.bytes / 1_000_000).toFixed(1)} MB · metadata only in this tab</small>}</>}
+            {coachPointer === "audio" && takes[0] && <small>The latest in-memory Trainer take can also serve as the session reference; it is never attached to exports.</small>}
+          </article>
+          <article>
+            <span className="label">Rhythmic displacement</span><p>Practice the same change on a different beat without rebuilding the round.</p><div className="trainer-beat-buttons">{[1, 2, 3, 4].map((beat) => <button key={beat} type="button" className={rhythmAware && changeBeat === beat ? "active" : ""} onClick={() => { setRhythmAware(true); setChangeBeat(beat); }} disabled={settingsLocked}>Beat {beat}</button>)}</div>
+          </article>
+          <article>
+            <span className="label">Hand-relaxation score</span><div className="trainer-score-pair"><label>Before<select value={relaxationBefore} onChange={(event) => setRelaxationBefore(Number(event.target.value))}>{[1, 2, 3, 4, 5].map((score) => <option key={score} value={score}>{score}/5 relaxed</option>)}</select></label><label>After<select value={relaxationAfter} onChange={(event) => setRelaxationAfter(Number(event.target.value))}>{[1, 2, 3, 4, 5].map((score) => <option key={score} value={score}>{score}/5 relaxed</option>)}</select></label></div><p>{relaxationAfter > relaxationBefore ? `Relaxation improved by ${relaxationAfter - relaxationBefore}.` : relaxationAfter < relaxationBefore ? "Tension increased; shorten the next round or rest." : "Relaxation is unchanged; keep the next goal small."}</p>
+          </article>
+          <article>
+            <span className="label">Progression memory commit</span><p>Say or enter the next chord before revealing the route.</p><label>Your committed answer<input maxLength={24} value={memoryAnswer} onChange={(event) => { setMemoryAnswer(event.target.value); setMemoryResult(""); }} placeholder="Next chord" /></label><button className="btn" type="button" onClick={commitMemoryAnswer} disabled={!memoryAnswer.trim()}>Commit and reveal</button>{memoryResult && <p role="status">{memoryResult}</p>}
+          </article>
+          <article>
+            <span className="label">Alternate-fingering A/B</span><p><strong>A · standard:</strong> {threeDGuideChord ? `Use the diagrammed fingering for ${threeDGuideChord.name}.` : "Choose a guide chord."}</p><p><strong>B · alternate:</strong> {alternateFingering}</p><div className="trainer-ab-scores"><button type="button" onClick={() => setFingeringScores((scores) => ({ ...scores, standard: scores.standard + 1 }))}>A clean · {fingeringScores.standard}</button><button type="button" onClick={() => setFingeringScores((scores) => ({ ...scores, alternate: scores.alternate + 1 }))}>B clean · {fingeringScores.alternate}</button></div><small>Counts last only for this open Trainer session.</small>
+          </article>
+          <article>
+            <span className="label">Performance rescue</span><label>Scenario<select value={rescueScenario} onChange={(event) => setRescueScenario(event.target.value as RescueScenario)} disabled={settingsLocked}><option value="lostPlace">Lost your place</option><option value="badChange">Bad chord change</option><option value="brokenRhythm">Broken rhythm</option><option value="restart">Restart under pressure</option></select></label><button className="btn" type="button" onClick={loadRescueDrill} disabled={settingsLocked}>Load five-change rescue drill</button>
+          </article>
+          <article className="trainer-vocabulary-card">
+            <span className="label">Personal chord vocabulary</span><div className="trainer-vocabulary-list">{activeLevel.chords.map((chord) => <label key={chord.name}><input type="checkbox" checked={personalVocabulary.includes(chord.name)} onChange={(event) => setPersonalVocabulary((names) => event.target.checked ? [...names.filter((name) => name !== chord.name), chord.name].slice(-24) : names.filter((name) => name !== chord.name))} disabled={settingsLocked} /> {chord.name}</label>)}</div><label><input type="checkbox" checked={vocabularyOnly} onChange={(event) => setVocabularyOnly(event.target.checked)} disabled={settingsLocked || personalVocabularyChords.length < 2} /> Limit new adaptive rounds to this vocabulary</label><small>{personalVocabularyChords.length}/24 supported shapes selected; choose at least two.</small>
+          </article>
+        </div>
+      </section>
+
+      <section className="panel trainer-rehearsal-tools" aria-label="Rehearsal readiness tools">
+        <div className="panel-header">
+          <div><p className="eyebrow">Rehearsal readiness</p><h2>Turn practice evidence into a usable plan.</h2><p>All of these controls stay local and are calculated only when this screen renders.</p></div>
+          <button className="btn primary" type="button" onClick={applyLast10Minutes} disabled={settingsLocked}>Load last 10 minutes</button>
+        </div>
+        <div className="trainer-rehearsal-grid">
+          <article className="trainer-confidence-card">
+            <span className="label">Performance confidence</span>
+            <strong className="trainer-confidence-score">{performanceConfidence.score}/100</strong>
+            <progress max={100} value={performanceConfidence.score} />
+            <div className="trainer-confidence-breakdown"><span>Transitions <b>{performanceConfidence.transition}%</b></span><span>Rhythm <b>{performanceConfidence.rhythm}%</b></span><span>Relaxation <b>{performanceConfidence.tension}%</b></span><span>Readiness <b>{performanceConfidence.checklist}%</b></span></div>
+            <small>Combines clean transition ratings, rhythm evidence, tension signals, and the five-item rehearsal checklist.</small>
+          </article>
+          <article>
+            <span className="label">Dated practice goal</span>
+            <form className="trainer-dated-goal" onSubmit={(event) => { event.preventDefault(); const values = new FormData(event.currentTarget); saveDatedPracticeGoal(String(values.get("goalDate") || ""), String(values.get("goalLabel") || "")); }}>
+              <label>Date<input name="goalDate" type="date" min={localDateKey()} defaultValue={persistence.datedPracticeGoal?.date ?? ""} /></label>
+              <label>Goal<input name="goalLabel" maxLength={120} defaultValue={persistence.datedPracticeGoal?.label ?? ""} placeholder="Ready for Friday rehearsal" /></label>
+              <div className="trainer-inline-actions"><button className="btn" type="submit">Save goal</button><button className="btn ghost" type="button" onClick={() => saveDatedPracticeGoal("", "")}>Clear</button></div>
+            </form>
+            <small>No notifications are scheduled. The date is only used to shape the local practice path.</small>
+          </article>
+          <article>
+            <span className="label">Progress snapshot</span>
+            {latestSnapshot ? <><div className="trainer-snapshot-values"><span><small>Latest</small><strong>{latestSnapshot.accuracy}%</strong></span><span><small>Prior</small><strong>{previousSnapshot ? `${previousSnapshot.accuracy}%` : "—"}</strong></span><span><small>Confidence</small><strong>{latestSnapshot.confidence}%</strong></span></div><p>{previousSnapshot ? `${latestSnapshot.accuracy - previousSnapshot.accuracy >= 0 ? "+" : ""}${latestSnapshot.accuracy - previousSnapshot.accuracy} points versus the prior ${previousSnapshot.period}.` : "A prior week or month will appear after another completed period."}</p></> : <p>Complete a round to create this week&apos;s and month&apos;s local baseline.</p>}
+          </article>
+          <article>
+            <span className="label">Voicing map · {threeDGuideChord?.name ?? "current chord"}</span>
+            {voicingMapEntries.length ? <div className="trainer-voicing-map">{voicingMapEntries.map((item) => <div key={item.id}><strong>{item.position}</strong><span>{item.chord.name}</span><small>{item.qualityLabel}</small></div>)}</div> : <p>No alternate local voicings are catalogued for this shape yet.</p>}
+            <small>Compare open, barre, and higher-neck options when the library has them.</small>
+          </article>
+          <article>
+            <span className="label">Band context</span>
+            {bandContext ? <><strong>{bandContext.root} · bass anchor</strong><p>{bandContext.role}</p><small>Keep the root clear for the bass player, then choose the suggested rhythm role.</small></> : <p>Select a chord to see its root and band role.</p>}
+          </article>
+          <article>
+            <span className="label">Explain this change</span>
+            {explainChange ? <><strong>{explainChange.from} → {explainChange.to}</strong><p>{explainChange.movement}.</p><small>{explainChange.pivot}</small></> : <p>Start a round to see harmonic movement and likely finger pivots.</p>}
+          </article>
+          <article>
+            <span className="label">Adaptive song-section spacing</span>
+            <p>{sectionSpacing}</p>
+            <small>Weak transitions currently detected: {weakTransitionCount}. This affects guidance only; your saved song order is unchanged.</small>
+          </article>
+          <article>
+            <span className="label">Instrument + tuning warm-up</span>
+            <label>Profile<select value={warmUpTemplate} onChange={(event) => setWarmUpTemplate(event.target.value as InstrumentProfile)}><option value="acoustic">Acoustic</option><option value="electric">Electric</option><option value="classical">Classical</option><option value="reducedString">Reduced-string</option></select></label>
+            <p>{INSTRUMENT_PROFILES[warmUpTemplate].detail} · {tuningLabel}</p>
+            <button className="btn" type="button" onClick={() => applyWarmUpTemplate(warmUpTemplate)} disabled={settingsLocked}>Load profile warm-up</button>
+          </article>
+          <article>
+            <span className="label">Transition → scale fragment</span>
+            {scaleFragment ? <><strong>After {currentChord?.name ?? nextChord?.name}</strong><p>{scaleFragment.label}</p><div className="trainer-scale-notes">{scaleFragment.notes.split(" · ").map((note) => <span key={note}>{note}</span>)}</div><small>Use this short fragment after the change to connect chord memory to the neck.</small></> : <p>Select a current chord to reveal a compatible fragment.</p>}
+          </article>
+          <article className="trainer-rebuild-card">
+            <span className="label">Rebuild after error</span>
+            {rebuildPrompt.index >= 0 ? <><strong>Find beat {rebuildPrompt.beat}, then rejoin.</strong><p>The miss is paused at item {rebuildPrompt.index + 1}. Breathe, locate the pulse, and re-enter without restarting the whole progression.</p><div className="trainer-inline-actions"><select value={rebuildPrompt.rejoin} onChange={(event) => setRebuildPrompt((prompt) => ({ ...prompt, rejoin: event.target.value as "current" | "next" }))}><option value="current">Rejoin current chord</option><option value="next">Rejoin next chord</option></select><button className="btn primary" type="button" onClick={applyRebuildChoice}>Rejoin progression</button></div></> : <p>A Missed rating pauses the round here so you can rebuild the beat and choose where to rejoin.</p>}
+          </article>
+          <article className="trainer-footswitch-card">
+            <span className="label">Footswitch-friendly controls</span>
+            <label><input type="checkbox" checked={footswitchMode} onChange={(event) => setFootswitchMode(event.target.checked)} /> Enable N / R / C shortcuts</label>
+            <div className="trainer-footswitch-actions"><button type="button" onClick={advanceChord} disabled={!footswitchMode || status !== "running"}>Next</button><button type="button" onClick={recoverCurrent} disabled={!footswitchMode || status !== "running"}>Repeat</button><button type="button" onClick={() => rateAndAdvance("clean")} disabled={!footswitchMode || status !== "running" || Boolean(feedback[currentIndex])}>Mark clean</button></div>
+            <small>N = Next · R = Repeat · C = Mark clean. Buttons remain available for a keyboard or MIDI foot-switch mapping.</small>
+          </article>
+        </div>
+        <article className="trainer-reflection-card">
+          <span className="label">Post-performance reflection</span>
+          <div className="trainer-reflection-grid"><label>What went well?<textarea maxLength={300} value={performanceWentWell} onChange={(event) => setPerformanceWentWell(event.target.value)} placeholder="The chorus stayed in time…" /></label><label>Where did you lose time?<textarea maxLength={300} value={performanceLostTime} onChange={(event) => setPerformanceLostTime(event.target.value)} placeholder="The F change in the bridge…" /></label><label>Transition to revisit<input maxLength={80} value={performanceRevisit} onChange={(event) => setPerformanceRevisit(event.target.value)} placeholder="G → C" /></label></div>
+          <button className="btn" type="button" onClick={savePerformanceReflection} disabled={!performanceWentWell.trim() && !performanceLostTime.trim() && !performanceRevisit.trim()}>Save reflection locally</button>
+        </article>
       </section>
 
       <section className="trainer-insights panel" aria-label="Practice insights and data">
@@ -2366,7 +2846,7 @@ export default function TrainerPage() {
       <section className="trainer-print-sheet" aria-label="Printable practice sheet">
         <header><p>Chord Hero · Practice sheet</p><h1>{roundConfig.drillLabel}</h1><span>{roundConfig.length} changes · {roundConfig.pace === "manual" ? "manual pace" : `${roundConfig.pace}s pace`} · {STRUMMING_PROMPTS[strummingPrompt]} · {tuningLabel}{capoFret ? ` · capo ${capoFret}` : " · no capo"}</span></header>
         <div className="trainer-print-chords">{practiceSheetChords.map((chord) => <article key={chord.name}><h2>{chord.name}</h2><ChordDiagram chord={chord} orientation={handedness} /></article>)}</div>
-        <div className="trainer-print-goals"><h2>Goals</h2><p>☐ Clear shapes &nbsp; ☐ Clean transitions &nbsp; ☐ Steady rhythm &nbsp; ☐ Full run-through</p><h2>Coach notes</h2><p>{coachNotes || "________________________________________________________________________________"}</p><h2>Practice notes</h2><p>________________________________________________________________________________</p><p>________________________________________________________________________________</p></div>
+        <div className="trainer-print-goals"><h2>Goals</h2><p>☐ Clear shapes &nbsp; ☐ Clean transitions &nbsp; ☐ Steady rhythm &nbsp; ☐ Full run-through</p><h2>Coach notes</h2><p>{coachNotes || "________________________________________________________________________________"}</p><h2>Practice notes</h2><p>________________________________________________________________________________</p><p>________________________________________________________________________________</p><h2>Rehearsal handoff</h2><p><strong>Song order:</strong> {selectedSongSet?.title ?? roundConfig.drillLabel}</p><p><strong>Setup:</strong> {tuningLabel} · {capoFret ? `capo ${capoFret}` : "no capo"} · {roundConfig.pace === "manual" ? "manual pace" : `${roundConfig.pace}s change pace`}</p><p><strong>Difficult transitions:</strong> {replayKeys.slice(0, 5).join(", ") || "None flagged yet"}</p><p><strong>Emergency restart points:</strong> {rebuildPrompt.index >= 0 ? `Item ${rebuildPrompt.index + 1}, beat ${rebuildPrompt.beat}` : "Find the current beat, rejoin the current chord, then continue."}</p></div>
       </section>
 
       <section className="trainer-review-grid">

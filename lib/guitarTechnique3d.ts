@@ -11,6 +11,7 @@ export type GuitarChordShape = {
 
 export type GuitarHandedness = "right" | "left";
 export type RightHandTechnique = "strumming" | "plectrum" | "fingerpicking";
+export type AuthoredHandRole = "fretting" | "picking";
 
 export type LeftHandTarget = {
   finger: number;
@@ -33,6 +34,29 @@ export type TechniqueMotion = {
 export const GUITAR_SCALE_LENGTH = 10.5;
 export const GUITAR_SCALE_INCHES = 25.5;
 export const INCH_TO_WORLD = GUITAR_SCALE_LENGTH / GUITAR_SCALE_INCHES;
+/** Calibrated wrist-to-middle-fingertip length for the authored hand assets. */
+export const AUTHORED_HAND_LENGTH_INCHES = 7.55;
+/** Source GLB fingers extend down the source -Y axis. These world-space
+ * directions turn that extension inward across the neck or toward the sound
+ * hole while keeping the wrist/palm above the instrument. */
+export const AUTHORED_HAND_ROLE_FORWARD = {
+  fretting: { rightHanded: [1, 0, 0] as [number, number, number], leftHanded: [-1, 0, 0] as [number, number, number] },
+  picking: [0, 0, -1] as [number, number, number]
+} as const;
+export const AUTHORED_HAND_WRIST_TARGET_Y = { fretting: 1.12, picking: 1.05 } as const;
+/** Joint swing envelopes in radians, applied around the imported bind pose. */
+export const AUTHORED_HAND_POSE_LIMITS = { metacarpal: 0.38, proximal: 0.9, intermediate: 0.82, distal: 0.7 } as const;
+export const AUTHORED_HAND_TARGET_BASIS = {
+  picking: { forward: [0, 0, -1] as [number, number, number], lateral: [-1, 0, 0] as [number, number, number], normal: [0, 1, 0] as [number, number, number] },
+  frettingRight: { forward: [1, 0, 0] as [number, number, number], lateral: [0, 0, -1] as [number, number, number], normal: [0, 1, 0] as [number, number, number] },
+  frettingLeft: { forward: [-1, 0, 0] as [number, number, number], lateral: [0, 0, 1] as [number, number, number], normal: [0, 1, 0] as [number, number, number] }
+} as const;
+export const AUTHORED_PICK_DIMENSIONS_MM = { width: 30, height: 25, thickness: 2 } as const;
+
+export function authoredHandForward(role: AuthoredHandRole, handedness: GuitarHandedness) {
+  if (role === "picking") return AUTHORED_HAND_ROLE_FORWARD.picking;
+  return handedness === "left" ? AUTHORED_HAND_ROLE_FORWARD.fretting.leftHanded : AUTHORED_HAND_ROLE_FORWARD.fretting.rightHanded;
+}
 export const GUITAR_BODY_LENGTH_INCHES = 19.75;
 export const GUITAR_BODY_LENGTH = GUITAR_BODY_LENGTH_INCHES * INCH_TO_WORLD;
 export const GUITAR_BODY_MAX_WIDTH_INCHES = 15.5;
@@ -61,17 +85,24 @@ export const GUITAR_FINGER_BONE_LENGTHS = {
   little: [0.39, 0.3, 0.22] as const
 };
 export type FingerChainPoint = { x: number; y: number; z: number };
-export type FingerChainResult = { points: [FingerChainPoint, FingerChainPoint, FingerChainPoint, FingerChainPoint]; endpointError: number; lengths: readonly number[] };
+export type FingerChainResult = { points: [FingerChainPoint, FingerChainPoint, FingerChainPoint, FingerChainPoint]; endpointError: number; lengths: readonly number[]; reachable: boolean };
 
 /** Camera positions are data-only so the renderer and validation can share them. */
 export const GUITAR_CAMERA_PRESETS = {
   // The physical guitar spans roughly 13.5 world units along z. Keep the
   // complete neck, body, and both hands inside the first viewport at the
   // component's 32-degree lens instead of relying on an initial user zoom.
-  overview: { position: [10.8, 7.2, 17.8] as [number, number, number], target: [0, 0.15, 3.15] as [number, number, number] },
-  fretting: { position: [6.1, 3.9, 3.7] as [number, number, number], target: [0, 0.38, -1.25] as [number, number, number] },
-  picking: { position: [-5.0, 3.6, 10.4] as [number, number, number], target: [0, 0.38, 5.65] as [number, number, number] }
+  overview: { position: [9.4, 6.1, 17.2] as [number, number, number], target: [0, 0.28, 3.1] as [number, number, number] },
+  fretting: { position: [6.1, 7.0, 4.8] as [number, number, number], target: [0, 0.48, -0.9] as [number, number, number] },
+  picking: { position: [5.4, 7.4, 11.0] as [number, number, number], target: [0, 0.58, 5.75] as [number, number, number] }
 } as const;
+
+export type GuitarDisplayMode = "left-hand" | "right-hand" | "both";
+
+/** The first view should teach the active technique immediately. */
+export function guitarPresetForMode(mode: GuitarDisplayMode): keyof typeof GUITAR_CAMERA_PRESETS {
+  return mode === "right-hand" ? "picking" : mode === "left-hand" ? "fretting" : "overview";
+}
 
 /** Distance from the nut to a fret using the physical 12th-root-of-two spacing. */
 export function guitarFretPosition(fret: number, nutPosition = -3.3, scaleLength = GUITAR_SCALE_LENGTH) {
@@ -106,21 +137,22 @@ function pointDistance(a: FingerChainPoint, b: FingerChainPoint) {
 }
 
 /**
- * Constrained three-bone IK. The final backward pass guarantees an exact target
- * endpoint while every returned bone retains its requested length. If the base
- * is too far away, it is pulled toward the target to keep the chain reachable.
+ * Constrained three-bone IK. Reachable targets converge to an exact endpoint
+ * while every returned bone retains its requested length. Unreachable targets
+ * return a straight natural reach and a measurable error instead of contorting.
  */
 export function solveFingerChain(anchor: FingerChainPoint, target: FingerChainPoint, boneLengths: readonly [number, number, number], bendDirection = 1): FingerChainResult {
   const lengths = boneLengths.map((length) => Math.max(0.04, length)) as [number, number, number];
   const maxReach = lengths[0] + lengths[1] + lengths[2];
   const initialDistance = pointDistance(anchor, target);
-  const base: FingerChainPoint = { ...anchor };
   if (initialDistance > maxReach - 0.01) {
-    const ratio = (maxReach - 0.01) / Math.max(initialDistance, 0.0001);
-    base.x = target.x + (anchor.x - target.x) * ratio;
-    base.y = target.y + (anchor.y - target.y) * ratio;
-    base.z = target.z + (anchor.z - target.z) * ratio;
+    const naturalDirection = { x: (target.x - anchor.x) / Math.max(initialDistance, 0.0001), y: (target.y - anchor.y) / Math.max(initialDistance, 0.0001), z: (target.z - anchor.z) / Math.max(initialDistance, 0.0001) };
+    const first = { x: anchor.x + naturalDirection.x * lengths[0], y: anchor.y + naturalDirection.y * lengths[0], z: anchor.z + naturalDirection.z * lengths[0] };
+    const second = { x: first.x + naturalDirection.x * lengths[1], y: first.y + naturalDirection.y * lengths[1], z: first.z + naturalDirection.z * lengths[1] };
+    const third = { x: second.x + naturalDirection.x * lengths[2], y: second.y + naturalDirection.y * lengths[2], z: second.z + naturalDirection.z * lengths[2] };
+    return { points: [anchor, first, second, third], endpointError: pointDistance(third, target), lengths, reachable: false };
   }
+  const base: FingerChainPoint = { ...anchor };
   const points: [FingerChainPoint, FingerChainPoint, FingerChainPoint, FingerChainPoint] = [
     base,
     { x: base.x, y: base.y, z: base.z },
@@ -150,7 +182,7 @@ export function solveFingerChain(anchor: FingerChainPoint, target: FingerChainPo
     const next = points[index + 1]; const current = points[index]; const length = pointDistance(current, next) || 0.0001; const scale = lengths[index] / length;
     points[index] = { x: next.x + (current.x - next.x) * scale, y: next.y + (current.y - next.y) * scale, z: next.z + (current.z - next.z) * scale };
   }
-  return { points, endpointError: pointDistance(points[3], target), lengths };
+  return { points, endpointError: pointDistance(points[3], target), lengths, reachable: true };
 }
 
 export function barreContactSpan(fret: number, from: number, to: number) {

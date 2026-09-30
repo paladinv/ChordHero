@@ -16,6 +16,51 @@ export type SongTagGroups = { gig: string[]; genre: string[]; mood: string[]; se
 
 export type SongInstrument = "guitar" | "ukulele" | "bass";
 
+export type SongCompositionEvent = {
+  id: string;
+  kind: "chord" | "note";
+  startBeat: number;
+  durationBeats: number;
+  accent?: boolean;
+  chord?: string;
+  /** Fret values in physical string order, from the lowest-numbered bass string upward. */
+  voicing?: Array<number | null>;
+  string?: number;
+  fret?: number;
+};
+
+export type SongCompositionMeasure = { id: string; events: SongCompositionEvent[] };
+export type SongCompositionTrack = {
+  id: string;
+  name: string;
+  instrument: SongInstrument;
+  /** Open-string pitches in MIDI note numbers, stored low-to-high string order. */
+  tuning: number[];
+  tuningLabel: string;
+  capo: number;
+  muted?: boolean;
+};
+export type SongCompositionSection = {
+  id: string;
+  title: string;
+  kind: SongSectionKind;
+  repeats: number;
+  bpm?: number;
+  timeSignature?: string;
+  lyrics?: string;
+  notes?: string;
+  measuresByTrack: Record<string, SongCompositionMeasure[]>;
+};
+export type SongComposition = {
+  version: 1;
+  key: string;
+  bpm: number;
+  timeSignature: string;
+  subdivision: 4 | 8 | 12 | 16;
+  tracks: SongCompositionTrack[];
+  sections: SongCompositionSection[];
+};
+
 export type SongVariation = {
   id: string;
   name: string;
@@ -49,10 +94,12 @@ export type LibrarySong = {
   sourceUrl?: string;
   notes?: string;
   importedAt?: string;
+  updatedAt?: string;
   archivedAt?: string;
   tagGroups?: SongTagGroups;
   songMap?: SongMapNode[];
   lyricSheets?: SongLyricSheet[];
+  composition?: SongComposition;
 };
 
 export type SongLibraryCollection = {
@@ -238,8 +285,24 @@ export type SongEquipmentNotes = { songId: string; instrument?: string; pickup?:
 export type SongRecordingTarget = { songId: string; variationId?: string; targetBpm?: number; referenceRecordingId?: string; referenceLabel?: string; updatedAt: string };
 export type SongAuditionSession = { id: string; songId: string; sectionIds: string[]; answered: number; correct: number; startedAt: string; completedAt?: string };
 
+export type SongRehearsalRoleKind = "vocals" | "guitar" | "cues" | "gear" | "custom";
+export type SongRehearsalRole = { id: string; name: string; role: SongRehearsalRoleKind; customRole?: string; claimedBy?: string; claimedAt?: string; releasedAt?: string; createdAt: string; updatedAt: string };
+export type SongRehearsalAssignment = { id: string; roleId: string; resourceType: "song" | "setlist"; resourceId: string; assignedBy: string; createdAt: string; updatedAt: string };
+export type SongRehearsalEvent = { id: string; songId?: string; setlistId?: string; kind: "played" | "rehearsed" | "changed" | "note" | "claimed" | "released"; summary: string; note?: string; createdAt: string };
+export type SongArrangementSnapshot = { id: string; songId: string; variationId?: string; label: string; notes?: string; variation: Omit<SongVariation, "id">; createdAt: string; restoredFromId?: string };
+export type SongSetlistReorderSuggestion = { setlistId: string; originalEntryIds: string[]; suggestedEntries: SongSetlistEntry[]; changes: number; originalChanges: number; explanation: string };
+export type SongStageCueKind = "count-in" | "mute" | "solo" | "talk" | "custom";
+export type SongStageCue = { id: string; songId: string; setlistId?: string; sectionId?: string; atSeconds?: number; kind: SongStageCueKind; text: string; createdAt: string; updatedAt: string };
+export type SongReferenceLinkKind = "performance" | "tutorial" | "live-arrangement";
+export type SongReferenceLink = { id: string; songId: string; kind: SongReferenceLinkKind; title: string; url: string; source: string; license: string; createdAt: string; updatedAt: string };
+export type SongReadinessGate = { songId: string; score: number; ready: boolean; mastery: number; confidence: number; practiceDebt: number; checklistCompletion: number; criteria: string; blockers: string[] };
+export type SongPacingSuggestion = { setlistId: string; originalEntryIds: string[]; suggestedEntries: SongSetlistEntry[]; explanation: string; changedPositions: number };
+export type SongOneMorePassRecommendation = { songId: string; eligible: boolean; reason: string; heuristic: string; recordingScore?: number; auditionScore?: number };
+export type SongRepertoireCalendarItem = { id: string; kind: "scheduled" | "setlist" | "gig" | "overdue-review"; date: string; title: string; resourceId?: string; note?: string };
+export type SongConcertOverride = { id: string; songId: string; setlistId?: string; name: string; snapshotId?: string; variation: Omit<SongVariation, "id">; createdAt: string; removedAt?: string };
+
 export type SongLibraryState = {
-  version: 6;
+  version: 8;
   collections: SongLibraryCollection[];
   songs: LibrarySong[];
   archivedSongIds: string[];
@@ -281,6 +344,13 @@ export type SongLibraryState = {
   equipmentNotes: SongEquipmentNotes[];
   recordingTargets: SongRecordingTarget[];
   auditionSessions: SongAuditionSession[];
+  rehearsalRoles: SongRehearsalRole[];
+  rehearsalAssignments: SongRehearsalAssignment[];
+  rehearsalEvents: SongRehearsalEvent[];
+  arrangementSnapshots: SongArrangementSnapshot[];
+  stageCues: SongStageCue[];
+  referenceLinks: SongReferenceLink[];
+  concertOverrides: SongConcertOverride[];
 };
 
 export type SongLibraryRole = "owner" | "editor" | "viewer" | "commenter" | "arranger" | "setlist-manager";
@@ -290,10 +360,10 @@ export type SongResourceShareAccess = { resourceType: "song" | "queue"; resource
 export const SONG_LIBRARY_STORAGE_KEY = "chord-hero-song-library-v1";
 
 export function emptySongLibraryState(): SongLibraryState {
-  return { version: 6, collections: [], songs: [], archivedSongIds: [], favorites: [], recentSongIds: [], practiceProgress: [], practiceQueues: [], preferences: { largePrint: false, handsFree: false, simplifyMode: false, benchmarkOptIn: false, localRole: "owner", stage: { mode: "standard", autoScroll: false, autoScrollSeconds: 12 } }, queueHistory: [], weeklyGoal: { weekStart: getWeekStart(), targetSessions: 3, completedSessions: 0 }, recordings: [], sourceHealth: [], sharedAccess: [], resourceAccess: [], practiceSessions: [], annotations: [], setlists: [], comments: [], appliedTranspositions: {}, adaptiveOverrides: {}, videoReferences: [], practicePaths: [], scheduledItems: [], pendingSyncOps: [], readinessHistory: [], drafts: [], journalEntries: [], assignments: [], assignmentComments: [], tempoRamps: [], rehearsalChecklists: [], checklistProgress: [], transitionGoals: [], songFamilies: [], sectionBookmarks: [], voicingPreferences: [], equipmentNotes: [], recordingTargets: [], auditionSessions: [] };
+  return { version: 8, collections: [], songs: [], archivedSongIds: [], favorites: [], recentSongIds: [], practiceProgress: [], practiceQueues: [], preferences: { largePrint: false, handsFree: false, simplifyMode: false, benchmarkOptIn: false, localRole: "owner", stage: { mode: "standard", autoScroll: false, autoScrollSeconds: 12 } }, queueHistory: [], weeklyGoal: { weekStart: getWeekStart(), targetSessions: 3, completedSessions: 0 }, recordings: [], sourceHealth: [], sharedAccess: [], resourceAccess: [], practiceSessions: [], annotations: [], setlists: [], comments: [], appliedTranspositions: {}, adaptiveOverrides: {}, videoReferences: [], practicePaths: [], scheduledItems: [], pendingSyncOps: [], readinessHistory: [], drafts: [], journalEntries: [], assignments: [], assignmentComments: [], tempoRamps: [], rehearsalChecklists: [], checklistProgress: [], transitionGoals: [], songFamilies: [], sectionBookmarks: [], voicingPreferences: [], equipmentNotes: [], recordingTargets: [], auditionSessions: [], rehearsalRoles: [], rehearsalAssignments: [], rehearsalEvents: [], arrangementSnapshots: [], stageCues: [], referenceLinks: [], concertOverrides: [] };
 }
 
-const STATE_LIMITS = { collections: 100, songs: 500, favorites: 500, practiceProgress: 500, practiceQueues: 100, queueHistory: 50, recordings: 500, sourceHealth: 200, sharedAccess: 500, resourceAccess: 500, practiceSessions: 500, annotations: 500, setlists: 100, comments: 500, videoReferences: 500, practicePaths: 50, scheduledItems: 200, pendingSyncOps: 200, readinessHistory: 30, drafts: 100, journalEntries: 200, assignments: 200, assignmentComments: 500, tempoRamps: 200, rehearsalChecklists: 50, checklistProgress: 500, transitionGoals: 500, songFamilies: 100, sectionBookmarks: 500, voicingPreferences: 500, equipmentNotes: 500, recordingTargets: 500, auditionSessions: 100 } as const;
+const STATE_LIMITS = { collections: 100, songs: 500, favorites: 500, practiceProgress: 500, practiceQueues: 100, queueHistory: 50, recordings: 500, sourceHealth: 200, sharedAccess: 500, resourceAccess: 500, practiceSessions: 500, annotations: 500, setlists: 100, comments: 500, videoReferences: 500, practicePaths: 50, scheduledItems: 200, pendingSyncOps: 200, readinessHistory: 30, drafts: 100, journalEntries: 200, assignments: 200, assignmentComments: 500, tempoRamps: 200, rehearsalChecklists: 50, checklistProgress: 500, transitionGoals: 500, songFamilies: 100, sectionBookmarks: 500, voicingPreferences: 500, equipmentNotes: 500, recordingTargets: 500, auditionSessions: 100, rehearsalRoles: 100, rehearsalAssignments: 500, rehearsalEvents: 500, arrangementSnapshots: 200, stageCues: 500, referenceLinks: 500, concertOverrides: 100 } as const;
 const bounded = <T>(value: unknown, limit: number): T[] => Array.isArray(value) ? value.slice(0, limit) as T[] : [];
 const boundedRecord = <T>(value: unknown, limit: number): Record<string, T> => value && typeof value === "object" ? Object.fromEntries(Object.entries(value).slice(0, limit)) as Record<string, T> : {};
 
@@ -302,18 +372,62 @@ const clampTempo = (value: unknown, fallback = 90) => Math.max(40, Math.min(240,
 const inferSectionKind = (title: string): SongSectionKind => { const value = title.toLowerCase(); if (/intro|opening/.test(value)) return "intro"; if (/chorus|refrain|hook/.test(value)) return "chorus"; if (/bridge|middle 8/.test(value)) return "bridge"; if (/solo|instrumental|break/.test(value)) return "solo"; if (/ending|outro|coda|tag/.test(value)) return "ending"; if (/verse|pre-chorus/.test(value)) return "verse"; return "other"; };
 const defaultTagGroups = (tags: string[] = []): SongTagGroups => ({ gig: tags.filter((tag) => /gig|set|live|worship|campfire/i.test(tag)), genre: tags.filter((tag) => /folk|hymn|blues|rock|pop|country|jazz|traditional/i.test(tag)), mood: tags.filter((tag) => /upbeat|calm|sad|joy|reflective|energetic/i.test(tag)), season: tags.filter((tag) => /summer|winter|spring|fall|holiday|christmas/i.test(tag)), audience: tags.filter((tag) => /beginner|family|kids|audience|sing-along/i.test(tag)) });
 const normalizeSection = (section: SongSection, index: number): SongSection => ({ ...section, id: String(section.id || `section-${index + 1}`), title: String(section.title || `Section ${index + 1}`).slice(0, 120), kind: section.kind ?? inferSectionKind(String(section.title || "")), blocks: bounded<SongBlock>(section.blocks, 24).map((block) => ({ ...block, text: typeof block.text === "string" ? block.text.slice(0, 4000) : undefined, chords: bounded<string>(block.chords, 64).map((chord) => String(chord).slice(0, 32)), lines: bounded<string>(block.lines, 32).map((line) => String(line).slice(0, 400)) })) });
-const normalizeLibrarySong = (song: LibrarySong, index: number): LibrarySong => { const sections = bounded<SongSection>(song.sections, 64).map(normalizeSection); const songMap = bounded<SongMapNode>(song.songMap, 64).length ? bounded<SongMapNode>(song.songMap, 64) : sections.map((section, order) => ({ sectionId: section.id, label: section.title, kind: section.kind ?? "other", order })); const lyricSheets = bounded<SongLyricSheet>(song.lyricSheets, 4).length ? bounded<SongLyricSheet>(song.lyricSheets, 4).map((sheet) => ({ ...sheet, name: String(sheet.name || "Lyric sheet").slice(0, 80), rangeLabel: sheet.rangeLabel?.slice(0, 80), sections: bounded<SongSection>(sheet.sections, 64).map(normalizeSection) })) : [{ id: `${song.id || `song-${index + 1}`}-original`, name: "Original", kind: "original" as const, sections }]; return { ...song, id: String(song.id || `song-${index + 1}`), title: String(song.title || "Untitled song").slice(0, 160), artist: String(song.artist || "Unknown artist").slice(0, 160), tags: bounded<string>(song.tags, 32).map((tag) => String(tag).slice(0, 48)), sections, songMap, lyricSheets, tagGroups: { ...defaultTagGroups(song.tags), ...(song.tagGroups ?? {}) }, variations: bounded<SongVariation>(song.variations, 16).map((variation) => ({ ...variation, bpm: clampTempo(variation.bpm, song.bpm), capo: Math.max(0, Math.min(12, Math.round(Number(variation.capo) || 0))), arrangementKind: variation.arrangementKind ?? (/finger/i.test(variation.name) ? "fingerstyle" : /simpl/i.test(variation.name) ? "simplified" : "original") })), bpm: clampTempo(song.bpm) }; };
+const normalizeComposition = (input: unknown): SongComposition | undefined => {
+  if (!input || typeof input !== "object") return undefined;
+  const value = input as Partial<SongComposition>;
+  const subdivision = [4, 8, 12, 16].includes(Number(value.subdivision)) ? Number(value.subdivision) as SongComposition["subdivision"] : 8;
+  const instruments: SongInstrument[] = ["guitar", "ukulele", "bass"];
+  const tracks = bounded<SongCompositionTrack>(value.tracks, 16).flatMap((track, index) => {
+    if (!track || !instruments.includes(track.instrument) || !Array.isArray(track.tuning)) return [];
+    const tuning = track.tuning.filter((pitch) => Number.isFinite(pitch)).slice(0, 7).map((pitch) => Math.max(20, Math.min(96, Math.round(pitch))));
+    if (tuning.length < 4) return [];
+    return [{ id: String(track.id || `track-${index + 1}`).slice(0, 100), name: String(track.name || "Track").slice(0, 80), instrument: track.instrument, tuning, tuningLabel: String(track.tuningLabel || "Custom").slice(0, 80), capo: Math.max(0, Math.min(12, Math.round(Number(track.capo) || 0))), muted: track.muted === true }];
+  });
+  if (!tracks.length) return undefined;
+  const sections = bounded<SongCompositionSection>(value.sections, 64).map((section, sectionIndex) => {
+    const rawMeasures = section?.measuresByTrack && typeof section.measuresByTrack === "object" ? section.measuresByTrack : {};
+    const measuresByTrack: Record<string, SongCompositionMeasure[]> = {};
+    for (const track of tracks) {
+      const measures = bounded<SongCompositionMeasure>((rawMeasures as Record<string, unknown>)[track.id], 512);
+      measuresByTrack[track.id] = measures.map((measure, measureIndex) => ({
+        id: String(measure?.id || `measure-${measureIndex + 1}`).slice(0, 100),
+        events: bounded<SongCompositionEvent>(measure?.events, 128).flatMap<SongCompositionEvent>((event, eventIndex) => {
+          if (!event || !Number.isFinite(event.startBeat) || !Number.isFinite(event.durationBeats) || event.startBeat < 0 || event.durationBeats <= 0 || event.startBeat > 64 || event.durationBeats > 64) return [];
+          const common = { id: String(event.id || `event-${eventIndex + 1}`).slice(0, 100), startBeat: Math.round(event.startBeat * 96) / 96, durationBeats: Math.round(event.durationBeats * 96) / 96, accent: event.accent === true };
+          if (event.kind === "chord" && typeof event.chord === "string") {
+            const voicing = Array.isArray(event.voicing) ? event.voicing.slice(0, 7).map((fret) => fret === null ? null : typeof fret === "number" && Number.isFinite(fret) ? Math.max(0, Math.min(24, Math.round(fret))) : null) : undefined;
+            return [{ ...common, kind: "chord" as const, chord: event.chord.slice(0, 32), voicing }];
+          }
+          if (event.kind === "note" && Number.isInteger(event.string) && Number.isInteger(event.fret) && event.string! >= 1 && event.string! <= track.tuning.length && event.fret! >= 0 && event.fret! <= 24) {
+            return [{ ...common, kind: "note" as const, string: event.string!, fret: event.fret! }];
+          }
+          return [];
+        })
+      }));
+    }
+    const kind = ["intro", "verse", "chorus", "bridge", "solo", "ending", "other"].includes(String(section?.kind)) ? section?.kind ?? "other" : "other";
+    return { id: String(section?.id || `composition-section-${sectionIndex + 1}`).slice(0, 100), title: String(section?.title || `Section ${sectionIndex + 1}`).slice(0, 120), kind: kind as SongSectionKind, repeats: Math.max(1, Math.min(32, Math.round(Number(section?.repeats) || 1))), bpm: section?.bpm ? clampTempo(section.bpm) : undefined, timeSignature: typeof section?.timeSignature === "string" ? section.timeSignature.slice(0, 12) : undefined, lyrics: typeof section?.lyrics === "string" ? section.lyrics.slice(0, 4000) : undefined, notes: typeof section?.notes === "string" ? section.notes.slice(0, 2000) : undefined, measuresByTrack };
+  });
+  if (!sections.length) return undefined;
+  return { version: 1, key: String(value.key || "C").slice(0, 12), bpm: clampTempo(value.bpm), timeSignature: String(value.timeSignature || "4/4").slice(0, 12), subdivision, tracks, sections };
+};
+const normalizeLibrarySong = (song: LibrarySong, index: number): LibrarySong => { const sections = bounded<SongSection>(song.sections, 64).map(normalizeSection); const songMap = bounded<SongMapNode>(song.songMap, 64).length ? bounded<SongMapNode>(song.songMap, 64) : sections.map((section, order) => ({ sectionId: section.id, label: section.title, kind: section.kind ?? "other", order })); const lyricSheets = bounded<SongLyricSheet>(song.lyricSheets, 4).length ? bounded<SongLyricSheet>(song.lyricSheets, 4).map((sheet) => ({ ...sheet, name: String(sheet.name || "Lyric sheet").slice(0, 80), rangeLabel: sheet.rangeLabel?.slice(0, 80), sections: bounded<SongSection>(sheet.sections, 64).map(normalizeSection) })) : [{ id: `${song.id || `song-${index + 1}`}-original`, name: "Original", kind: "original" as const, sections }]; return { ...song, id: String(song.id || `song-${index + 1}`), title: String(song.title || "Untitled song").slice(0, 160), artist: String(song.artist || "Unknown artist").slice(0, 160), tags: bounded<string>(song.tags, 32).map((tag) => String(tag).slice(0, 48)), sections, songMap, lyricSheets, tagGroups: { ...defaultTagGroups(song.tags), ...(song.tagGroups ?? {}) }, variations: bounded<SongVariation>(song.variations, 16).map((variation) => ({ ...variation, bpm: clampTempo(variation.bpm, song.bpm), capo: Math.max(0, Math.min(12, Math.round(Number(variation.capo) || 0))), arrangementKind: variation.arrangementKind ?? (/finger/i.test(variation.name) ? "fingerstyle" : /simpl/i.test(variation.name) ? "simplified" : "original") })), bpm: clampTempo(song.bpm), composition: normalizeComposition(song.composition) }; };
 
-/** Additive v1-v6 reader used by local storage, plain backups, and encrypted backups. */
+const REHEARSAL_ROLE_KINDS: SongRehearsalRoleKind[] = ["vocals", "guitar", "cues", "gear", "custom"];
+const STAGE_CUE_KINDS: SongStageCueKind[] = ["count-in", "mute", "solo", "talk", "custom"];
+const clampSeconds = (value: unknown) => Math.max(0, Math.min(86400, Math.round(Number(value) || 0)));
+const boundedText = (value: unknown, limit: number) => typeof value === "string" ? value.trim().slice(0, limit) : undefined;
+
+/** Additive v1-v8 reader used by local storage, plain backups, and encrypted backups. */
 export function migrateSongLibraryState(input: unknown): SongLibraryState {
   const parsed = (input && typeof input === "object" ? input : {}) as Record<string, unknown>;
   const defaults = emptySongLibraryState();
-  if (![1, 2, 3, 4, 5, 6].includes(Number(parsed.version)) || !Array.isArray(parsed.collections) || !Array.isArray(parsed.songs)) return defaults;
+  if (![1, 2, 3, 4, 5, 6, 7, 8].includes(Number(parsed.version)) || !Array.isArray(parsed.collections) || !Array.isArray(parsed.songs)) return defaults;
   const preferences = { ...defaults.preferences, ...(parsed.preferences && typeof parsed.preferences === "object" ? parsed.preferences : {}) } as SongLibraryState["preferences"];
   return {
     ...defaults,
     ...parsed,
-    version: 6,
+    version: 8,
     collections: bounded<SongLibraryCollection>(parsed.collections, STATE_LIMITS.collections).map((collection) => ({ ...collection, songIds: bounded<string>(collection.songIds, STATE_LIMITS.songs) })),
     songs: bounded<LibrarySong>(parsed.songs, STATE_LIMITS.songs).map(normalizeLibrarySong),
     archivedSongIds: bounded<string>(parsed.archivedSongIds, STATE_LIMITS.songs),
@@ -355,6 +469,13 @@ export function migrateSongLibraryState(input: unknown): SongLibraryState {
     equipmentNotes: bounded<SongEquipmentNotes>(parsed.equipmentNotes, STATE_LIMITS.equipmentNotes).map((notes) => ({ ...notes, instrument: notes.instrument?.slice(0, 120), pickup: notes.pickup?.slice(0, 240), effects: notes.effects?.slice(0, 240), microphone: notes.microphone?.slice(0, 240), backingTrackMix: notes.backingTrackMix?.slice(0, 240) })),
     recordingTargets: bounded<SongRecordingTarget>(parsed.recordingTargets, STATE_LIMITS.recordingTargets).map((target) => ({ ...target, targetBpm: typeof target.targetBpm === "number" ? clampTempo(target.targetBpm) : undefined, referenceLabel: target.referenceLabel?.slice(0, 160) })),
     auditionSessions: bounded<SongAuditionSession>(parsed.auditionSessions, STATE_LIMITS.auditionSessions).map((session) => ({ ...session, sectionIds: bounded<string>(session.sectionIds, 64), answered: Math.max(0, Math.min(64, Math.round(Number(session.answered) || 0))), correct: Math.max(0, Math.min(64, Math.round(Number(session.correct) || 0))) })),
+    rehearsalRoles: bounded<SongRehearsalRole>(parsed.rehearsalRoles, STATE_LIMITS.rehearsalRoles).map((role, index) => ({ ...role, id: String(role.id || `role-${index + 1}`), name: String(role.name || "Bandmate").slice(0, 80), role: REHEARSAL_ROLE_KINDS.includes(role.role) ? role.role : "custom", customRole: boundedText(role.customRole, 80), claimedBy: boundedText(role.claimedBy, 80), createdAt: String(role.createdAt || new Date(0).toISOString()), updatedAt: String(role.updatedAt || role.createdAt || new Date(0).toISOString()) })),
+    rehearsalAssignments: bounded<SongRehearsalAssignment>(parsed.rehearsalAssignments, STATE_LIMITS.rehearsalAssignments).map((assignment) => ({ ...assignment, roleId: String(assignment.roleId || ""), resourceType: assignment.resourceType === "setlist" ? "setlist" : "song", resourceId: String(assignment.resourceId || ""), assignedBy: String(assignment.assignedBy || "local-player").slice(0, 80) })),
+    rehearsalEvents: bounded<SongRehearsalEvent>(parsed.rehearsalEvents, STATE_LIMITS.rehearsalEvents).map((event, index) => ({ ...event, id: String(event.id || `rehearsal-event-${index + 1}`), kind: ["played", "rehearsed", "changed", "note", "claimed", "released"].includes(event.kind) ? event.kind : "note", summary: String(event.summary || "Rehearsal update").slice(0, 240), note: boundedText(event.note, 400), createdAt: String(event.createdAt || new Date(0).toISOString()) })),
+    arrangementSnapshots: bounded<SongArrangementSnapshot>(parsed.arrangementSnapshots, STATE_LIMITS.arrangementSnapshots).map((snapshot, index) => ({ ...snapshot, id: String(snapshot.id || `arrangement-snapshot-${index + 1}`), label: String(snapshot.label || "Arrangement snapshot").slice(0, 100), notes: boundedText(snapshot.notes, 400), variation: { ...snapshot.variation, name: String(snapshot.variation?.name || snapshot.label || "Arrangement").slice(0, 100), bpm: clampTempo(snapshot.variation?.bpm), capo: Math.max(0, Math.min(12, Math.round(Number(snapshot.variation?.capo) || 0))), pattern: String(snapshot.variation?.pattern || "").slice(0, 120), feel: String(snapshot.variation?.feel || "").slice(0, 160), tuningId: String(snapshot.variation?.tuningId || "standard").slice(0, 40), key: String(snapshot.variation?.key || "C").slice(0, 12), timeSignature: String(snapshot.variation?.timeSignature || "4/4").slice(0, 12) } })),
+    stageCues: bounded<SongStageCue>(parsed.stageCues, STATE_LIMITS.stageCues).map((cue, index) => ({ ...cue, id: String(cue.id || `stage-cue-${index + 1}`), songId: String(cue.songId || ""), setlistId: boundedText(cue.setlistId, 100), sectionId: boundedText(cue.sectionId, 100), atSeconds: cue.atSeconds === undefined ? undefined : clampSeconds(cue.atSeconds), kind: STAGE_CUE_KINDS.includes(cue.kind) ? cue.kind : "custom", text: String(cue.text || "Stage cue").slice(0, 180), createdAt: String(cue.createdAt || new Date(0).toISOString()), updatedAt: String(cue.updatedAt || cue.createdAt || new Date(0).toISOString()) })),
+    referenceLinks: bounded<SongReferenceLink>(parsed.referenceLinks, STATE_LIMITS.referenceLinks).map((link, index) => ({ ...link, id: String(link.id || `reference-${index + 1}`), songId: String(link.songId || ""), kind: ["performance", "tutorial", "live-arrangement"].includes(link.kind) ? link.kind : "tutorial", title: String(link.title || "Reference link").slice(0, 120), url: String(link.url || "").slice(0, 500), source: String(link.source || "User-provided").slice(0, 120), license: String(link.license || "Verify rights at source").slice(0, 240) })),
+    concertOverrides: bounded<SongConcertOverride>(parsed.concertOverrides, STATE_LIMITS.concertOverrides).map((override, index) => ({ ...override, id: String(override.id || `concert-override-${index + 1}`), songId: String(override.songId || ""), setlistId: boundedText(override.setlistId, 100), name: String(override.name || "Concert override").slice(0, 100), variation: { ...override.variation, name: String(override.variation?.name || "Concert arrangement").slice(0, 100), bpm: clampTempo(override.variation?.bpm), capo: Math.max(0, Math.min(12, Math.round(Number(override.variation?.capo) || 0))), pattern: String(override.variation?.pattern || "").slice(0, 120), feel: String(override.variation?.feel || "").slice(0, 160), tuningId: String(override.variation?.tuningId || "standard").slice(0, 40), key: String(override.variation?.key || "C").slice(0, 12), timeSignature: String(override.variation?.timeSignature || "4/4").slice(0, 12) } })),
   };
 }
 
@@ -372,6 +493,93 @@ export function readSongLibraryState(): SongLibraryState {
 export function writeSongLibraryState(state: SongLibraryState) {
   if (typeof window !== "undefined") window.localStorage.setItem(SONG_LIBRARY_STORAGE_KEY, JSON.stringify(migrateSongLibraryState(state)));
 }
+
+const canManageRehearsalRoles = (role: SongLibraryRole) => ["owner", "editor", "arranger", "setlist-manager"].includes(role);
+export function createRehearsalRole(state: SongLibraryState, input: Pick<SongRehearsalRole, "name" | "role"> & Partial<Pick<SongRehearsalRole, "customRole">>, actorRole = state.preferences.localRole, now = new Date().toISOString()): SongLibraryState {
+  if (!canManageRehearsalRoles(actorRole)) return state;
+  const item: SongRehearsalRole = { id: `rehearsal-role-${crypto.randomUUID()}`, name: input.name.trim().slice(0, 80) || "Bandmate", role: input.role, customRole: input.role === "custom" ? input.customRole?.trim().slice(0, 80) : undefined, createdAt: now, updatedAt: now };
+  return { ...state, rehearsalRoles: [item, ...state.rehearsalRoles].slice(0, STATE_LIMITS.rehearsalRoles) };
+}
+export function assignRehearsalRole(state: SongLibraryState, input: Omit<SongRehearsalAssignment, "id" | "createdAt" | "updatedAt">, actorRole = state.preferences.localRole, now = new Date().toISOString()): SongLibraryState {
+  if (!canManageRehearsalRoles(actorRole) || !state.rehearsalRoles.some((role) => role.id === input.roleId)) return state;
+  const assignment: SongRehearsalAssignment = { ...input, id: `rehearsal-assignment-${crypto.randomUUID()}`, resourceId: input.resourceId.slice(0, 100), assignedBy: input.assignedBy.slice(0, 80), createdAt: now, updatedAt: now };
+  return { ...state, rehearsalAssignments: [assignment, ...state.rehearsalAssignments.filter((item) => !(item.roleId === input.roleId && item.resourceType === input.resourceType && item.resourceId === input.resourceId))].slice(0, STATE_LIMITS.rehearsalAssignments) };
+}
+export function claimRehearsalRole(state: SongLibraryState, roleId: string, accountId: string, actorRole = state.preferences.localRole, now = new Date().toISOString()): SongLibraryState {
+  if (!canManageRehearsalRoles(actorRole) || !accountId.trim()) return state;
+  return { ...state, rehearsalRoles: state.rehearsalRoles.map((role) => role.id !== roleId ? role : { ...role, claimedBy: accountId.trim().slice(0, 80), claimedAt: now, releasedAt: undefined, updatedAt: now }), rehearsalEvents: addRehearsalEvent(state, { kind: "claimed", summary: `Role claimed: ${accountId.trim().slice(0, 60)}` }, now).rehearsalEvents };
+}
+export function releaseRehearsalRole(state: SongLibraryState, roleId: string, actorRole = state.preferences.localRole, now = new Date().toISOString()): SongLibraryState {
+  if (!canManageRehearsalRoles(actorRole)) return state;
+  const role = state.rehearsalRoles.find((item) => item.id === roleId);
+  return { ...state, rehearsalRoles: state.rehearsalRoles.map((item) => item.id !== roleId ? item : { ...item, claimedBy: undefined, releasedAt: now, updatedAt: now }), rehearsalEvents: addRehearsalEvent(state, { kind: "released", summary: `Role released: ${role?.name ?? roleId}` }, now).rehearsalEvents };
+}
+export function addRehearsalEvent(state: SongLibraryState, input: Omit<SongRehearsalEvent, "id" | "createdAt">, now = new Date().toISOString()): SongLibraryState {
+  const event: SongRehearsalEvent = { ...input, id: `rehearsal-event-${crypto.randomUUID()}`, summary: input.summary.trim().slice(0, 240), note: input.note?.trim().slice(0, 400), createdAt: now };
+  return { ...state, rehearsalEvents: [event, ...state.rehearsalEvents].slice(0, STATE_LIMITS.rehearsalEvents) };
+}
+export function rehearsalTimeline(state: SongLibraryState, songId?: string, setlistId?: string): SongRehearsalEvent[] {
+  return state.rehearsalEvents.filter((event) => (!songId || event.songId === songId) && (!setlistId || event.setlistId === setlistId)).slice(0, 50);
+}
+
+function variationSnapshot(variation: SongVariation): Omit<SongVariation, "id"> { const { id: _id, ...snapshot } = variation; return { ...snapshot }; }
+export function createArrangementSnapshot(state: SongLibraryState, song: LibrarySong, variationId?: string, label = "Snapshot", notes?: string, now = new Date().toISOString()): SongLibraryState {
+  const variation = song.variations.find((item) => item.id === variationId) ?? song.variations[0];
+  if (!variation) return state;
+  const snapshot: SongArrangementSnapshot = { id: `arrangement-snapshot-${crypto.randomUUID()}`, songId: song.id, variationId: variation.id, label: label.trim().slice(0, 100) || "Snapshot", notes: notes?.trim().slice(0, 400), variation: variationSnapshot(variation), createdAt: now };
+  return { ...state, arrangementSnapshots: [snapshot, ...state.arrangementSnapshots].slice(0, STATE_LIMITS.arrangementSnapshots) };
+}
+export function compareArrangementSnapshots(left: SongArrangementSnapshot, right: SongArrangementSnapshot): Array<{ field: string; left: string | number; right: string | number }> {
+  const fields: Array<keyof Omit<SongVariation, "id">> = ["name", "key", "timeSignature", "bpm", "tuningId", "capo", "pattern", "feel", "arrangementKind"];
+  return fields.filter((field) => left.variation[field] !== right.variation[field]).map((field) => ({ field, left: String(left.variation[field] ?? ""), right: String(right.variation[field] ?? "") }));
+}
+export function restoreArrangementSnapshot(state: SongLibraryState, snapshotId: string, actorRole = state.preferences.localRole, now = new Date().toISOString()): SongLibraryState {
+  if (!canManageRehearsalRoles(actorRole)) return state;
+  const snapshot = state.arrangementSnapshots.find((item) => item.id === snapshotId); if (!snapshot) return state;
+  const song = state.songs.find((item) => item.id === snapshot.songId); if (!song) return state;
+  const variationId = snapshot.variationId ?? song.variations[0]?.id; if (!variationId) return state;
+  const next = { ...state, songs: state.songs.map((item) => item.id !== song.id ? item : { ...item, variations: item.variations.map((variation) => variation.id === variationId ? { ...snapshot.variation, id: variation.id } : variation) }) };
+  return addRehearsalEvent(next, { songId: song.id, kind: "changed", summary: `Restored arrangement snapshot: ${snapshot.label}` }, now);
+}
+
+function entrySetup(entry: SongSetlistEntry): string { return `${entry.capo ?? 0}:${entry.tuningId ?? "standard"}`; }
+function setupChanges(entries: SongSetlistEntry[]): number { return entries.slice(1).reduce((count, entry, index) => count + (entrySetup(entry) === entrySetup(entries[index]) ? 0 : 1), 0); }
+export function suggestSetlistReorder(setlist: SongSetlist): SongSetlistReorderSuggestion {
+  const original = setlist.entries.slice(0, 100); const remaining = original.map((entry, index) => ({ entry, index })); const suggested: SongSetlistEntry[] = [];
+  while (remaining.length) {
+    const previous = suggested[suggested.length - 1];
+    remaining.sort((a, b) => (previous && entrySetup(a.entry) === entrySetup(previous) ? -1 : 0) - (previous && entrySetup(b.entry) === entrySetup(previous) ? -1 : 0) || a.index - b.index);
+    suggested.push(remaining.shift()!.entry);
+  }
+  const originalChanges = setupChanges(original); const changes = setupChanges(suggested); const same = original.every((entry, index) => entry === suggested[index]);
+  return { setlistId: setlist.id, originalEntryIds: original.map((entry, index) => `${entry.songId}:${index}`), suggestedEntries: suggested, changes, originalChanges, explanation: same ? "Current order already groups matching capo/tuning setups." : `Preview groups matching capo/tuning setups: ${originalChanges} change${originalChanges === 1 ? "" : "s"} becomes ${changes}. No setlist was changed.` };
+}
+export function suggestSetlistPacing(setlist: SongSetlist, songs: LibrarySong[], state: SongLibraryState): SongPacingSuggestion {
+  const entries = setlist.entries.slice(0, 100); const remaining = entries.map((entry, index) => ({ entry, index })); const result: SongSetlistEntry[] = []; const intensity = (song: LibrarySong | undefined) => song?.tags.some((tag) => /upbeat|energetic|dance|rock/i.test(tag)) ? 2 : song?.tags.some((tag) => /calm|reflective|slow|ballad/i.test(tag)) ? 0 : 1; const vocals = (entry: SongSetlistEntry) => state.rehearsalAssignments.some((assignment) => assignment.resourceType === "song" && assignment.resourceId === entry.songId && state.rehearsalRoles.find((role) => role.id === assignment.roleId)?.role === "vocals");
+  while (remaining.length) { const previousSong = songs.find((song) => song.id === result[result.length - 1]?.songId); remaining.sort((a, b) => { const score = (item: { entry: SongSetlistEntry; index: number }) => { const song = songs.find((candidate) => candidate.id === item.entry.songId); const previousIntensity = previousSong ? intensity(previousSong) : -1; return Math.abs(intensity(song) - previousIntensity) * 3 + (previousSong && previousSong.key === song?.key ? 1 : 0) + (previousSong && Math.abs((previousSong.bpm ?? 90) - (song?.bpm ?? 90)) < 12 ? 1 : 0) + (vocals(item.entry) ? 2 : 0); }; return score(a) - score(b) || a.index - b.index; }); result.push(remaining.shift()!.entry); }
+  const changedPositions = result.reduce((count, entry, index) => count + (entry !== entries[index] ? 1 : 0), 0); return { setlistId: setlist.id, originalEntryIds: entries.map((entry, index) => `${entry.songId}:${index}`), suggestedEntries: result, changedPositions, explanation: changedPositions ? "Preview alternates stored intensity where possible, avoids adjacent key/tempo collisions, and spreads songs with assigned vocalist workload. It never changes the setlist automatically." : "Current order already satisfies the deterministic pacing heuristic." };
+}
+
+export function addStageCue(state: SongLibraryState, input: Omit<SongStageCue, "id" | "createdAt" | "updatedAt">, actorRole = state.preferences.localRole, now = new Date().toISOString()): SongLibraryState {
+  if (!canManageRehearsalRoles(actorRole)) return state;
+  const cue: SongStageCue = { ...input, id: `stage-cue-${crypto.randomUUID()}`, text: input.text.trim().slice(0, 180), atSeconds: input.atSeconds === undefined ? undefined : clampSeconds(input.atSeconds), createdAt: now, updatedAt: now };
+  return { ...state, stageCues: [cue, ...state.stageCues].slice(0, STATE_LIMITS.stageCues) };
+}
+export function stageCuesFor(state: SongLibraryState, songId: string, setlistId?: string): SongStageCue[] { return state.stageCues.filter((cue) => cue.songId === songId && (!setlistId || !cue.setlistId || cue.setlistId === setlistId)).sort((left, right) => (left.atSeconds ?? 0) - (right.atSeconds ?? 0)).slice(0, 24); }
+
+export function addReferenceLink(state: SongLibraryState, input: Omit<SongReferenceLink, "id" | "createdAt" | "updatedAt">, actorRole = state.preferences.localRole, now = new Date().toISOString()): SongLibraryState {
+  if (!canManageRehearsalRoles(actorRole) || !/^https?:\/\/[^\s]+$/i.test(input.url.trim())) return state;
+  const link: SongReferenceLink = { ...input, id: `reference-${crypto.randomUUID()}`, title: input.title.trim().slice(0, 120) || "Reference link", url: input.url.trim().slice(0, 500), source: input.source.trim().slice(0, 120) || "User-provided", license: input.license.trim().slice(0, 240) || "Verify rights at source", createdAt: now, updatedAt: now };
+  return { ...state, referenceLinks: [link, ...state.referenceLinks].slice(0, STATE_LIMITS.referenceLinks) };
+}
+
+export function deriveGigReadinessGate(state: SongLibraryState, song: LibrarySong, setlist?: SongSetlist): SongReadinessGate {
+  const progress = state.practiceProgress.find((item) => item.songId === song.id); const masteryValues = Object.values(progress?.sectionMastery ?? {}); const mastery = masteryValues.length ? Math.round(masteryValues.reduce((sum, value) => sum + value, 0) / masteryValues.length) : 0; const confidence = progress?.confidence ?? (Object.values(progress?.sectionConfidence ?? {}).length ? Math.round(Object.values(progress?.sectionConfidence ?? {}).reduce((sum, value) => sum + value, 0) / Object.values(progress?.sectionConfidence ?? {}).length) : 0); const debt = derivePracticeDebt(state, [song])[0]?.score ?? 100; const checklist = state.rehearsalChecklists[0]; const checked = setlist ? state.checklistProgress.find((item) => item.checklistId === checklist?.id && item.setlistId === setlist.id)?.checkedItemIds.length ?? 0 : 0; const checklistCompletion = checklist ? Math.round((checked / Math.max(1, checklist.items.length)) * 100) : 0; const score = Math.round(mastery * 0.35 + confidence * 0.25 + (100 - debt) * 0.2 + checklistCompletion * 0.2); const blockers = [mastery < 70 ? "mastery below 70%" : "", confidence < 60 ? "confidence below 60%" : "", debt > 45 ? "practice debt above 45" : "", checklist && checklistCompletion < 100 ? "rehearsal checklist incomplete" : ""].filter(Boolean); return { songId: song.id, score, ready: blockers.length === 0 && score >= 75, mastery, confidence, practiceDebt: debt, checklistCompletion, criteria: "Ready requires mastery ≥70%, confidence ≥60%, practice debt ≤45, a complete local rehearsal checklist, and a combined score ≥75.", blockers };
+}
+export function suggestOneMorePass(state: SongLibraryState, song: LibrarySong): SongOneMorePassRecommendation { const comparison = compareSongRecordingToTarget(state, song.id); const recordingScore = comparison.timingDifferencePercent === undefined ? undefined : Math.max(0, 100 - comparison.timingDifferencePercent); const audition = state.auditionSessions.filter((item) => item.songId === song.id && item.answered > 0).slice(0, 3); const auditionScore = audition.length ? Math.round(audition.reduce((sum, item) => sum + (item.correct / Math.max(1, item.answered)) * 100, 0) / audition.length) : undefined; const eligible = (recordingScore !== undefined && recordingScore >= 75 && recordingScore < 92) || (auditionScore !== undefined && auditionScore >= 70 && auditionScore < 90); return { songId: song.id, eligible, reason: eligible ? "Your stored recording or audition result is close to the success band; one focused pass may cross it." : "No near-success recording or audition metric is stored yet.", heuristic: "Near-success means timing consistency 75–91% or audition accuracy 70–89%; this is a transparent local heuristic, not a prediction.", recordingScore, auditionScore }; }
+export function repertoireCalendar(state: SongLibraryState, songs: LibrarySong[], now = Date.now()): SongRepertoireCalendarItem[] { const items: SongRepertoireCalendarItem[] = state.scheduledItems.slice(0, 200).map((item) => ({ id: item.id, kind: "scheduled", date: item.dueAt, title: item.note || `${item.kind} practice`, resourceId: item.resourceId })); state.setlists.filter((setlist) => !setlist.archivedAt).slice(0, 100).forEach((setlist) => items.push({ id: `setlist:${setlist.id}`, kind: "setlist", date: setlist.updatedAt, title: setlist.name, resourceId: setlist.id, note: `${setlist.entries.length} songs` })); dueSectionReviews(state, songs, now).slice(0, 100).forEach((review) => items.push({ id: `review:${review.songId}:${review.sectionId}`, kind: "overdue-review", date: review.dueAt, title: `${review.title} review`, resourceId: review.songId })); return items.sort((left, right) => left.date.localeCompare(right.date)).slice(0, 200); }
+export function simplifyForTonight(state: SongLibraryState, song: LibrarySong, setlistId?: string, now = new Date().toISOString()): SongLibraryState { const variation = song.variations[0]; if (!variation) return state; const snapshotState = createArrangementSnapshot(state, song, variation.id, "Source before tonight", "Created automatically before an explicit concert simplification.", now); const snapshot = snapshotState.arrangementSnapshots[0]; const override: SongConcertOverride = { id: `concert-override-${crypto.randomUUID()}`, songId: song.id, setlistId, name: "Tonight · simplified emergency override", snapshotId: snapshot?.id, variation: { ...variationSnapshot(simplifyVariation(variation)), arrangementKind: "concert" }, createdAt: now }; return { ...snapshotState, concertOverrides: [override, ...snapshotState.concertOverrides].slice(0, STATE_LIMITS.concertOverrides) }; }
+export function removeConcertOverride(state: SongLibraryState, overrideId: string): SongLibraryState { return { ...state, concertOverrides: state.concertOverrides.map((override) => override.id === overrideId ? { ...override, removedAt: new Date().toISOString() } : override) }; }
 
 export function sectionKindLabel(kind: SongSectionKind): string { return kind === "other" ? "Section" : kind[0].toUpperCase() + kind.slice(1); }
 export function songMapFor(song: LibrarySong): SongMapNode[] { return song.songMap?.length ? song.songMap : song.sections.map((section, order) => ({ sectionId: section.id, label: section.title, kind: section.kind ?? inferSectionKind(section.title), order })); }
@@ -451,9 +659,10 @@ export function createTransitionGoal(input: Pick<SongChordTransitionGoal, "songI
 export function autoTransitionGoals(song: LibrarySong, items: ChordTransitionHeatmapItem[], now = new Date().toISOString()): SongChordTransitionGoal[] { return items.slice(0, 5).map((item) => createTransitionGoal({ songId: song.id, from: item.from, to: item.to, targetRepetitions: Math.max(4, Math.min(30, Math.round(item.difficulty / 4))), source: "auto" }, now)); }
 export function recordTransitionGoalRepetition(state: SongLibraryState, goalId: string, successful: boolean, now = new Date().toISOString()): SongLibraryState { return { ...state, transitionGoals: state.transitionGoals.map((goal) => { if (goal.id !== goalId) return goal; const completedRepetitions = successful ? Math.min(goal.targetRepetitions, goal.completedRepetitions + 1) : goal.completedRepetitions; return { ...goal, completedRepetitions, completedAt: completedRepetitions >= goal.targetRepetitions ? goal.completedAt ?? now : undefined, updatedAt: now }; }) }; }
 
-export function buildLocalSharePayload(kind: "lead-sheet" | "setlist", song?: LibrarySong, setlist?: SongSetlist): string { const payload = kind === "lead-sheet" && song ? { schema: 6, kind, song: { id: song.id, title: song.title, artist: song.artist, license: song.license, sourceUrl: song.sourceUrl, map: songMapFor(song), variations: song.variations.map((variation) => ({ id: variation.id, name: variation.name, arrangementKind: variation.arrangementKind, key: variation.key, bpm: variation.bpm })) } } : { schema: 6, kind, setlist: setlist ? { id: setlist.id, name: setlist.name, entries: setlist.entries.map((entry) => ({ songId: entry.songId, variationId: entry.variationId, capo: entry.capo, tuningId: entry.tuningId })) } : undefined }; return JSON.stringify(payload);
+export function buildLocalSharePayload(kind: "lead-sheet" | "setlist", song?: LibrarySong, setlist?: SongSetlist): string { const payload = kind === "lead-sheet" && song ? { schema: 7, kind, song: { id: song.id, title: song.title, artist: song.artist, license: song.license, sourceUrl: song.sourceUrl, map: songMapFor(song), variations: song.variations.map((variation) => ({ id: variation.id, name: variation.name, arrangementKind: variation.arrangementKind, key: variation.key, bpm: variation.bpm })) } } : { schema: 7, kind, setlist: setlist ? { id: setlist.id, name: setlist.name, entries: setlist.entries.map((entry) => ({ songId: entry.songId, variationId: entry.variationId, capo: entry.capo, tuningId: entry.tuningId })) } : undefined }; return JSON.stringify(payload);
 }
-export function buildLocalShareCode(payload: string): string { if (typeof btoa === "function") { const bytes = new TextEncoder().encode(payload); let binary = ""; bytes.forEach((byte) => { binary += String.fromCharCode(byte); }); return `CHORDHERO-LOCAL-V6:${btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`; } return `CHORDHERO-LOCAL-V6:${payload}`; }
+export function parseLocalSharePayload(payload: string): Record<string, unknown> { const parsed = JSON.parse(payload) as Record<string, unknown>; if (![1, 2, 3, 4, 5, 6, 7].includes(Number(parsed.schema))) throw new Error("Unsupported local share schema"); return parsed; }
+export function buildLocalShareCode(payload: string): string { if (typeof btoa === "function") { const bytes = new TextEncoder().encode(payload); let binary = ""; bytes.forEach((byte) => { binary += String.fromCharCode(byte); }); return `CHORDHERO-LOCAL-V7:${btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "")}`; } return `CHORDHERO-LOCAL-V7:${payload}`; }
 export function buildLocalShareVisual(code: string, size = 21): boolean[][] { let hash = 2166136261; for (const character of code) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619); return Array.from({ length: size }, (_, row) => Array.from({ length: size }, (_, column) => { const finder = (originRow: number, originColumn: number) => row >= originRow && row < originRow + 7 && column >= originColumn && column < originColumn + 7 && (row === originRow || row === originRow + 6 || column === originColumn || column === originColumn + 6 || (row >= originRow + 2 && row <= originRow + 4 && column >= originColumn + 2 && column <= originColumn + 4)); if (finder(0, 0) || finder(0, size - 7) || finder(size - 7, 0)) return true; hash = Math.imul(hash ^ row * 31 + column, 16777619); return (hash >>> 28) % 2 === 1; })); }
 
 /** Readiness is intentionally device-private and is never included in an account-sync payload. */
@@ -710,11 +919,11 @@ export function buildPracticeTemplateQueue(state: SongLibraryState, songs: Libra
   return { id: `queue-template-${minutes}`, name: `${minutes}-minute due-first practice`, songIds, createdAt: stamp, updatedAt: stamp, targetDurationMinutes: minutes };
 }
 
-export type PreShowSong = { index: number; title: string; stageInfo: string; checklist: string[]; arrangement: string };
+export type PreShowSong = { index: number; title: string; stageInfo: string; checklist: string[]; arrangement: string; cues: SongStageCue[] };
 export type PreShowView = { setlistId: string; name: string; totalMinutes: number; songs: PreShowSong[]; emergencyPlan: string };
 export function buildPreShowView(state: SongLibraryState, setlist: SongSetlist, songs: LibrarySong[]): PreShowView {
   const timeline = estimateSetlistTimeline(setlist, songs); const setlistChecklist = state.rehearsalChecklists.slice(0, 50).flatMap((checklist) => { const progress = state.checklistProgress.find((item) => item.checklistId === checklist.id && item.setlistId === setlist.id); return checklist.items.slice(0, 32).filter((item) => !progress?.checkedItemIds.includes(item.id)).map((item) => item.label); }).slice(0, 32);
-  return { setlistId: setlist.id, name: setlist.name, totalMinutes: timeline.totalMinutes, songs: setlist.entries.slice(0, 100).map((entry, index) => { const song = songs.find((item) => item.id === entry.songId); const resolved = song ? resolveSetlistSongVersion(song, entry) : undefined; return { index: index + 1, title: song?.title ?? "Missing song", stageInfo: resolved ? `${resolved.tempo} BPM · capo ${resolved.capo} · ${resolved.tuningId}${resolved.notes ? ` · ${resolved.notes}` : ""}` : "Resolve arrangement", checklist: [entry.changeNotes, resolved?.notes].filter((value): value is string => Boolean(value)).slice(0, 4), arrangement: resolved?.simplifiedFallback ? "Simplified fallback ready" : "Use selected arrangement; simplify only if needed" }; }), emergencyPlan: "If a section drops out, keep the pulse, use the simplified arrangement, and re-enter at the next marked section." };
+  return { setlistId: setlist.id, name: setlist.name, totalMinutes: timeline.totalMinutes, songs: setlist.entries.slice(0, 100).map((entry, index) => { const song = songs.find((item) => item.id === entry.songId); const resolved = song ? resolveSetlistSongVersion(song, entry) : undefined; return { index: index + 1, title: song?.title ?? "Missing song", stageInfo: resolved ? `${resolved.tempo} BPM · capo ${resolved.capo} · ${resolved.tuningId}${resolved.notes ? ` · ${resolved.notes}` : ""}` : "Resolve arrangement", checklist: [entry.changeNotes, resolved?.notes].filter((value): value is string => Boolean(value)).slice(0, 4), arrangement: resolved?.simplifiedFallback ? "Simplified fallback ready" : "Use selected arrangement; simplify only if needed", cues: song ? stageCuesFor(state, song.id, setlist.id) : [] }; }), emergencyPlan: "If a section drops out, keep the pulse, use the simplified arrangement, and re-enter at the next marked section." };
 }
 
 export type SongWarmup = { id: string; transition: string; instruction: string; repetitions: number; tempo: number };

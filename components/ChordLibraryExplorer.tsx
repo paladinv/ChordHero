@@ -173,7 +173,7 @@ type HeatmapNote = {
   note: string;
   state: "primary" | "comparison" | "shared" | "idle";
 };
-type LibraryWorkspace = "browse" | "practice" | "compare" | "tools";
+type LibraryWorkspace = "browse" | "focus" | "practice" | "compare" | "tools";
 
 const noteAt = (index: number) => NOTES[((index % 12) + 12) % 12];
 
@@ -511,6 +511,35 @@ export default function ChordLibraryExplorer() {
     if (!deferredLibrarySearch) return [];
     return searchLibraryEntries(CHORD_LIBRARY, deferredLibrarySearch).slice(0, 8);
   }, [deferredLibrarySearch]);
+
+  const emptyLibraryFilterLabels = useMemo(() => [
+    libraryFunctionKey !== "any" ? `key ${libraryFunctionKey}` : null,
+    libraryFunctionRole !== "any" ? `function ${libraryFunctionRole}` : null,
+    libraryHarmonicEvent !== "all" ? `event ${libraryHarmonicEvent}` : null,
+    libraryRoot !== "any" ? `root ${libraryRoot}` : null,
+    libraryQuality !== "any" ? `type ${libraryQuality}` : null,
+    libraryInversion !== "all" ? "specific position" : null,
+    libraryTag !== "all" ? `difficulty ${libraryTag}` : null,
+    fretFilter !== "all" ? `fret range ${fretFilter}` : null,
+    stringFilter !== "all" ? `string set ${stringFilter}` : null,
+    deferredLibrarySearch ? `search \"${librarySearch.trim()}\"` : null,
+    activePackId !== "all" ? "progression pack" : null,
+    activeCollection !== "all" ? `${activeCollection} collection` : null
+  ].filter((label): label is string => Boolean(label)), [
+    activeCollection,
+    activePackId,
+    deferredLibrarySearch,
+    fretFilter,
+    libraryFunctionKey,
+    libraryFunctionRole,
+    libraryHarmonicEvent,
+    libraryInversion,
+    libraryQuality,
+    libraryRoot,
+    librarySearch,
+    libraryTag,
+    stringFilter
+  ]);
 
   const selectedLibraryEntry = resolveSelectedLibraryEntry(filteredLibraryEntries, selectedLibraryId);
   const compareEntry =
@@ -1528,6 +1557,7 @@ export default function ChordLibraryExplorer() {
         <nav className="library-workspace-tabs" aria-label="Library tools">
           {([
             ["browse", "Browse"],
+            ["focus", "One chord"],
             ["practice", "Practice"],
             ["compare", "Compare"],
             ["tools", "Packs & export"]
@@ -1655,6 +1685,27 @@ export default function ChordLibraryExplorer() {
                         ))}
                       </div>
                     ) : null}
+                  </div>
+                </div>
+              ) : null}
+
+              {workspace === "focus" ? (
+                <div className="library-focus-view" aria-labelledby="one-chord-title">
+                  <header className="library-focus-header">
+                    <div><span className="label">Distraction-free practice</span><h3 id="one-chord-title">One chord at a time</h3><p>Keep the chart, hand position, sound, and one prompt in view.</p></div>
+                    <button className="btn" type="button" onClick={() => setWorkspace("browse")}>Exit focus view</button>
+                  </header>
+                  <div className="library-focus-grid">
+                    <section className="library-focus-chart" aria-label={`${selectedLibraryEntry.chord.name} chord chart`}>
+                      {sightReadingMode ? <div className="library-chart-hidden" role="status">Chart hidden until you answer in sight-reading mode.</div> : <ChordDiagram chord={selectedLibraryEntry.chord} orientation={displaySettings.handedness} highContrast={displaySettings.highContrast} largeChart={displaySettings.largeCharts} simplifiedChart={displaySettings.simplifiedCharts} />}
+                      <div className="library-focus-audio"><button className="btn primary" type="button" onClick={() => playChordPreview(selectedLibraryEntry.chord, "strum")}>Strum</button><button className="btn" type="button" onClick={() => playChordPreview(selectedLibraryEntry.chord, "arpeggio")}>Arpeggiate</button></div>
+                    </section>
+                    <section className="library-focus-hand" aria-label="Left hand position">
+                      <GuitarTechnique3D chord={selectedLibraryEntry.chord} handedness={displaySettings.handedness} mode="left-hand" labels />
+                    </section>
+                    <section className="library-focus-prompt">
+                      <span className="label">Practice prompt</span><h4>Make one clean attack</h4><p>{selectedLibraryEntry.practiceFocus}</p><p className="muted">Fingering: {selectedLibraryEntry.recommendedVariant}</p><div className="library-focus-actions"><button className="btn primary" type="button" onClick={() => addPracticeRep(selectedLibraryEntry.id)}>Log clean rep</button><button className="btn" type="button" onClick={() => setWorkspace("practice")}>Open full practice tools</button></div>
+                    </section>
                   </div>
                 </div>
               ) : null}
@@ -1877,7 +1928,11 @@ export default function ChordLibraryExplorer() {
             </div>
           </div>
         ) : (
-          <div className="history-empty">No voicings match these filters. Clear the pack or broaden the search.</div>
+          <div className="history-empty library-no-results" role="status">
+            <p>No voicings match the current library selection.</p>
+            <p className="muted">{emptyLibraryFilterLabels.length ? `Active filters: ${emptyLibraryFilterLabels.join(", ")}.` : "The current primary function has no stored playable shapes."} Primary key, mode, function, and harmonic-event choices are preserved.</p>
+            <button className="btn ghost" type="button" onClick={() => { setLibrarySearch(""); setLibraryRoot("any"); setLibraryQuality("any"); setLibraryInversion("all"); setLibraryTag("all"); setFretFilter("all"); setStringFilter("all"); setActivePackId("all"); setActiveCollection("all"); }}>Reset shape, search, and collection filters</button>
+          </div>
         )}
       </div>
     </section>

@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import ChordDiagram from "../../components/ChordDiagram";
+import { CHORD_LOOKUP } from "../../lib/chords";
 import sharedSongContent from "../../shared/content/v1/songs.json";
 import {
   emptySongLibraryState,
@@ -78,6 +80,25 @@ import {
   createAuditionPrompt,
   revealAuditionPrompt,
   buildPreShowView,
+  createRehearsalRole,
+  assignRehearsalRole,
+  claimRehearsalRole,
+  releaseRehearsalRole,
+  rehearsalTimeline,
+  addRehearsalEvent,
+  createArrangementSnapshot,
+  compareArrangementSnapshots,
+  restoreArrangementSnapshot,
+  suggestSetlistReorder,
+  suggestSetlistPacing,
+  addStageCue,
+  stageCuesFor,
+  addReferenceLink,
+  deriveGigReadinessGate,
+  suggestOneMorePass,
+  repertoireCalendar,
+  simplifyForTonight,
+  removeConcertOverride,
   dueSectionReviews,
   recordSectionReview,
   setSongConfidence,
@@ -110,6 +131,9 @@ import {
   type SongReviewResult,
   type SongStagePreferences,
   type SongVoicingMode,
+  type SongRehearsalRoleKind,
+  type SongStageCueKind,
+  type SongReferenceLinkKind,
   writeSongLibraryState,
 } from "../../lib/songLibrary";
 import { deleteRecording, loadRecording, saveRecording } from "../../lib/songRecording";
@@ -233,6 +257,22 @@ export default function SongLibraryPage() {
   const [targetBpm, setTargetBpm] = useState("");
   const [referenceLabel, setReferenceLabel] = useState("");
   const [auditionPrompt, setAuditionPrompt] = useState<ReturnType<typeof createAuditionPrompt>>();
+  const [roleName, setRoleName] = useState("");
+  const [roleKind, setRoleKind] = useState<SongRehearsalRoleKind>("guitar");
+  const [roleClaimAccount, setRoleClaimAccount] = useState("local-player");
+  const [timelineNote, setTimelineNote] = useState("");
+  const [snapshotLabel, setSnapshotLabel] = useState("");
+  const [snapshotNotes, setSnapshotNotes] = useState("");
+  const [compareSnapshotId, setCompareSnapshotId] = useState("");
+  const [cueKind, setCueKind] = useState<SongStageCueKind>("count-in");
+  const [cueText, setCueText] = useState("");
+  const [cueSectionId, setCueSectionId] = useState("");
+  const [cueSeconds, setCueSeconds] = useState("");
+  const [referenceKind, setReferenceKind] = useState<SongReferenceLinkKind>("tutorial");
+  const [referenceTitle, setReferenceTitle] = useState("");
+  const [referenceUrl, setReferenceUrl] = useState("");
+  const [referenceSource, setReferenceSource] = useState("");
+  const [referenceLicense, setReferenceLicense] = useState("");
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -314,6 +354,21 @@ export default function SongLibraryPage() {
   const selectedBookmarks = useMemo(() => selectedSong ? bookmarksForSong(state, selectedSong.id) : [], [selectedSong?.id, state.sectionBookmarks]);
   const selectedComparison = useMemo(() => selectedSong ? compareSongRecordingToTarget(state, selectedSong.id, selectedVariation?.id) : undefined, [selectedSong?.id, selectedVariation?.id, state.recordingTargets, state.recordings]);
   const activePreShow = useMemo(() => { const setlist = state.setlists.find((item) => item.id === timerSetlistId); return setlist ? buildPreShowView(state, setlist, allSongs) : undefined; }, [allSongs, state, timerSetlistId]);
+  const rehearsalEvents = useMemo(() => rehearsalTimeline(state, selectedSong?.id, timerSetlistId || undefined), [selectedSong?.id, state.rehearsalEvents, timerSetlistId]);
+  const selectedRoles = useMemo(() => state.rehearsalRoles.filter((role) => !role.releasedAt).slice(0, 24), [state.rehearsalRoles]);
+  const selectedSnapshots = useMemo(() => state.arrangementSnapshots.filter((snapshot) => snapshot.songId === selectedSong?.id).slice(0, 24), [selectedSong?.id, state.arrangementSnapshots]);
+  const compareSnapshot = useMemo(() => selectedSnapshots.find((snapshot) => snapshot.id === compareSnapshotId), [compareSnapshotId, selectedSnapshots]);
+  const currentSnapshot = useMemo(() => selectedSnapshots.find((snapshot) => snapshot.variationId === selectedVariation?.id), [selectedSnapshots, selectedVariation?.id]);
+  const snapshotDifferences = useMemo(() => currentSnapshot && compareSnapshot ? compareArrangementSnapshots(currentSnapshot, compareSnapshot) : [], [compareSnapshot, currentSnapshot]);
+  const activeV7Setlist = activeConcertSetlist ?? state.setlists.find((setlist) => setlist.id === timerSetlistId) ?? state.setlists.find((setlist) => !setlist.archivedAt);
+  const capoSuggestion = useMemo(() => activeV7Setlist ? suggestSetlistReorder(activeV7Setlist) : undefined, [activeV7Setlist]);
+  const pacingSuggestion = useMemo(() => activeV7Setlist ? suggestSetlistPacing(activeV7Setlist, allSongs, state) : undefined, [activeV7Setlist, allSongs, state.rehearsalAssignments, state.rehearsalRoles]);
+  const stageCues = useMemo(() => selectedSong ? stageCuesFor(state, selectedSong.id, timerSetlistId || undefined) : [], [selectedSong?.id, state.stageCues, timerSetlistId]);
+  const readinessGate = useMemo(() => selectedSong ? deriveGigReadinessGate(state, selectedSong, activeV7Setlist) : undefined, [activeV7Setlist, selectedSong, state]);
+  const oneMorePass = useMemo(() => selectedSong ? suggestOneMorePass(state, selectedSong) : undefined, [selectedSong, state.auditionSessions, state.recordings, state.recordingTargets]);
+  const calendarItems = useMemo(() => repertoireCalendar(state, allSongs), [allSongs, state]);
+  const shapeCards = useMemo(() => selectedSong ? knownSongChordVoicings(selectedSong, voicingMode).map((name) => CHORD_LOOKUP.get(name)).filter((chord): chord is NonNullable<typeof chord> => Boolean(chord)).slice(0, 12) : [], [selectedSong, voicingMode]);
+  const activeOverrides = useMemo(() => state.concertOverrides.filter((override) => !override.removedAt && (!selectedSong || override.songId === selectedSong.id)).slice(0, 8), [selectedSong?.id, state.concertOverrides]);
 
   useEffect(() => {
     if (!selectedSong) return;
@@ -353,6 +408,17 @@ export default function SongLibraryPage() {
   const reviewImport = () => { if (!importText.trim()) return; try { const parsed = parseSongPreset(importText, importFormat); const reviewed: LibrarySong = { ...normalizeImportedSong({ title: parsed.title, artist: parsed.artist, sourceUrl: "local://reviewed-preset", notes: "Imported after explicit review; parsed content stays local." }), ...parsed, id: `review-${Date.now()}`, sourceUrl: undefined, origin: "manual", license: "User-provided preset; verify rights before sharing", importedAt: new Date().toISOString(), tags: ["imported", "reviewed"], variations: [{ id: `review-${Date.now()}-variation`, name: "Reviewed arrangement", technique: "strumming", key: "C", timeSignature: "4/4", bpm: 90, tuningId: "standard", capo: 0, pattern: "D - D -", feel: "Parsed preset for local review.", arrangementKind: "original" }] }; setImportReview(reviewed); } catch { setStatus("That preset could not be parsed."); } };
   const confirmImportReview = () => { if (!importReview) return; const duplicate = allSongs.some((song) => song.title.trim().toLowerCase() === importReview.title.trim().toLowerCase() && song.artist.trim().toLowerCase() === importReview.artist.trim().toLowerCase()); if (duplicate && !window.confirm("A song with the same title and artist exists. Save this reviewed copy anyway?")) return; updateState({ ...state, songs: [...state.songs, importReview].slice(0, 500) }, "Confirmed reviewed song import", "import"); setSelectedId(importReview.id); setSelectedVariationId(importReview.variations[0]?.id ?? ""); setImportReview(null); setImportText(""); setStatus("Reviewed preset saved locally after confirmation. Rights remain your responsibility."); };
   const createChecklist = () => { const checklist = createRehearsalChecklist(); updateState({ ...state, rehearsalChecklists: [checklist, ...state.rehearsalChecklists].slice(0, 50) }, "Created a reusable rehearsal checklist"); setStatus("Reusable rehearsal checklist created."); };
+  const saveRehearsalRole = () => { if (!roleName.trim()) return; updateState(createRehearsalRole(state, { name: roleName, role: roleKind, customRole: roleKind === "custom" ? roleName : undefined }), "Created rehearsal role"); setRoleName(""); setStatus("Bandmate role saved locally."); };
+  const claimRole = (roleId: string) => { updateState(claimRehearsalRole(state, roleId, roleClaimAccount.trim() || "local-player"), "Claimed rehearsal role"); setStatus("Rehearsal role claimed locally."); };
+  const releaseRole = (roleId: string) => { updateState(releaseRehearsalRole(state, roleId), "Released rehearsal role"); setStatus("Rehearsal role released locally."); };
+  const assignRole = (roleId: string, resourceType: "song" | "setlist", resourceId: string) => { updateState(assignRehearsalRole(state, { roleId, resourceType, resourceId, assignedBy: "local-player" }), "Assigned rehearsal role"); setStatus("Role assignment saved locally."); };
+  const saveSnapshot = () => { if (!selectedSong || !selectedVariation) return; updateState(createArrangementSnapshot(state, selectedSong, selectedVariation.id, snapshotLabel || `${selectedVariation.name} · ${new Date().toLocaleDateString()}`, snapshotNotes), "Saved immutable arrangement snapshot"); setSnapshotLabel(""); setSnapshotNotes(""); setStatus("Arrangement snapshot saved. Restore requires an explicit action."); };
+  const restoreSnapshot = () => { if (!compareSnapshot) return; updateState(restoreArrangementSnapshot(state, compareSnapshot.id), `Restored arrangement snapshot: ${compareSnapshot.label}`); setStatus(`Restored ${compareSnapshot.label}; the action was explicit and the snapshot remains available.`); };
+  const logTimelineNote = () => { if (!timelineNote.trim()) return; updateState(addRehearsalEvent(state, { songId: selectedSong?.id, setlistId: activeV7Setlist?.id, kind: "note", summary: timelineNote }), "Logged concise rehearsal timeline note", "practice"); setTimelineNote(""); };
+  const saveCue = () => { if (!selectedSong || !cueText.trim()) return; updateState(addStageCue(state, { songId: selectedSong.id, setlistId: timerSetlistId || concertSetlistId || undefined, sectionId: cueSectionId || undefined, atSeconds: cueSeconds ? Number(cueSeconds) : undefined, kind: cueKind, text: cueText }), "Saved stage cue"); setCueText(""); setCueSeconds(""); setStatus("Stage cue saved for pre-show and timer context."); };
+  const saveReference = () => { if (!selectedSong || !referenceTitle.trim() || !referenceUrl.trim()) return; const next = addReferenceLink(state, { songId: selectedSong.id, kind: referenceKind, title: referenceTitle, url: referenceUrl, source: referenceSource || "User-provided", license: referenceLicense || "Verify rights at source" }); if (next === state) { setStatus("Reference links must use an http(s) URL."); return; } updateState(next, "Saved metadata-only reference link"); setReferenceTitle(""); setReferenceUrl(""); setStatus("Metadata-only reference saved; external content was not copied."); };
+  const simplifyTonight = () => { if (!selectedSong) return; updateState(simplifyForTonight(state, selectedSong, activeV7Setlist?.id), "Created reversible simplify-for-tonight override"); setStatus("Tonight override created. The source arrangement is unchanged and can be restored by removing the override."); };
+  const printChordCards = () => { document.body.classList.add("print-v7-chord-cards"); window.addEventListener("afterprint", () => document.body.classList.remove("print-v7-chord-cards"), { once: true }); window.print(); };
 
   const saveReadiness = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -577,7 +643,7 @@ export default function SongLibraryPage() {
 
   const importLibrary = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]; if (!file) return;
-    const reader = new FileReader(); reader.onload = () => { try { const parsed = JSON.parse(String(reader.result)); if ([1, 2, 3, 4, 5, 6].includes(parsed?.version) && Array.isArray(parsed.collections) && Array.isArray(parsed.songs)) { const imported = migrateSongLibraryState(parsed); const migrated = { ...imported, songs: [...state.songs, ...imported.songs.filter((song) => !state.songs.some((existing) => existing.id === song.id))] }; updateState(migrated, "Imported a library backup", "import"); setStatus("Library backup restored and migrated to v6."); } else throw new Error("Invalid library"); } catch { setStatus("That backup could not be imported."); } }; reader.readAsText(file); event.target.value = "";
+    const reader = new FileReader(); reader.onload = () => { try { const parsed = JSON.parse(String(reader.result)); if ([1, 2, 3, 4, 5, 6, 7, 8].includes(parsed?.version) && Array.isArray(parsed.collections) && Array.isArray(parsed.songs)) { const imported = migrateSongLibraryState(parsed); const migrated = { ...imported, songs: [...state.songs, ...imported.songs.filter((song) => !state.songs.some((existing) => existing.id === song.id))] }; updateState(migrated, "Imported a library backup", "import"); setStatus("Library backup restored and migrated to v8."); } else throw new Error("Invalid library"); } catch { setStatus("That backup could not be imported."); } }; reader.readAsText(file); event.target.value = "";
   };
 
   const importEncryptedLibrary = (event: React.ChangeEvent<HTMLInputElement>) => { const file = event.target.files?.[0]; if (!file) return; const password = window.prompt("Password for encrypted backup"); if (!password) return; void file.text().then((payload) => decryptLibraryBackup(payload, password)).then((imported) => { updateState(imported); setStatus("Encrypted backup restored."); }).catch(() => setStatus("Could not decrypt that backup.")); event.target.value = ""; };
@@ -681,7 +747,7 @@ export default function SongLibraryPage() {
 
       <section className="song-library-feature-grid v6-feature-grid">
         <div className="library-management-card feature-card"><span className="label">Hands-free rehearsal timer</span><h2>Run a setlist timeline</h2><select value={timerSetlistId} onChange={(event) => { setTimerSetlistId(event.target.value); setTimerElapsedSeconds(0); setTimerRunning(false); }} aria-label="Timer setlist"><option value="">Choose a setlist</option>{state.setlists.filter((setlist) => !setlist.archivedAt).slice(0, 20).map((setlist) => <option key={setlist.id} value={setlist.id}>{setlist.name}</option>)}</select><div className="timer-readout" aria-live="polite">{Math.floor(timerElapsedSeconds / 60).toString().padStart(2, "0")}:{(timerElapsedSeconds % 60).toString().padStart(2, "0")} · {activePreShow?.totalMinutes ?? 0} min planned</div><div className="chip-row"><button className="btn primary" type="button" onClick={() => setTimerRunning((running) => !running)} disabled={!activePreShow}>{timerRunning ? "Pause timer" : "Start timer"}</button><button className="btn" type="button" onClick={() => { setTimerElapsedSeconds(0); setTimerRunning(false); }}>Reset</button></div><p className="muted">Browser-safe visual timer with live announcements; no audio is required. The interval is cleaned up when paused or unmounted.</p></div>
-        <div className="library-management-card feature-card pre-show-card"><span className="label">Pre-show mode</span><h2>{activePreShow?.name ?? "Select a setlist"}</h2>{activePreShow ? <div className="pre-show-list" aria-live="polite">{activePreShow.songs.slice(0, 12).map((item) => <article key={`${item.index}-${item.title}`}><strong>{item.index}. {item.title}</strong><span>{item.stageInfo}</span><small>{item.arrangement}{item.checklist.length ? ` · ${item.checklist.join(" · ")}` : ""}</small></article>)}<p><b>Emergency plan:</b> {activePreShow.emergencyPlan}</p></div> : <p className="muted">Pre-show composes stage info, pending checklist context, and the resolved or simplified arrangement for the selected setlist.</p>}</div>
+        <div className="library-management-card feature-card pre-show-card"><span className="label">Pre-show mode</span><h2>{activePreShow?.name ?? "Select a setlist"}</h2>{activePreShow ? <div className="pre-show-list" aria-live="polite">{activePreShow.songs.slice(0, 12).map((item) => <article key={`${item.index}-${item.title}`}><strong>{item.index}. {item.title}</strong><span>{item.stageInfo}</span><small>{item.arrangement}{item.checklist.length ? ` · ${item.checklist.join(" · ")}` : ""}{item.cues.length ? ` · cues: ${item.cues.map((cue) => `${cue.kind}${cue.atSeconds !== undefined ? ` @${cue.atSeconds}s` : ""} — ${cue.text}`).join(" · ")}` : ""}</small></article>)}<p><b>Emergency plan:</b> {activePreShow.emergencyPlan}</p></div> : <p className="muted">Pre-show composes stage info, pending checklist context, cues, and the resolved or simplified arrangement for the selected setlist.</p>}</div>
       </section>
 
       {selectedSong && <section className="song-library-feature-grid v6-feature-grid">
@@ -824,6 +890,56 @@ export default function SongLibraryPage() {
       <section className="song-library-feature-grid">
         <div className="library-management-card feature-card"><span className="label">Local sharing</span><h2>Optional lead-sheet / setlist code</h2><p className="muted">Read-only, local payload. It contains titles, arrangement metadata, rights metadata, and source links—not protected lyrics or tabs.</p><select aria-label="Local share type" value={shareKind} onChange={(event) => setShareKind(event.target.value as typeof shareKind)}><option value="lead-sheet">Selected lead-sheet metadata</option><option value="setlist">Selected setlist metadata</option></select><button className="btn" type="button" onClick={shareSelected}>Prepare local share</button>{shareCode && <><div className="share-visual" role="img" aria-label="Deterministic local share visual fallback">{shareVisual.map((row, rowIndex) => row.map((filled, columnIndex) => <i className={filled ? "filled" : ""} key={`${rowIndex}-${columnIndex}`} />))}</div><textarea readOnly rows={3} value={shareCode} aria-label="Local share code" /><small className="muted">This is a visual/payload fallback, not an upload or account share.</small></>}</div>
         <div className="library-management-card feature-card"><span className="label">Import review</span><h2>Review before saving</h2><p className="muted">Paste an authorized ChordPro/plain-text preset. The review shows duplicate risk, rights metadata, parsed chords, and sections. Nothing is saved until you confirm.</p><div className="two-inputs"><select aria-label="Import format" value={importFormat} onChange={(event) => setImportFormat(event.target.value as typeof importFormat)}><option value="chordpro">ChordPro</option><option value="plain-tab">Plain text / tab</option></select><button className="btn" type="button" onClick={reviewImport}>Review pasted preset</button></div><textarea value={importText} onChange={(event) => setImportText(event.target.value)} rows={4} placeholder="Paste content you are authorized to use" aria-label="Preset content" />{importReview && <div className="import-review"><strong>{importReview.title} · {importReview.artist}</strong><span>Rights: {importReview.license}</span><span>Duplicate title/artist: {allSongs.some((song) => song.title.toLowerCase() === importReview.title.toLowerCase() && song.artist.toLowerCase() === importReview.artist.toLowerCase()) ? "possible match" : "none found"}</span><span>Parsed sections: {importReview.sections.map((section) => `${section.title} (${section.kind ?? "other"})`).join(" · ") || "none"}</span><span>Parsed chords: {songChords(importReview).join(" ") || "none"}</span><button className="btn primary" type="button" onClick={confirmImportReview}>Confirm and save locally</button><button className="text-button" type="button" onClick={() => setImportReview(null)}>Discard review</button></div>}</div>
+      </section>
+      <section className="song-library-feature-grid v7-feature-grid" aria-label="Rehearsal and live performance tools">
+        <div className="library-management-card feature-card v7-panel">
+          <span className="label">Bandmate roles · local permissions</span><h2>Claim the rehearsal work</h2>
+          <p className="muted">Roles are local metadata. Only owner/editor/arranger/setlist-manager roles can change claims or assignments.</p>
+          <form className="v7-inline-form" onSubmit={(event) => { event.preventDefault(); saveRehearsalRole(); }}><input value={roleName} onChange={(event) => setRoleName(event.target.value)} placeholder="Bandmate name" aria-label="Bandmate name" maxLength={80} /><select value={roleKind} onChange={(event) => setRoleKind(event.target.value as SongRehearsalRoleKind)} aria-label="Bandmate role"><option value="vocals">Vocals</option><option value="guitar">Guitar</option><option value="cues">Cues</option><option value="gear">Gear</option><option value="custom">Custom</option></select><button className="btn" type="submit" disabled={!permissions.canArrange}>Add role</button></form>
+          <div className="v7-role-list">{selectedRoles.map((role) => <article key={role.id}><strong>{role.name} · {role.role === "custom" ? role.customRole || "custom" : role.role}</strong><small>{role.claimedBy ? `Claimed by ${role.claimedBy}` : "Unclaimed"} · assignments: {state.rehearsalAssignments.filter((assignment) => assignment.roleId === role.id).length}</small><span className="chip-row"><button className="text-button" type="button" onClick={() => role.claimedBy ? releaseRole(role.id) : claimRole(role.id)} disabled={!permissions.canArrange}>{role.claimedBy ? "Release" : "Claim"}</button>{selectedSong && <button className="text-button" type="button" onClick={() => assignRole(role.id, "song", selectedSong.id)} disabled={!permissions.canArrange}>Assign song</button>}{activeV7Setlist && <button className="text-button" type="button" onClick={() => assignRole(role.id, "setlist", activeV7Setlist.id)} disabled={!permissions.canManageSetlists}>Assign setlist</button>}</span></article>)}{!selectedRoles.length && <p className="muted">Add a bandmate role to start a local handoff.</p>}</div>
+          <div className="v7-inline-form"><input value={roleClaimAccount} onChange={(event) => setRoleClaimAccount(event.target.value)} maxLength={80} aria-label="Claim account label" placeholder="Claim as…" /><button className="text-button" type="button" onClick={() => selectedRoles[0] && claimRole(selectedRoles[0].id)} disabled={!permissions.canArrange || !selectedRoles.length}>Claim first role</button></div>
+        </div>
+        <div className="library-management-card feature-card v7-panel">
+          <span className="label">Rehearsal timeline</span><h2>{selectedSong?.title ?? "Selected song"}</h2><p className="muted">Concise events and notes only; raw recordings and media never enter this timeline.</p>
+          <div className="v7-inline-form"><input value={timelineNote} onChange={(event) => setTimelineNote(event.target.value)} placeholder="What changed or landed?" aria-label="Rehearsal timeline note" maxLength={240} /><button className="btn" type="button" onClick={logTimelineNote} disabled={!timelineNote.trim()}>Log note</button></div>
+          <div className="v7-timeline">{rehearsalEvents.slice(0, 8).map((event) => <article key={event.id}><strong>{event.kind}</strong><span>{event.summary}</span><small>{new Date(event.createdAt).toLocaleString()}</small></article>)}{!rehearsalEvents.length && <p className="muted">No rehearsal events for this song yet.</p>}</div>
+        </div>
+      </section>
+      <section className="song-library-feature-grid v7-feature-grid">
+        <div className="library-management-card feature-card v7-panel">
+          <span className="label">Arrangement snapshots</span><h2>Compare before restoring</h2><p className="muted">Snapshots are immutable. Restore is an explicit action and never silently changes a setlist.</p>
+          <div className="v7-inline-form"><input value={snapshotLabel} onChange={(event) => setSnapshotLabel(event.target.value)} placeholder="Snapshot label" aria-label="Snapshot label" maxLength={100} /><input value={snapshotNotes} onChange={(event) => setSnapshotNotes(event.target.value)} placeholder="Notes" aria-label="Snapshot notes" maxLength={400} /><button className="btn" type="button" onClick={saveSnapshot} disabled={!selectedSong || !selectedVariation || !permissions.canArrange}>Save snapshot</button></div>
+          <div className="v7-inline-form"><select value={compareSnapshotId} onChange={(event) => setCompareSnapshotId(event.target.value)} aria-label="Snapshot to compare"><option value="">Choose snapshot</option>{selectedSnapshots.map((snapshot) => <option key={snapshot.id} value={snapshot.id}>{snapshot.label}</option>)}</select><button className="btn" type="button" onClick={restoreSnapshot} disabled={!compareSnapshot || !permissions.canArrange}>Restore chosen snapshot</button></div>
+          {snapshotDifferences.length ? <div className="v7-diff-list">{snapshotDifferences.map((difference) => <p key={difference.field}><b>{difference.field}</b>: {difference.left} → {difference.right}</p>)}</div> : <p className="muted">Choose a stored snapshot and a current snapshot with the same variation to see differences.</p>}
+          <div className="v7-list">{selectedSnapshots.slice(0, 6).map((snapshot) => <span key={snapshot.id}><b>{snapshot.label}</b> · {snapshot.variation.name} · {snapshot.variation.bpm} BPM</span>)}</div>
+        </div>
+        <div className="library-management-card feature-card v7-panel">
+          <span className="label">Setlist previews</span><h2>Group changes, then pace the run</h2><p className="muted">Both suggestions are deterministic previews. The underlying setlist is never mutated.</p>
+          <strong>{activeV7Setlist?.name ?? "Choose or create a setlist"}</strong>
+          {capoSuggestion && <div className="v7-preview"><b>Capo/tuning grouping</b><span>{capoSuggestion.originalChanges} → {capoSuggestion.changes} setup changes</span><small>{capoSuggestion.explanation}</small><ol>{capoSuggestion.suggestedEntries.slice(0, 8).map((entry, index) => <li key={`${entry.songId}-${index}`}>{allSongs.find((song) => song.id === entry.songId)?.title ?? entry.songId} · capo {entry.capo ?? 0} · {entry.tuningId ?? "standard"}</li>)}</ol></div>}
+          {pacingSuggestion && <div className="v7-preview"><b>Pacing preview · {pacingSuggestion.changedPositions} positions differ</b><small>{pacingSuggestion.explanation}</small><ol>{pacingSuggestion.suggestedEntries.slice(0, 8).map((entry, index) => <li key={`${entry.songId}-${index}`}>{allSongs.find((song) => song.id === entry.songId)?.title ?? entry.songId}</li>)}</ol></div>}
+        </div>
+      </section>
+      <section className="song-library-feature-grid v7-feature-grid">
+        <div className="library-management-card feature-card v7-panel">
+          <span className="label">Stage cues</span><h2>Make the next move visible</h2><p className="muted">Cues can point to a section or a timestamp and appear in pre-show and timer context.</p>
+          <div className="v7-inline-form"><select value={cueKind} onChange={(event) => setCueKind(event.target.value as SongStageCueKind)} aria-label="Cue type"><option value="count-in">Count-in</option><option value="mute">Mute</option><option value="solo">Solo</option><option value="talk">Talk</option><option value="custom">Custom</option></select><select value={cueSectionId} onChange={(event) => setCueSectionId(event.target.value)} aria-label="Cue section"><option value="">Whole song / timestamp</option>{selectedSong?.sections.map((section) => <option key={section.id} value={section.id}>{section.title}</option>)}</select><input type="number" min="0" max="86400" value={cueSeconds} onChange={(event) => setCueSeconds(event.target.value)} placeholder="Seconds" aria-label="Cue timestamp seconds" /></div><div className="v7-inline-form"><input value={cueText} onChange={(event) => setCueText(event.target.value)} placeholder="Cue text" aria-label="Cue text" maxLength={180} /><button className="btn" type="button" onClick={saveCue} disabled={!selectedSong || !cueText.trim() || !permissions.canArrange}>Save cue</button></div>
+          <div className="v7-list">{stageCues.map((cue) => <span key={cue.id}><b>{cue.kind}</b>{cue.sectionId ? ` · ${selectedSong?.sections.find((section) => section.id === cue.sectionId)?.title ?? cue.sectionId}` : ""}{cue.atSeconds !== undefined ? ` · ${cue.atSeconds}s` : ""} · {cue.text}</span>)}{!stageCues.length && <small className="muted">No cues for this song yet.</small>}</div>
+        </div>
+        <div className="library-management-card feature-card v7-panel v7-print-cards">
+          <span className="label">Printable known chord-shape cards</span><h2>Print only authored voicings</h2><p className="muted">Cards use existing known voicing data only. Unknown chords are omitted; no diagrams are invented.</p><div className="v7-shape-grid">{shapeCards.map((chord) => <article key={chord.name}><h3>{chord.name}</h3><ChordDiagram chord={chord} simplifiedChart /></article>)}{!shapeCards.length && <p className="muted">No known shape for this song and voicing preference.</p>}</div><button className="btn primary" type="button" onClick={printChordCards} disabled={!shapeCards.length}>Print chord-shape cards</button></div>
+      </section>
+      <section className="song-library-feature-grid v7-feature-grid">
+        <div className="library-management-card feature-card v7-panel">
+          <span className="label">Gig-readiness gate</span><h2>{readinessGate ? `${readinessGate.ready ? "Ready" : "Not ready"} · ${readinessGate.score}/100` : "Select a song"}</h2><p className="muted">{readinessGate?.criteria}</p>{readinessGate && <div className="v7-metric-grid"><span>Mastery <b>{readinessGate.mastery}%</b></span><span>Confidence <b>{readinessGate.confidence}%</b></span><span>Practice debt <b>{readinessGate.practiceDebt}</b></span><span>Checklist <b>{readinessGate.checklistCompletion}%</b></span></div>}{readinessGate?.blockers.length ? <p className="danger-text">Blockers: {readinessGate.blockers.join(" · ")}</p> : <p className="v7-good">All gate criteria are met.</p>}</div>
+        <div className="library-management-card feature-card v7-panel"><span className="label">One more pass</span><h2>{oneMorePass?.eligible ? "Worth one focused pass" : "No near-success signal"}</h2><p>{oneMorePass?.reason}</p><small className="muted">{oneMorePass?.heuristic}</small>{oneMorePass?.eligible && <div className="v7-metric-grid"><span>Recording <b>{oneMorePass.recordingScore ?? "—"}</b></span><span>Audition <b>{oneMorePass.auditionScore ?? "—"}</b></span></div>}</div>
+      </section>
+      <section className="song-library-feature-grid v7-feature-grid">
+        <div className="library-management-card feature-card v7-panel"><span className="label">Repertoire calendar</span><h2>Scheduled, live, and overdue</h2><p className="muted">Local calendar-like view combining reminders, setlists, and due reviews.</p><div className="v7-calendar">{calendarItems.slice(0, 16).map((item) => <article key={item.id}><time dateTime={item.date}>{new Date(item.date).toLocaleDateString()}</time><strong>{item.title}</strong><small>{item.kind}{item.note ? ` · ${item.note}` : ""}</small></article>)}{!calendarItems.length && <p className="muted">No repertoire dates yet.</p>}</div></div>
+        <div className="library-management-card feature-card v7-panel"><span className="label">Reference links</span><h2>Save source metadata, not content</h2><form className="v7-stack-form" onSubmit={(event) => { event.preventDefault(); saveReference(); }}><div className="v7-inline-form"><select value={referenceKind} onChange={(event) => setReferenceKind(event.target.value as SongReferenceLinkKind)} aria-label="Reference kind"><option value="performance">Performance</option><option value="tutorial">Tutorial</option><option value="live-arrangement">Live arrangement</option></select><input value={referenceTitle} onChange={(event) => setReferenceTitle(event.target.value)} placeholder="Title" aria-label="Reference title" maxLength={120} /></div><input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(event.target.value)} placeholder="https://…" aria-label="Reference URL" required /><div className="v7-inline-form"><input value={referenceSource} onChange={(event) => setReferenceSource(event.target.value)} placeholder="Source / publisher" aria-label="Reference source" maxLength={120} /><input value={referenceLicense} onChange={(event) => setReferenceLicense(event.target.value)} placeholder="License / rights note" aria-label="Reference license" maxLength={240} /></div><button className="btn" type="submit" disabled={!selectedSong}>Save metadata link</button></form><div className="v7-list">{state.referenceLinks.filter((link) => link.songId === selectedSong?.id).slice(0, 8).map((link) => <span key={link.id}><b>{link.kind}</b> · {link.title} · <a href={link.url} target="_blank" rel="noreferrer">Open ↗</a><small>{link.source} · {link.license}</small></span>)}</div></div>
+      </section>
+      <section className="song-library-feature-grid v7-feature-grid">
+        <div className="library-management-card feature-card v7-panel"><span className="label">Simplify for tonight</span><h2>Create a reversible emergency override</h2><p className="muted">This creates a named concert override plus a source snapshot. The source arrangement and setlist stay unchanged.</p><button className="btn primary" type="button" onClick={simplifyTonight} disabled={!selectedSong || !permissions.canManageSetlists}>Simplify selected song for tonight</button>{activeOverrides.map((override) => <div className="v7-override" key={override.id}><strong>{override.name}</strong><small>{override.variation.bpm} BPM · capo {override.variation.capo} · {override.variation.tuningId}</small><button className="text-button" type="button" onClick={() => { updateState(removeConcertOverride(state, override.id), `Removed concert override: ${override.name}`); setStatus("Concert override removed; source arrangement remains available."); }}>Remove / restore source</button></div>)}</div>
       </section>
       <section className="song-library-feature-grid print-tools">
         <div className="library-management-card feature-card"><span className="label">Rehearsal exports</span><h2>Print the run from a setlist</h2><p className="muted">Client-side plain text export for a printable setlist, lyric sheet, or changeover checklist. No content is uploaded.</p><div className="two-inputs"><select aria-label="Export format" value={exportFormat} onChange={(event) => setExportFormat(event.target.value as typeof exportFormat)}><option value="setlist">Printable setlist</option><option value="lyrics">Lyric sheet</option><option value="changeover">Changeover checklist</option></select><button className="btn" type="button" onClick={() => window.print()}>Print current page</button></div>{state.setlists.filter((setlist) => !setlist.archivedAt).map((setlist) => <p className="export-row" key={setlist.id}><strong>{setlist.name}</strong><button className="text-button" type="button" onClick={() => exportSetlist(setlist)}>Export {exportFormat}</button></p>)}</div>

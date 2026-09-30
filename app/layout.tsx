@@ -41,6 +41,7 @@ export default function RootLayout({
             <Link href="/trainer">Trainer</Link>
             <Link href="/right-hand">Right Hand</Link>
             <Link href="/songs">Songs</Link>
+            <Link href="/song-builder">Song Builder</Link>
             <Link href="/song-library">Song Library</Link>
             <Link href="/library">Library</Link>
             <Link href="/chords">Chord Chart</Link>

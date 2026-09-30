@@ -14,28 +14,35 @@ type RightHandLiveCoachProps = {
   step: number;
   strings: readonly number[];
   run: boolean;
-  autoOpen: boolean;
   id: string;
   loop: number;
   chordName?: string;
 };
 
-export default function RightHandLiveCoach({ technique, step, strings, run, autoOpen, id, loop, chordName }: RightHandLiveCoachProps) {
+const TECHNIQUE_COPY: Record<RightHandTechnique, { title: string; action: string }> = {
+  strumming: { title: "See the strumming hand cross the strings", action: "Show 3D strumming hand" },
+  plectrum: { title: "See the pick travel to the target strings", action: "Show 3D picking hand" },
+  fingerpicking: { title: "See the picking fingers reach their strings", action: "Show 3D fingerpicking hand" }
+};
+
+export default function RightHandLiveCoach({ technique, step, strings, run, id, loop, chordName }: RightHandLiveCoachProps) {
   const [open, setOpen] = useState(false);
+  const copy = TECHNIQUE_COPY[technique];
 
   useEffect(() => {
     setOpen(false);
   }, [id]);
 
-  useEffect(() => {
-    if (autoOpen) setOpen(true);
-  }, [autoOpen]);
-
-  return <section className="right-hand-live-coach" aria-labelledby="right-hand-live-coach-title">
+  return <section className={`right-hand-live-coach${open ? " is-open" : ""}`} aria-labelledby="right-hand-live-coach-title">
     <div className="right-hand-live-coach__header">
-      <div><span className="label">Live 3D coach</span><strong id="right-hand-live-coach-title">Watch the picking hand at the sound hole</strong><p>Start a round to load the interactive guitar. Drag to orbit; use Shift-drag and the wheel to explore the view.</p></div>
-      <button type="button" onClick={() => setOpen((visible) => !visible)} aria-expanded={open}>{open ? "Hide 3D coach" : "Open 3D coach"}</button>
+      <div>
+        <span className="label">3D right-hand display · available now</span>
+        <strong id="right-hand-live-coach-title">{copy.title}</strong>
+        <p>Open it while idle, then use Play motion or start the round. The left hand frets <b>{chordName ?? "the chord"}</b>; this display teaches the right hand that strikes the strings.</p>
+      </div>
+      <button type="button" onClick={() => setOpen((visible) => !visible)} aria-expanded={open} aria-controls="right-hand-live-coach-view">{open ? "Hide 3D hand" : copy.action}</button>
     </div>
-    {open ? <RightHandTechnique3D technique={technique} step={step} strings={strings} run={run} id={id} loop={loop} chordName={chordName} /> : null}
+    <p className="right-hand-live-coach__status" role="status" aria-live="polite">{open ? `3D hand visible · step ${step + 1} · target ${strings.length ? `string${strings.length > 1 ? "s" : ""} ${strings.join(", ")}` : "rest"}` : "The 3D engine stays unloaded until you open this display."}</p>
+    {open ? <div id="right-hand-live-coach-view"><RightHandTechnique3D technique={technique} step={step} strings={strings} run={run} id={id} loop={loop} chordName={chordName} /></div> : null}
   </section>;
 }
