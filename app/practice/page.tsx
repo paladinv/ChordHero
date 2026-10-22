@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import LocalizedCopy from "../../components/LocalizedCopy";
 import { FormEvent, useCallback, useEffect, useMemo, useState } from "react";
 import { createRevisionSyncClient } from "../../lib/songSyncClient";
 import { RIGHT_HAND_EXERCISES, TECHNIQUE_DETAILS, type RightHandTechnique } from "../../lib/rightHandExercises";
@@ -28,6 +29,8 @@ export default function PracticePage() {
   const [assignmentArea, setAssignmentArea] = useState<PracticeArea>("rightHand");
   const [message, setMessage] = useState("Your data stays on this device unless you export or connect sync.");
   const [syncURL, setSyncURL] = useState("");
+  const [syncAccountID, setSyncAccountID] = useState("current-device-profile");
+  const [syncToken, setSyncToken] = useState("");
   const [syncing, setSyncing] = useState(false);
   const [feedbackKind, setFeedbackKind] = useState<"audioLink" | "videoLink" | "recordingReference">("audioLink");
   const [feedbackValue, setFeedbackValue] = useState("");
@@ -122,14 +125,21 @@ export default function PracticePage() {
   };
 
   const sync = async () => {
-    if (!syncURL.trim()) return;
+    if (!syncURL.trim() || !syncAccountID.trim() || !syncToken) { setMessage("Enter the sync URL, configured account ID, and access token."); return; }
     setSyncing(true);
     try {
-      const client = createRevisionSyncClient<PracticePlatformState>(syncURL.trim(), "practice-platform", "current-device-profile");
+      const endpoint = new URL(syncURL.trim());
+      if (endpoint.username || endpoint.password || endpoint.search || endpoint.hash || endpoint.protocol !== "https:" && endpoint.hostname !== "localhost" && endpoint.hostname !== "127.0.0.1") throw new Error("Use a credential-free HTTPS sync URL. HTTP is allowed only on localhost.");
+      const client = createRevisionSyncClient<PracticePlatformState>(endpoint.toString().replace(/\/$/, ""), "practice-platform", syncAccountID.trim(), syncToken);
       let revision = 0;
       let remote = state;
       try {
         const pulled = await client.pull();
+        if (pulled.accessRole === "viewer") {
+          writePracticePlatformState(pulled.state);
+          setMessage(`Loaded view-only practice data · revision ${pulled.revision}.`);
+          return;
+        }
         revision = pulled.revision;
         remote = pulled.state;
       } catch {
@@ -149,7 +159,7 @@ export default function PracticePage() {
   return (
     <main className="page focused-page practice-hub-page">
       <section className="studio-heading dashboard-hero">
-        <div><span className="tag">Today&apos;s practice</span><h1>A balanced session, ready when you are.</h1><p>Chord changes, right-hand control, and a song are brought into one short plan. Recommendations adapt from saved scores and missed beats.</p></div>
+        <div><span className="tag">Today&apos;s practice</span><h1><LocalizedCopy id="practiceTitle" /></h1><p><LocalizedCopy id="practiceIntro" /></p></div>
         <div className="studio-session-note"><span className="label">Daily progress</span><strong>{completed} / {today.tasks.length} complete</strong><span>{today.tasks.reduce((sum, task) => sum + task.minutes, 0)} planned minutes · local-first</span></div>
       </section>
 
@@ -191,7 +201,7 @@ export default function PracticePage() {
 
         <article className="practice-hub-panel">
           <span className="label">Optional device sync</span><h2>Use your own sync endpoint</h2><p>Connect the existing revision-safe sync format when you have an authenticated endpoint. Local practice continues offline if sync is unavailable.</p>
-          <div className="sync-form"><label>Sync server URL<input type="url" inputMode="url" placeholder="https://your-server.example" value={syncURL} onChange={(event) => setSyncURL(event.target.value)} /></label><button type="button" disabled={!syncURL || syncing} onClick={() => void sync()}>{syncing ? "Syncing…" : "Sync now"}</button></div>
+          <div className="sync-form"><label>Sync server URL<input type="url" inputMode="url" placeholder="https://your-server.example" value={syncURL} onChange={(event) => setSyncURL(event.target.value)} /></label><label>Configured account ID<input value={syncAccountID} maxLength={100} onChange={(event) => setSyncAccountID(event.target.value)} autoComplete="username" /></label><label>Account access token<input type="password" value={syncToken} maxLength={500} onChange={(event) => setSyncToken(event.target.value)} autoComplete="off" /></label><button type="button" disabled={!syncURL || syncing} onClick={() => void sync()}>{syncing ? "Syncing…" : "Sync now"}</button></div>
           <span className="label">Recent practice</span>
           <div className="recent-practice-list">{recent.map((event) => <div key={event.id}><strong>{event.title}</strong><span>{AREA_LABELS[event.area]} · {Math.max(1, Math.round(event.seconds / 60))} min{event.score ? ` · ${event.score}%` : ""}</span></div>)}{!recent.length ? <small>Scores and completed rounds will appear here.</small> : null}</div>
         </article>

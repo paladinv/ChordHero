@@ -1,5 +1,6 @@
 package com.codingmonkey.chordhero.features
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.codingmonkey.chordhero.R
 import com.codingmonkey.chordhero.designsystem.ChordDiagram
 import com.codingmonkey.chordhero.domain.ContentBundle
 import com.codingmonkey.chordhero.domain.PlaybackStatus
@@ -79,7 +81,7 @@ fun TrainerScreen(content: ContentBundle, audio: AudioService) {
         }
     }
 
-    FeatureList("Timed Chord Trainer", "Ten chords, three seconds per change") {
+    FeatureList(stringResource(R.string.trainer_title), stringResource(R.string.trainer_intro)) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 content.chords.levels.forEachIndexed { index, item ->
@@ -128,17 +130,17 @@ fun TrainerScreen(content: ContentBundle, audio: AudioService) {
                 }) {
                     Text(
                         when (state.status) {
-                            PlaybackStatus.Running -> "Pause"
-                            PlaybackStatus.Paused -> "Resume"
-                            else -> "Start round"
+                            PlaybackStatus.Running -> stringResource(R.string.pause)
+                            PlaybackStatus.Paused -> stringResource(R.string.resume)
+                            else -> stringResource(R.string.start_round)
                         },
                     )
                 }
-                OutlinedButton(onClick = { state = TrainerState(); audio.stop() }) { Text("Reset") }
+                OutlinedButton(onClick = { state = TrainerState(); audio.stop() }) { Text(stringResource(R.string.reset)) }
             }
         }
         if (state.chordIds.isNotEmpty()) {
-            item { Text("Round history", style = MaterialTheme.typography.titleMedium) }
+            item { Text(stringResource(R.string.round_history), style = MaterialTheme.typography.titleMedium) }
             items(state.chordIds.withIndex().toList()) { (index, id) ->
                 OutlinedButton(onClick = { state = state.copy(currentIndex = index) }) {
                     Text("${index + 1}. ${chords[id]?.chord?.name ?: id}")

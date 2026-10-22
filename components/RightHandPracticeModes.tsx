@@ -1,8 +1,10 @@
 "use client";
 
+import LocalizedCopy from "./LocalizedCopy";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { RIGHT_HAND_EXERCISES, type RightHandDifficulty, type RightHandExercise, type RightHandTechnique } from "../lib/rightHandExercises";
+import { classifyRightHandOnset, rightHandTimingMissDeadline, rightHandTimingSlot } from "../lib/rightHandPracticeRuntime";
 import type { ExerciseProgress } from "../lib/rightHandPracticeRuntime";
 import type { AnticipationMode, CoachingFocus, DynamicsProfile } from "./RightHandCoachingStudio";
 
@@ -27,6 +29,7 @@ export type PracticeModeSettings = {
 };
 
 type Props = {
+  section: "learn" | "practise" | "review" | "settings";
   status: "idle" | "countin" | "running" | "paused" | "complete";
   bpm: number;
   elapsedSeconds: number;
@@ -42,6 +45,7 @@ type Props = {
   onSelectExercise: (exercise: RightHandExercise) => void;
   onPreparePerformance: () => void;
   onStartRound: () => void;
+  onPauseRound: () => void;
   onSetRoundSeconds: (seconds: number) => void;
 };
 
@@ -113,18 +117,22 @@ export default function RightHandPracticeModes(props: Props) {
   const [packs, setPacks] = useState<ChallengePack[]>([]);
   const [listenState, setListenState] = useState<"off" | "requesting" | "ready" | "denied" | "unavailable">("off");
   const [liveCue, setLiveCue] = useState("Listen mode is off.");
-  const [liveCounts, setLiveCounts] = useState({ onsets: 0, onTime: 0, early: 0, late: 0 });
+  const [liveCounts, setLiveCounts] = useState({ onsets: 0, expected: 0, missed: 0, onTime: 0, early: 0, late: 0 });
+  const [liveConfidence, setLiveConfidence] = useState(0);
   const [fatiguePrompt, setFatiguePrompt] = useState(false);
   const [recoveryMisses, setRecoveryMisses] = useState(0);
-  const [simulationScore, setSimulationScore] = useState<{ score: number; loops: number; listenScore?: number } | null>(null);
+  const [simulationScore, setSimulationScore] = useState<{ score: number | null; loops: number; listenScore?: number } | null>(null);
   const [showCoachingStudio, setShowCoachingStudio] = useState(false);
   const streamRef = useRef<MediaStream | null>(null);
   const audioRef = useRef<AudioContext | null>(null);
   const frameRef = useRef<number | null>(null);
-  const runningSinceRef = useRef(0);
+  const listenGeneration = useRef(0);
+  const listenPending = useRef(false);
   const noiseRef = useRef(0.012);
   const lastOnsetRef = useRef(0);
   const lastAnnounceRef = useRef(0);
+  const lastConfidencePaintRef = useRef(0);
+  const timingRef = useRef<{ startAt: number; stepMs: number; pattern: string[]; technique: RightHandTechnique; cursorStep: number } | null>(null);
   const previousStatusRef = useRef(props.status);
   const livePropsRef = useRef({ status: props.status, bpm: props.bpm, subdivision: props.exercise.subdivision });
   livePropsRef.current = { status: props.status, bpm: props.bpm, subdivision: props.exercise.subdivision };
@@ -149,31 +157,37 @@ export default function RightHandPracticeModes(props: Props) {
   }, [onSettingsChange]);
 
   const updateSettings = useCallback((patch: Partial<PracticeModeSettings>) => {
-    setSettings((current) => {
-      const next = { ...current, ...patch };
-      localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...next, performanceMode: false }));
-      onSettingsChange(next);
-      return next;
-    });
-  }, [onSettingsChange]);
+    const next = { ...settings, ...patch };
+    setSettings(next);
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify({ ...next, performanceMode: false }));
+    onSettingsChange(next);
+  }, [onSettingsChange, settings]);
 
   const saveLibrary = useCallback((next: typeof library) => {
     const bounded = boundedLibrary(next); setLibrary(bounded); localStorage.setItem(LIBRARY_KEY, JSON.stringify(bounded));
   }, []);
 
   const stopListening = useCallback(() => {
+    listenGeneration.current++; listenPending.current = false;
     if (frameRef.current !== null) cancelAnimationFrame(frameRef.current);
     frameRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop()); streamRef.current = null;
     void audioRef.current?.close(); audioRef.current = null;
+    timingRef.current = null;
+    setLiveConfidence(0);
+    window.dispatchEvent(new CustomEvent("chord-hero:right-hand-live-mic", { detail: false }));
     setListenState("off"); setLiveCue("Listen mode is off.");
   }, []);
 
   const startListening = useCallback(async () => {
+    if (listenPending.current || streamRef.current) return;
     if (!navigator.mediaDevices?.getUserMedia || typeof AudioContext === "undefined") { setListenState("unavailable"); setLiveCue("This browser cannot provide live microphone input."); return; }
-    setListenState("requesting");
+    const generation = ++listenGeneration.current; listenPending.current = true; setListenState("requesting");
+    window.dispatchEvent(new CustomEvent("chord-hero:right-hand-live-mic", { detail: true }));
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      if (generation !== listenGeneration.current) { stream.getTracks().forEach((track) => track.stop()); return; }
+      streamRef.current = stream; listenPending.current = false;
       const context = new AudioContext(); const source = context.createMediaStreamSource(stream); const analyser = context.createAnalyser();
       analyser.fftSize = 512; analyser.smoothingTimeConstant = 0.25; source.connect(analyser);
       streamRef.current = stream; audioRef.current = context; setListenState("ready"); setLiveCue("Listening. Start a round when ready.");
@@ -182,36 +196,87 @@ export default function RightHandPracticeModes(props: Props) {
         analyser.getFloatTimeDomainData(samples);
         let square = 0; for (let index = 0; index < samples.length; index += 1) square += samples[index] * samples[index];
         const rms = Math.sqrt(square / samples.length); const now = performance.now();
-        noiseRef.current = noiseRef.current * 0.985 + Math.min(rms, noiseRef.current * 1.8) * 0.015;
+        const calibrating = livePropsRef.current.status !== "running";
+        if (calibrating && rms < Math.max(0.035, noiseRef.current * 2.1)) noiseRef.current = noiseRef.current * 0.985 + rms * 0.015;
+        const confidence = Math.round(Math.max(20, Math.min(96, 100 - noiseRef.current * 1_400)));
+        if (now - lastConfidencePaintRef.current > 450) { lastConfidencePaintRef.current = now; setLiveConfidence(confidence); }
         const attack = rms > Math.max(0.025, noiseRef.current * 2.25) && now - lastOnsetRef.current > 85;
-        if (attack && livePropsRef.current.status === "running") {
+        const timeline = timingRef.current;
+        let currentSlot = timeline && livePropsRef.current.status === "running" && confidence >= 45 ? rightHandTimingSlot(timeline.pattern, timeline.technique, timeline.startAt, timeline.stepMs, timeline.cursorStep) : null;
+        let nextSlot = timeline && currentSlot ? rightHandTimingSlot(timeline.pattern, timeline.technique, timeline.startAt, timeline.stepMs, currentSlot.absoluteStep + 1) : null;
+        const tolerance = timeline ? Math.max(65, Math.min(120, timeline.stepMs * 0.2)) : 0;
+        // Without an onset, wait until the next slot's grace boundary before
+        // declaring the current slot missed. This preserves a late onset for
+        // the current slot and keeps absolute loop time monotonic.
+        if (!attack && timeline && currentSlot && now > rightHandTimingMissDeadline(currentSlot, nextSlot, tolerance)) {
+          setLiveCounts((counts) => ({ ...counts, expected: counts.expected + 1, missed: counts.missed + 1 }));
+          timeline.cursorStep = currentSlot.absoluteStep + 1;
+          currentSlot = rightHandTimingSlot(timeline.pattern, timeline.technique, timeline.startAt, timeline.stepMs, timeline.cursorStep);
+          nextSlot = timeline && currentSlot ? rightHandTimingSlot(timeline.pattern, timeline.technique, timeline.startAt, timeline.stepMs, currentSlot.absoluteStep + 1) : null;
+        }
+        if (attack && livePropsRef.current.status === "running" && timeline) {
           lastOnsetRef.current = now;
-          const subdivision = livePropsRef.current.subdivision;
-          const stepMs = 60000 / livePropsRef.current.bpm / (subdivision === "Quarter notes" ? 1 : subdivision === "Eighth notes" ? 2 : subdivision === "Triplets" ? 3 : 4);
-          const phase = (now - runningSinceRef.current) % stepMs; const signed = phase > stepMs / 2 ? phase - stepMs : phase;
-          const kind = Math.abs(signed) <= stepMs * 0.16 ? "onTime" : signed < 0 ? "early" : "late";
-          setLiveCounts((counts) => ({ ...counts, onsets: counts.onsets + 1, [kind]: counts[kind] + 1 }));
-          if (now - lastAnnounceRef.current > 420) { lastAnnounceRef.current = now; setLiveCue(kind === "onTime" ? "Centered on the pulse — keep it easy." : kind === "early" ? "A touch early — breathe into the next stroke." : "A touch late — keep the hand moving through the beat."); }
+          if (confidence < 45) {
+            if (now - lastAnnounceRef.current > 700) { lastAnnounceRef.current = now; setLiveCue("Ambient level is high; timing feedback is paused until the signal is clearer."); }
+          } else {
+            let decision = currentSlot && nextSlot ? classifyRightHandOnset(now, currentSlot, nextSlot, timeline.stepMs, tolerance) : currentSlot ? classifyRightHandOnset(now, currentSlot, null, timeline.stepMs, tolerance) : null;
+            if (decision?.kind === "missed" && currentSlot) {
+              setLiveCounts((counts) => ({ ...counts, expected: counts.expected + 1, missed: counts.missed + 1 }));
+              timeline.cursorStep = decision.consumeStep;
+              currentSlot = rightHandTimingSlot(timeline.pattern, timeline.technique, timeline.startAt, timeline.stepMs, timeline.cursorStep);
+              nextSlot = timeline && currentSlot ? rightHandTimingSlot(timeline.pattern, timeline.technique, timeline.startAt, timeline.stepMs, currentSlot.absoluteStep + 1) : null;
+              decision = currentSlot && nextSlot ? classifyRightHandOnset(now, currentSlot, nextSlot, timeline.stepMs, tolerance) : currentSlot ? classifyRightHandOnset(now, currentSlot, null, timeline.stepMs, tolerance) : null;
+            }
+            if (decision && decision.kind !== "missed") {
+              const kind = decision.kind;
+              setLiveCounts((counts) => ({ ...counts, expected: counts.expected + 1, onsets: counts.onsets + 1, [kind]: counts[kind] + 1 }));
+              timeline.cursorStep = decision.consumeStep;
+              if (now - lastAnnounceRef.current > 420) { lastAnnounceRef.current = now; setLiveCue(kind === "onTime" ? "Centered on the expected stroke — keep it easy." : kind === "early" ? "A touch early — breathe into the next stroke." : "A touch late — keep the hand moving through the next slot."); }
+            }
+          }
         }
         frameRef.current = requestAnimationFrame(inspect);
       };
       frameRef.current = requestAnimationFrame(inspect);
     } catch (error) {
+      if (generation !== listenGeneration.current) return;
+      stopListening();
       const denied = error instanceof DOMException && (error.name === "NotAllowedError" || error.name === "SecurityError");
       setListenState(denied ? "denied" : "unavailable"); setLiveCue(denied ? "Microphone permission was not granted. You can still practise without listen mode." : "Microphone input could not be started.");
     }
-  }, []);
+  }, [stopListening]);
 
   useEffect(() => () => stopListening(), [stopListening]);
   useEffect(() => {
-    if (props.status === "running" && previousStatusRef.current !== "running") { runningSinceRef.current = performance.now(); setLiveCounts({ onsets: 0, onTime: 0, early: 0, late: 0 }); setSimulationScore(null); }
+    window.addEventListener("chord-hero:right-hand-capture", stopListening);
+    return () => window.removeEventListener("chord-hero:right-hand-capture", stopListening);
+  }, [stopListening]);
+  useEffect(() => {
+    const onPatternStart = (event: Event) => {
+      const detail = (event as CustomEvent<{ pattern?: unknown; technique?: unknown; bpm?: unknown; subdivision?: unknown; startAt?: unknown }>).detail;
+      const pattern = Array.isArray(detail?.pattern) ? detail.pattern.filter((token): token is string => typeof token === "string") : [];
+      const technique = detail?.technique === "strumming" || detail?.technique === "plectrum" || detail?.technique === "fingerpicking" ? detail.technique : livePropsRef.current.status ? props.technique : "strumming";
+      const bpm = typeof detail?.bpm === "number" && Number.isFinite(detail.bpm) ? detail.bpm : livePropsRef.current.bpm;
+      const subdivision = detail?.subdivision ?? livePropsRef.current.subdivision;
+      const perBeat = subdivision === "Quarter notes" ? 1 : subdivision === "Eighth notes" ? 2 : subdivision === "Triplets" ? 3 : 4;
+      if (!pattern.length) return;
+      timingRef.current = { startAt: typeof detail?.startAt === "number" ? detail.startAt : performance.now(), stepMs: 60000 / bpm / perBeat, pattern, technique, cursorStep: 0 };
+      setLiveCounts({ onsets: 0, expected: 0, missed: 0, onTime: 0, early: 0, late: 0 });
+      setLiveCue("Pattern started. Listening for expected strokes…");
+    };
+    window.addEventListener("chord-hero:right-hand-pattern-start", onPatternStart);
+    return () => window.removeEventListener("chord-hero:right-hand-pattern-start", onPatternStart);
+  }, [props.technique]);
+  useEffect(() => { stopListening(); }, [props.exercise.id, stopListening]);
+  useEffect(() => {
+    if (props.status === "running" && previousStatusRef.current !== "running" && !timingRef.current) { setLiveCounts({ onsets: 0, expected: 0, missed: 0, onTime: 0, early: 0, late: 0 }); setSimulationScore(null); }
     if (props.status === "complete" && previousStatusRef.current !== "complete" && settings.performanceMode) {
-      const listenScore = liveCounts.onsets ? Math.round(liveCounts.onTime / liveCounts.onsets * 100) : undefined;
-      setSimulationScore({ score: listenScore ?? Math.min(100, 60 + props.loopsCompleted * 6), loops: props.loopsCompleted, listenScore });
+      const listenScore = liveConfidence >= 45 && liveCounts.expected ? Math.round(liveCounts.onTime / liveCounts.expected * 100) : undefined;
+      setSimulationScore({ score: listenScore ?? null, loops: props.loopsCompleted, listenScore });
       updateSettings({ performanceMode: false });
     }
     previousStatusRef.current = props.status;
-  }, [liveCounts, props.loopsCompleted, props.status, settings.performanceMode, updateSettings]);
+  }, [liveConfidence, liveCounts, props.loopsCompleted, props.status, settings.performanceMode, updateSettings]);
 
   useEffect(() => {
     if (props.status === "running" && props.elapsedSeconds >= 90 && props.elapsedSeconds % 90 === 0) setFatiguePrompt(true);
@@ -271,31 +336,31 @@ export default function RightHandPracticeModes(props: Props) {
     <section className="right-hand-practice-modes" aria-labelledby="practice-lab-title">
       <header><div><span className="label">Practice lab</span><h3 id="practice-lab-title">Shape the round without crowding the player</h3></div><span>Saved locally</span></header>
 
-      <div className="practice-mode-summary">
+      <div className="practice-mode-summary" hidden={props.section !== "learn"}>
         <div><span className="label">Technical focus</span><strong>{props.exercise.focus}</strong></div>
         <div><span className="label">Common mistake</span><p>{cue.mistake}</p></div>
         <div><span className="label">Fix it now</span><p>{cue.correction}</p></div>
       </div>
 
       <section className="coaching-studio-launch"><div><span className="label">Focused coaching lab</span><strong>String routes, dynamics, rehearsal, setup and hands-free control</strong><p>The 3D hand now has one clear entry point in the primary player above the follow-along pattern.</p></div><button type="button" aria-expanded={showCoachingStudio} onClick={() => setShowCoachingStudio((value) => !value)}>{showCoachingStudio ? "Close coaching studio" : "Open coaching studio"}</button></section>
-      {showCoachingStudio ? <RightHandCoachingStudio status={props.status} bpm={props.bpm} elapsedSeconds={props.elapsedSeconds} activeStep={props.activeStep} loopsCompleted={props.loopsCompleted} exercise={props.exercise} progress={props.progress} playlists={library.playlists} chordProgression={props.chordProgression} focus={settings.focus} dynamics={settings.dynamics} ghostStrum={settings.ghostStrum} anticipation={settings.anticipation} onModeChange={updateSettings} onSetRoundSeconds={props.onSetRoundSeconds} onSelectExercise={props.onSelectExercise} onToggleRound={props.onStartRound} /> : null}
+      {showCoachingStudio ? <RightHandCoachingStudio section={props.section} status={props.status} bpm={props.bpm} elapsedSeconds={props.elapsedSeconds} activeStep={props.activeStep} loopsCompleted={props.loopsCompleted} exercise={props.exercise} progress={props.progress} playlists={library.playlists} chordProgression={props.chordProgression} focus={settings.focus} dynamics={settings.dynamics} ghostStrum={settings.ghostStrum} anticipation={settings.anticipation} onModeChange={updateSettings} onSetRoundSeconds={props.onSetRoundSeconds} onSelectExercise={props.onSelectExercise} onStartRound={props.onStartRound} onPauseRound={props.onPauseRound} /> : null}
 
-      <details open><summary>Sound, demo & no-look</summary><div className="practice-mode-grid">
+      <details open hidden={props.section !== "settings"}><summary>Sound, demo & no-look</summary><div className="practice-mode-grid">
         <label>Target sound<select value={settings.targetSound} onChange={(event) => updateSettings({ targetSound: event.target.value as RightHandTargetSound })}>{TARGET_SOUNDS.map((sound) => <option key={sound.id} value={sound.id}>{sound.label}</option>)}</select><small>{TARGET_SOUNDS.find((sound) => sound.id === settings.targetSound)?.help}; no extra sample download.</small></label>
         <label>Demo motion<select value={settings.demoSpeed} onChange={(event) => updateSettings({ demoSpeed: Number(event.target.value) as PracticeModeSettings["demoSpeed"] })}><option value={1}>Full speed</option><option value={0.75}>75% slow motion</option><option value={0.5}>50% slow motion</option></select><small>Changes the hand animation only, never your BPM.</small></label>
         <label className="check-card"><input type="checkbox" checked={settings.noLook} onChange={(event) => updateSettings({ noLook: event.target.checked })} /> No-look after count-in<small>The pattern fades only while the round is running.</small></label>
       </div><div className="practice-mixer" aria-label="Backing track mixer">{([["Click", "clickMix"], ["Guitar demo", "guitarMix"], ["Chord context", "contextMix"]] as const).map(([label, key]) => <label key={key}><span>{label}<b>{settings[key]}%</b></span><input type="range" min={0} max={100} value={settings[key]} onChange={(event) => updateSettings({ [key]: Number(event.target.value) })} /></label>)}</div></details>
 
-      <details><summary>Live listen & performance simulation</summary><div className="listen-performance-grid">
-        <section className={`live-listen-card state-${listenState}`}><span className="label">Live listen · onset timing</span><strong aria-live="polite">{liveCue}</strong><p>Feedback is based on detected attacks against the pulse. It does not claim live chord recognition.</p><div><button type="button" onClick={listenState === "ready" ? stopListening : () => void startListening()} disabled={listenState === "requesting"}>{listenState === "ready" ? "Stop listening" : listenState === "requesting" ? "Requesting…" : "Enable microphone"}</button><small>{liveCounts.onsets} attacks · {liveCounts.onTime} centered · {liveCounts.early} early · {liveCounts.late} late</small></div></section>
-        <section className="performance-card"><span className="label">Performance simulation</span><strong>Full round, no visual prompts</strong><p>Uses your current chord progression and mixer. Listen mode improves the final timing evidence.</p><button type="button" onClick={startSimulation} disabled={props.status === "running" || props.status === "countin"}>Start performance</button>{simulationScore ? <div className="simulation-score" role="status"><b>{simulationScore.score}%</b><span>{simulationScore.loops} loops · {simulationScore.listenScore === undefined ? "completion score; no microphone timing" : `${simulationScore.listenScore}% attacks centered`}</span></div> : null}</section>
+      <details hidden={props.section !== "practise"}><summary>Live listen & performance simulation</summary><div className="listen-performance-grid">
+        <section className={`live-listen-card state-${listenState}`}><span className="label">Live listen · expected-slot timing</span><strong aria-live="polite">{liveCue}</strong><p>Ambient confidence: <b>{listenState === "ready" ? `${liveConfidence}%` : "—"}</b>. Rest slots are skipped; string-level claims are not inferred from microphone onset timing.</p><div><button type="button" onClick={listenState === "ready" ? stopListening : () => void startListening()} disabled={listenState === "requesting"}>{listenState === "ready" ? "Stop listening" : listenState === "requesting" ? "Requesting…" : "Enable microphone"}</button><small>{liveCounts.onsets} attacks · {liveCounts.expected} expected slots · {liveCounts.missed} missed · {liveCounts.onTime} centered · {liveCounts.early} early · {liveCounts.late} late</small></div></section>
+        <section className="performance-card"><span className="label">Performance simulation</span><strong>Full round, no visual prompts</strong><p>Uses your current chord progression and mixer. Listen mode improves the final timing evidence.</p><button type="button" onClick={startSimulation} disabled={props.status === "running" || props.status === "countin"}>Start performance</button>{simulationScore ? <div className="simulation-score" role="status"><b>{simulationScore.score === null ? "—" : `${simulationScore.score}%`}</b><span>{simulationScore.loops} loops · {simulationScore.listenScore === undefined ? "completed; no microphone score" : `${simulationScore.listenScore}% attacks centered`}</span></div> : null}</section>
       </div></details>
 
-      <details><summary>Skill map & adaptive warmup</summary><div className="skill-map">{SKILL_LABELS.map((label, index) => <div key={label} className={index === weakestIndex ? "weakest" : ""}><span>{label}<b>{skillMap[index]}%</b></span><i><em style={{ width: `${skillMap[index]}%` }} /></i></div>)}</div><div className="adaptive-warmup"><span className="label">Today&apos;s weakest-metric warmup</span><strong>{warmup}</strong><p>Start at {Math.max(40, Math.round(props.bpm * 0.5))} BPM for 60–90 seconds, then return to the selected drill.</p></div></details>
+      <details hidden={props.section !== "review" && props.section !== "learn"}><summary>Skill map & adaptive warmup</summary><div className="skill-map">{SKILL_LABELS.map((label, index) => <div key={label} className={index === weakestIndex ? "weakest" : ""}><span>{label}<b>{skillMap[index]}%</b></span><i><em style={{ width: `${skillMap[index]}%` }} /></i></div>)}</div><div className="adaptive-warmup"><span className="label">Today&apos;s weakest-metric warmup</span><strong>{warmup}</strong><p>Start at {Math.max(40, Math.round(props.bpm * 0.5))} BPM for 60–90 seconds, then return to the selected drill.</p></div></details>
 
-      <details><summary>Bookmarks, playlists & notes</summary><div className="practice-library-actions"><button type="button" aria-pressed={bookmarked} onClick={() => saveLibrary({ ...library, bookmarks: bookmarked ? library.bookmarks.filter((id) => id !== props.exercise.id) : [...library.bookmarks, props.exercise.id] })}>{bookmarked ? "Remove bookmark" : "Bookmark this drill"}</button><label>Personal reminder<textarea value={library.notes[props.exercise.id] ?? ""} maxLength={240} placeholder="Keep pick shallow…" onChange={(event) => saveLibrary({ ...library, notes: { ...library.notes, [props.exercise.id]: event.target.value } })} /></label><div><label>New playlist<input value={playlistName} maxLength={48} placeholder="Friday groove set" onChange={(event) => setPlaylistName(event.target.value)} /></label><button type="button" onClick={createPlaylist}>Create with this drill</button></div></div>{library.playlists.length ? <div className="practice-playlists">{library.playlists.map((playlist) => <div key={playlist.id}><strong>{playlist.name}</strong><span>{playlist.exerciseIds.length} drills</span><button type="button" disabled={playlist.exerciseIds.includes(props.exercise.id)} onClick={() => saveLibrary({ ...library, playlists: library.playlists.map((item) => item.id === playlist.id ? { ...item, exerciseIds: [...item.exerciseIds, props.exercise.id] } : item) })}>Add current</button></div>)}</div> : <p className="empty-practice-library">No named playlists yet.</p>}</details>
+      <details hidden={props.section !== "practise"}><summary>Bookmarks, playlists & notes</summary><div className="practice-library-actions"><button type="button" aria-pressed={bookmarked} onClick={() => saveLibrary({ ...library, bookmarks: bookmarked ? library.bookmarks.filter((id) => id !== props.exercise.id) : [...library.bookmarks, props.exercise.id] })}>{bookmarked ? "Remove bookmark" : "Bookmark this drill"}</button><label>Personal reminder<textarea value={library.notes[props.exercise.id] ?? ""} maxLength={240} placeholder="Keep pick shallow…" onChange={(event) => saveLibrary({ ...library, notes: { ...library.notes, [props.exercise.id]: event.target.value } })} /></label><div><label>New playlist<input value={playlistName} maxLength={48} placeholder="Friday groove set" onChange={(event) => setPlaylistName(event.target.value)} /></label><button type="button" onClick={createPlaylist}>Create with this drill</button></div></div>{library.playlists.length ? <div className="practice-playlists">{library.playlists.map((playlist) => <div key={playlist.id}><strong>{playlist.name}</strong><span>{playlist.exerciseIds.length} drills</span><button type="button" disabled={playlist.exerciseIds.includes(props.exercise.id)} onClick={() => saveLibrary({ ...library, playlists: library.playlists.map((item) => item.id === playlist.id ? { ...item, exerciseIds: [...item.exerciseIds, props.exercise.id] } : item) })}>Add current</button></div>)}</div> : <p className="empty-practice-library">No named playlists yet.</p>}</details>
 
-      <details><summary>Random drill, recovery & challenge packs</summary><div className="random-recovery-grid"><section><span className="label">Constrained random pattern</span><strong>{props.technique} · {props.difficulty}</strong><p>Chooses another authored pattern with valid notation at the same technique and difficulty.</p><button type="button" onClick={randomize}>Choose a random drill</button></section><section className={recoveryMisses >= 2 ? "recovery-ready" : ""}><span className="label">Recovery mode</span><strong>{recoveryMisses >= 2 ? "A reset is ready" : `${recoveryMisses} / 2 difficult rounds`}</strong><p>{recoveryMisses >= 2 ? `Apply ${Math.max(40, props.bpm - 8)} BPM and a shorter ${props.technique} pattern. Nothing changes until you confirm.` : "Two mistakes/too-fast ratings will offer a gentler version."}</p>{recoveryMisses >= 2 ? <button type="button" onClick={applyRecovery}>Apply recovery setup</button> : null}</section></div><section className="challenge-pack-import"><div><span className="label">Attributed challenge packs</span><strong>Local JSON import · offline after import</strong><p>{packMessage}</p></div><label className="file-button">Import pack<input type="file" accept="application/json,.json" onChange={(event) => void importPack(event.target.files?.[0])} /></label></section>{packs.map((pack) => <div className="challenge-pack" key={`${pack.creator}-${pack.title}`}><div><strong>{pack.title}</strong><span>By {pack.creator} · {pack.license} · {pack.exerciseIds.length} drills</span><small>{pack.attribution}</small></div><button type="button" onClick={() => exportPack(pack)}>Export</button></div>)}</details>
+      <details hidden={props.section !== "practise"}><summary>Random drill, recovery & challenge packs</summary><div className="random-recovery-grid"><section><span className="label">Constrained random pattern</span><strong>{props.technique} · {props.difficulty}</strong><p>Chooses another authored pattern with valid notation at the same technique and difficulty.</p><button type="button" onClick={randomize}>Choose a random drill</button></section><section className={recoveryMisses >= 2 ? "recovery-ready" : ""}><span className="label">Recovery mode</span><strong>{recoveryMisses >= 2 ? "A reset is ready" : `${recoveryMisses} / 2 difficult rounds`}</strong><p>{recoveryMisses >= 2 ? `Apply ${Math.max(40, props.bpm - 8)} BPM and a shorter ${props.technique} pattern. Nothing changes until you confirm.` : "Two mistakes/too-fast ratings will offer a gentler version."}</p>{recoveryMisses >= 2 ? <button type="button" onClick={applyRecovery}>Apply recovery setup</button> : null}</section></div><section className="challenge-pack-import"><div><span className="label">Attributed challenge packs</span><strong>Local JSON import · offline after import</strong><p>{packMessage}</p></div><label className="file-button">Import pack<input type="file" accept="application/json,.json" onChange={(event) => void importPack(event.target.files?.[0])} /></label></section>{packs.map((pack) => <div className="challenge-pack" key={`${pack.creator}-${pack.title}`}><div><strong>{pack.title}</strong><span>By {pack.creator} · {pack.license} · {pack.exerciseIds.length} drills</span><small>{pack.attribution}</small></div><button type="button" onClick={() => exportPack(pack)}><LocalizedCopy id="export" /></button></div>)}</details>
 
       {fatiguePrompt ? <div className="fatigue-check" role="alert"><div><span className="label">90-second fatigue check</span><strong>Can your wrist and shoulders still feel loose?</strong><p>Pause for sharp pain, numbness, or building tension. This is a posture reminder, not medical advice.</p></div><button type="button" onClick={() => setFatiguePrompt(false)}>I reset my posture</button></div> : null}
     </section>

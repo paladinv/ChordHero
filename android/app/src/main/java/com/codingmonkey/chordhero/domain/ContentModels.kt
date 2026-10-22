@@ -9,6 +9,18 @@ data class ChordDocument(
     val chordLibrary: List<ChordLibraryItem>,
     val levels: List<LevelDefinition>,
     val progressionPacks: List<ProgressionPack>,
+    val qualityDefinitions: List<ChordQualityDefinition> = emptyList(),
+)
+
+@Serializable
+data class ChordQualityDefinition(
+    val id: String,
+    val label: String,
+    val suffix: String,
+    val aliases: List<String>,
+    val intervals: List<Int>,
+    val essential: List<Int>,
+    val optional: List<Int>,
 )
 
 @Serializable

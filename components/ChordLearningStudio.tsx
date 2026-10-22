@@ -1,5 +1,7 @@
 "use client";
 
+import LocalizedCopy from "./LocalizedCopy";
+import { useLocale } from "../lib/localeClient";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ChordDiagram, { type Chord } from "./ChordDiagram";
 import {
@@ -73,6 +75,7 @@ export default function ChordLearningStudio({
   onLogPractice,
   onPlayChord
 }: ChordLearningStudioProps) {
+  const { formatDate } = useLocale();
   const [voiceStatus, setVoiceStatus] = useState("Ready");
   const [importStatus, setImportStatus] = useState("");
   const voiceRunRef = useRef(0);
@@ -179,7 +182,7 @@ export default function ChordLearningStudio({
           <div className="learning-panel-heading"><div><span className="label">Personalization</span><h4>Make shapes fit your hand</h4></div></div>
           <div className="learning-preference-controls">
             <label>Hand span: {learningPreferences.handSpanCm.toFixed(1)} cm<input type="range" min="14" max="25" step="0.5" value={learningPreferences.handSpanCm} onChange={(event) => updateState({ handPreference: { ...learningPreferences, handSpanCm: Number(event.target.value) } })} /></label>
-            <label>Target skill<select value={learningPreferences.targetSkill} onChange={(event) => updateState({ handPreference: { ...learningPreferences, targetSkill: event.target.value as LearningSkill } })}><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="advanced">Advanced</option></select></label>
+            <label>Target skill<select value={learningPreferences.targetSkill} onChange={(event) => updateState({ handPreference: { ...learningPreferences, targetSkill: event.target.value as LearningSkill } })}><option value="beginner"><LocalizedCopy id="beginner" /></option><option value="intermediate"><LocalizedCopy id="intermediate" /></option><option value="advanced">Advanced</option></select></label>
           </div>
           <p className="muted">Recommendations use hand span, difficulty tags, shared fingers, fret movement, string changes, and barre load. Existing instrument settings are unchanged.</p>
           <div className="learning-ranked-list">{rankedVoicings.map(({ entry, reason }) => <button key={entry.id} type="button" onClick={() => onSelectEntry(entry.id)}><span><strong>{entry.chord.name}</strong><small>{entry.position}</small></span><small>{reason}</small></button>)}</div>
@@ -195,7 +198,7 @@ export default function ChordLearningStudio({
       <div className="learning-studio-grid learning-review-grid">
         <section className="learning-panel learning-goals">
           <div className="learning-panel-heading"><div><span className="label">Spaced practice</span><h4>Goals and streaks</h4></div>{!activeGoal ? <button className="btn primary" type="button" onClick={createGoal}>Create V to I goal</button> : null}</div>
-          {activeGoal ? <><strong>{activeGoal.title}</strong><p>{activeGoal.completedKeys.length}/{activeGoal.keys.length} keys complete · {activeGoal.streak} day streak{activeGoal.nextReviewAt ? ` · review ${new Date(activeGoal.nextReviewAt).toLocaleDateString()}` : ""}</p><div className="chip-row">{activeGoal.keys.map((key) => <button key={key} type="button" className={`chip ${activeGoal.completedKeys.includes(key) ? "active" : ""}`} onClick={() => completeGoalKey(key)}>{key} {activeGoal.completedKeys.includes(key) ? "done" : "mark done"}</button>)}</div><p className="muted">{goalComplete ? "Goal complete. Keep the streak alive with the scheduled review." : "Mark a key after a clean, focused review."}</p></> : <p className="muted">Create a goal to keep V to I work moving across five keys with lightweight local scheduling.</p>}
+          {activeGoal ? <><strong>{activeGoal.title}</strong><p>{activeGoal.completedKeys.length}/{activeGoal.keys.length} keys complete · {activeGoal.streak} day streak{activeGoal.nextReviewAt ? ` · review ${formatDate(new Date(activeGoal.nextReviewAt))}` : ""}</p><div className="chip-row">{activeGoal.keys.map((key) => <button key={key} type="button" className={`chip ${activeGoal.completedKeys.includes(key) ? "active" : ""}`} onClick={() => completeGoalKey(key)}>{key} {activeGoal.completedKeys.includes(key) ? "done" : "mark done"}</button>)}</div><p className="muted">{goalComplete ? "Goal complete. Keep the streak alive with the scheduled review." : "Mark a key after a clean, focused review."}</p></> : <p className="muted">Create a goal to keep V to I work moving across five keys with lightweight local scheduling.</p>}
         </section>
 
         <section className="learning-panel learning-glossary">
@@ -209,7 +212,7 @@ export default function ChordLearningStudio({
         <div className="learning-panel-heading"><div><span className="label">Real-time composer</span><h4>Build the next move</h4></div><span className="muted">Start: {composerStart}</span></div>
         <div className="learning-composer-rows">
           <div className="learning-composer-row"><span className="learning-chip-label">Progression</span><div className="chip-row">{learningComposerRoles.length ? learningComposerRoles.map((role, index) => <button key={`${role}-${index}`} type="button" className="chip active" onClick={() => updateState({ composerRoles: learningComposerRoles.filter((_, currentIndex) => currentIndex !== index) })}>{role} ×</button>) : <span className="muted">No roles added yet.</span>}</div></div>
-          <div className="learning-composer-row"><span className="learning-chip-label">Next roles</span><div className="chip-row">{composerSuggestions.map((role) => <button key={role} type="button" className="chip" onClick={() => addComposerRole(role)}>{role}</button>)}<button className="btn ghost" type="button" onClick={() => updateState({ composerRoles: [] })}>Clear</button></div></div>
+          <div className="learning-composer-row"><span className="learning-chip-label">Next roles</span><div className="chip-row">{composerSuggestions.map((role) => <button key={role} type="button" className="chip" onClick={() => addComposerRole(role)}>{role}</button>)}<button className="btn ghost" type="button" onClick={() => updateState({ composerRoles: [] })}><LocalizedCopy id="clear" /></button></div></div>
         </div>
         {selectedFunction ? <p className="library-harmony-explanation">{selectedFunction.explanation} Suggested resolution: {selectedFunction.suggestedResolution}</p> : null}
       </section>

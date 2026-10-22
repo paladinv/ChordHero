@@ -1,5 +1,6 @@
 package com.codingmonkey.chordhero.features
 
+import androidx.compose.ui.res.stringResource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -27,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.codingmonkey.chordhero.R
 import com.codingmonkey.chordhero.domain.ContentBundle
 import com.codingmonkey.chordhero.domain.stepIntervalMillis
 import com.codingmonkey.chordhero.services.AudioService
@@ -88,7 +90,7 @@ fun RightHandScreen(content: ContentBundle, audio: AudioService) {
         }
     }
 
-    FeatureList("Right-Hand Studio", "Follow 36 strumming, plectrum, and fingerpicking drills") {
+    FeatureList(stringResource(R.string.right_hand_title), stringResource(R.string.right_hand_intro)) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 content.rightHand.techniques.forEach { (id, detail) ->
@@ -99,7 +101,11 @@ fun RightHandScreen(content: ContentBundle, audio: AudioService) {
                             selectedId = content.rightHand.exercises.firstOrNull { it.technique == id && it.difficulty == difficulty }?.id
                             step = 0
                         },
-                        label = { Text(detail.shortLabel) },
+                        label = { Text(stringResource(when (id) {
+                            "strumming" -> R.string.strumming
+                            "fingerpicking" -> R.string.fingerpicking
+                            else -> R.string.plectrum
+                        })) },
                     )
                 }
             }
@@ -114,7 +120,11 @@ fun RightHandScreen(content: ContentBundle, audio: AudioService) {
                             selectedId = content.rightHand.exercises.firstOrNull { it.technique == technique && it.difficulty == id }?.id
                             step = 0
                         },
-                        label = { Text(detail.label) },
+                        label = { Text(stringResource(when (id) {
+                            "beginner" -> R.string.beginner
+                            "intermediate" -> R.string.intermediate
+                            else -> R.string.expert
+                        })) },
                     )
                 }
             }
@@ -128,16 +138,16 @@ fun RightHandScreen(content: ContentBundle, audio: AudioService) {
                         Text(exercise.coaching)
                         Text("${exercise.subdivision} · ${tempo.toInt()} BPM")
                         Text(
-                            if (countIn > 0) "GET READY  $countIn" else exercise.pattern.mapIndexed { index, token -> if (index == step) "[$token]" else token }.joinToString("  "),
+                            if (countIn > 0) "${stringResource(R.string.get_ready)}  $countIn" else exercise.pattern.mapIndexed { index, token -> if (index == step) "[$token]" else token }.joinToString("  "),
                             style = MaterialTheme.typography.titleLarge,
                         )
-                        Text("Loops $loops · ${remaining / 60}:${(remaining % 60).toString().padStart(2, '0')} remaining")
+                        Text("${stringResource(R.string.loops)} $loops · ${remaining / 60}:${(remaining % 60).toString().padStart(2, '0')} ${stringResource(R.string.remaining)}")
                     }
                 }
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    listOf(30 to "30 sec", 60 to "1 min", 180 to "3 min").forEach { (seconds, label) ->
+                    listOf(30 to "30 ${stringResource(R.string.seconds)}", 60 to "1 ${stringResource(R.string.minutes)}", 180 to "3 ${stringResource(R.string.minutes)}").forEach { (seconds, label) ->
                         FilterChip(
                             selected = roundSeconds == seconds,
                             onClick = { playing = false; roundSeconds = seconds; remaining = seconds },
@@ -148,11 +158,11 @@ fun RightHandScreen(content: ContentBundle, audio: AudioService) {
                 Slider(tempo, { tempo = it }, valueRange = 40f..180f, steps = 139)
                 Row {
                     Checkbox(sound, { sound = it })
-                    Text("Technique click", modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
+                    Text(stringResource(R.string.technique_click), modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
                 }
                 Row {
                     Checkbox(autoRamp, { autoRamp = it })
-                    Text("Raise tempo after a clean round", modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
+                    Text(stringResource(R.string.raise_tempo_after_clean), modifier = Modifier.align(androidx.compose.ui.Alignment.CenterVertically))
                 }
             }
             item {
@@ -160,30 +170,30 @@ fun RightHandScreen(content: ContentBundle, audio: AudioService) {
                     OutlinedButton(
                         enabled = selectedIndex > 0,
                         onClick = { playing = false; selectedId = exercises[selectedIndex - 1].id; step = 0 },
-                    ) { Text("Previous") }
-                    Button(onClick = { playing = !playing }) { Text(if (playing) "Pause" else "Play") }
+                    ) { Text(stringResource(R.string.previous)) }
+                    Button(onClick = { playing = !playing }) { Text(stringResource(if (playing) R.string.pause else R.string.play)) }
                     OutlinedButton(
                         enabled = selectedIndex < exercises.lastIndex,
                         onClick = { playing = false; selectedId = exercises[selectedIndex + 1].id; step = 0 },
-                    ) { Text("Next") }
-                    OutlinedButton(onClick = { tempo = exercise.bpm.toFloat() }) { Text("Default tempo") }
+                    ) { Text(stringResource(R.string.next)) }
+                    OutlinedButton(onClick = { tempo = exercise.bpm.toFloat() }) { Text(stringResource(R.string.default_tempo)) }
                 }
             }
             if (feedback) {
                 item {
                     Card(Modifier.fillMaxWidth()) {
                         Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("How did it feel?", style = MaterialTheme.typography.titleMedium)
+                            Text(stringResource(R.string.how_feel), style = MaterialTheme.typography.titleMedium)
                             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                 Button(onClick = {
                                     if (autoRamp) tempo = (tempo + 4).coerceAtMost(180f)
                                     feedback = false; remaining = roundSeconds; step = 0; loops = 0
-                                }) { Text("Clean") }
-                                OutlinedButton(onClick = { feedback = false; remaining = roundSeconds; step = 0; loops = 0 }) { Text("Mistakes") }
+                                }) { Text(stringResource(R.string.clean)) }
+                                OutlinedButton(onClick = { feedback = false; remaining = roundSeconds; step = 0; loops = 0 }) { Text(stringResource(R.string.mistakes)) }
                                 OutlinedButton(onClick = {
                                     tempo = (tempo - 6).coerceAtLeast(40f)
                                     feedback = false; remaining = roundSeconds; step = 0; loops = 0
-                                }) { Text("Too fast") }
+                                }) { Text(stringResource(R.string.too_fast)) }
                             }
                         }
                     }

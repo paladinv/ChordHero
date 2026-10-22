@@ -28,7 +28,16 @@ export type TechniqueMotion = {
   strings: number[];
   fingers: number[];
   durationMs: number;
+  /** Present when the motion came from written notation rather than inference. */
+  token?: string;
+  accent?: boolean;
+  rest?: boolean;
+  mute?: boolean;
+  fingerAssignments?: TechniqueFingerAssignment[];
 };
+
+export type TechniqueFingerName = "thumb" | "index" | "middle" | "ring" | "pinky";
+export type TechniqueFingerAssignment = { finger: TechniqueFingerName; string: number };
 
 /** Standard 25.5in guitar scale represented in the scene's world units. */
 export const GUITAR_SCALE_LENGTH = 10.5;
@@ -43,9 +52,9 @@ export const AUTHORED_HAND_ROLE_FORWARD = {
   fretting: { rightHanded: [1, 0, 0] as [number, number, number], leftHanded: [-1, 0, 0] as [number, number, number] },
   picking: [0, 0, -1] as [number, number, number]
 } as const;
-export const AUTHORED_HAND_WRIST_TARGET_Y = { fretting: 1.12, picking: 1.05 } as const;
+export const AUTHORED_HAND_WRIST_TARGET_Y = { fretting: 0.84, picking: 0.78 } as const;
 /** Joint swing envelopes in radians, applied around the imported bind pose. */
-export const AUTHORED_HAND_POSE_LIMITS = { metacarpal: 0.38, proximal: 0.9, intermediate: 0.82, distal: 0.7 } as const;
+export const AUTHORED_HAND_POSE_LIMITS = { metacarpal: 1.12, proximal: 1.86, intermediate: 1.62, distal: 1.34 } as const;
 export const AUTHORED_HAND_TARGET_BASIS = {
   picking: { forward: [0, 0, -1] as [number, number, number], lateral: [-1, 0, 0] as [number, number, number], normal: [0, 1, 0] as [number, number, number] },
   frettingRight: { forward: [1, 0, 0] as [number, number, number], lateral: [0, 0, -1] as [number, number, number], normal: [0, 1, 0] as [number, number, number] },
@@ -93,8 +102,22 @@ export const GUITAR_CAMERA_PRESETS = {
   // complete neck, body, and both hands inside the first viewport at the
   // component's 32-degree lens instead of relying on an initial user zoom.
   overview: { position: [9.4, 6.1, 17.2] as [number, number, number], target: [0, 0.28, 3.1] as [number, number, number] },
-  fretting: { position: [6.1, 7.0, 4.8] as [number, number, number], target: [0, 0.48, -0.9] as [number, number, number] },
-  picking: { position: [5.4, 7.4, 11.0] as [number, number, number], target: [0, 0.58, 5.75] as [number, number, number] }
+  // Give the fretting wrist and its new forearm room at the nut while keeping
+  // the board contact plane prominent. The wider distance avoids the old
+  // close crop that clipped the active hand at the left edge.
+  // Frame the fretting wrist and the first five frets at a useful teaching
+  // scale. The overview preset remains the full-instrument composition.
+  fretting: { position: [8.8, 7.4, 3.8] as [number, number, number], target: [0, 0.58, -1.2] as [number, number, number] },
+  // Pull the string-contact close-up back enough to keep the lower bout and
+  // picking forearm inside the stage while retaining a useful hand scale.
+  picking: { position: [7.8, 8.6, 12.6] as [number, number, number], target: [0, 0.58, 5.2] as [number, number, number] }
+} as const;
+
+/** Right-hand teaching close-ups live separately to retain the original preset API. */
+export const GUITAR_TECHNIQUE_CLOSEUPS = {
+  "pick-grip": { position: [3.25, 3.05, 8.35] as [number, number, number], target: [0.04, 0.69, 5.92] as [number, number, number] },
+  "thumb-independence": { position: [4.35, 4.4, 8.7] as [number, number, number], target: [0, 0.58, 5.72] as [number, number, number] },
+  "palm-mute": { position: [4.6, 4.0, 10.15] as [number, number, number], target: [0, 0.55, 7.02] as [number, number, number] }
 } as const;
 
 export type GuitarDisplayMode = "left-hand" | "right-hand" | "both";
@@ -256,6 +279,91 @@ export function techniqueToMotionPlan(
   }
   const selected = strings.length ? strings : [0, 1, 2, 3, 4, 5];
   return { kind: "strum", direction: step % 2 ? "up" : "down", strings: selected, fingers: [], durationMs: 300 };
+}
+
+const FINGER_NUMBER: Record<TechniqueFingerName, number> = { thumb: 0, index: 1, middle: 2, ring: 3, pinky: 4 };
+const FINGER_NAME: Record<string, TechniqueFingerName> = { P: "thumb", p: "thumb", i: "index", m: "middle", a: "ring", c: "pinky" };
+const DEFAULT_FINGER_STRING: Partial<Record<TechniqueFingerName, number>> = { thumb: 5, index: 2, middle: 1, ring: 0, pinky: 0 };
+
+function writtenString(value: string | undefined) {
+  const string = Number(value) - 1;
+  return Number.isInteger(string) && string >= 0 && string < STRING_COUNT ? string : null;
+}
+
+/**
+ * Converts one displayed exercise token into an exact renderer plan. Written
+ * rests, mutes, directions, strings, and finger names win over every inferred
+ * default. Unknown explicit tokens remain neutral rather than alternating.
+ */
+export function rightHandTokenToMotionPlan(token: string, technique: RightHandTechnique): TechniqueMotion {
+  const source = String(token ?? "").trim();
+  const accent = source.endsWith("!");
+  const clean = source.replace(/!+$/g, "");
+  const durationMs = technique === "strumming" ? 300 : technique === "plectrum" ? 220 : 280;
+  if (clean === "·" || clean === "-") {
+    return { kind: technique === "fingerpicking" ? "fingerpick" : technique === "plectrum" ? "pick" : "strum", direction: "neutral", strings: [], fingers: [], durationMs, token: source, accent, rest: true, mute: false, fingerAssignments: [] };
+  }
+  if (clean.toUpperCase() === "X") {
+    return { kind: "strum", direction: "neutral", strings: [0, 1, 2, 3, 4, 5], fingers: [], durationMs: 240, token: source, accent, rest: false, mute: true, fingerAssignments: [] };
+  }
+  if (technique === "strumming") {
+    const direction = clean.toUpperCase() === "D" ? "down" : clean.toUpperCase() === "U" ? "up" : "neutral";
+    return { kind: "strum", direction, strings: [0, 1, 2, 3, 4, 5], fingers: [], durationMs, token: source, accent, rest: false, mute: false, fingerAssignments: [] };
+  }
+  if (technique === "plectrum") {
+    const match = clean.match(/^([1-6])([DU])$/i);
+    const string = writtenString(match?.[1]);
+    const direction = match?.[2]?.toUpperCase() === "D" ? "down" : match?.[2]?.toUpperCase() === "U" ? "up" : "neutral";
+    return { kind: "pick", direction, strings: string === null ? [] : [string], fingers: [], durationMs, token: source, accent, rest: false, mute: false, fingerAssignments: [] };
+  }
+
+  const fingerMatches = [...clean.matchAll(/[Pimac]/g)];
+  const fingerLetters = fingerMatches.map((match) => match[0]);
+  const digitMatches = [...clean.matchAll(/[1-6]/g)];
+  const assignments: TechniqueFingerAssignment[] = [];
+  const claimedDigits = new Set<number>();
+  // First honor a digit immediately following its written finger (P6, i3…).
+  fingerLetters.forEach((letter, index) => {
+    const name = FINGER_NAME[letter];
+    if (!name) return;
+    const letterOffset = fingerMatches[index].index ?? -1;
+    // A digit in compact im2+3 belongs to the group, rather than to m alone.
+    const grouped = letterOffset > 0 && /[Pimac]/.test(clean[letterOffset - 1]);
+    const direct = letterOffset >= 0 && !grouped ? clean.slice(letterOffset).match(new RegExp(`^${letter}([1-6])`, "i")) : null;
+    const directString = writtenString(direct?.[1]);
+    if (directString !== null) {
+      assignments.push({ finger: name, string: directString });
+      const digitIndex = digitMatches.findIndex((match) => Number(match[0]) - 1 === directString && !claimedDigits.has(match.index ?? -1));
+      if (digitIndex >= 0) claimedDigits.add(digitMatches[digitIndex].index ?? -1);
+    }
+  });
+  // Compact pinch notation such as im2+3 pairs remaining letters and digits.
+  const remainingFingers = fingerLetters.map((letter) => FINGER_NAME[letter]).filter((name): name is TechniqueFingerName => Boolean(name) && !assignments.some((assignment) => assignment.finger === name));
+  const remainingStrings = digitMatches.filter((match) => !claimedDigits.has(match.index ?? -1)).map((match) => writtenString(match[0])).filter((string): string is number => string !== null);
+  remainingFingers.forEach((finger, index) => assignments.push({ finger, string: remainingStrings[index] ?? DEFAULT_FINGER_STRING[finger] ?? 0 }));
+  // The common P6+ima shorthand writes the bass explicitly and relies on the
+  // conventional i/m/a treble-string assignment for the compact suffix.
+  const uniqueAssignments = assignments.filter((assignment, index) => assignments.findIndex((candidate) => candidate.finger === assignment.finger) === index);
+  const strings = [...new Set(uniqueAssignments.map((assignment) => assignment.string))];
+  return { kind: "fingerpick", direction: "neutral", strings, fingers: uniqueAssignments.map((assignment) => FINGER_NUMBER[assignment.finger]), durationMs, token: source, accent, rest: false, mute: false, fingerAssignments: uniqueAssignments };
+}
+
+/** Ordered contact strings for walkthrough pauses (0 = written string 1). */
+export function techniqueMotionContacts(plan: TechniqueMotion) {
+  if (plan.rest) return [];
+  if (plan.kind === "fingerpick" && plan.fingerAssignments?.length) return plan.fingerAssignments.map((assignment) => assignment.string);
+  const unique = [...new Set(plan.strings)];
+  if (plan.kind === "strum") return [...unique].sort((a, b) => plan.direction === "up" ? a - b : plan.direction === "down" ? b - a : a - b);
+  return unique;
+}
+
+/** Stable 0–1 freeze point centered on a written contact. */
+export function techniqueContactPhase(plan: TechniqueMotion, contactIndex: number) {
+  const contacts = techniqueMotionContacts(plan);
+  if (!contacts.length) return 0;
+  if (plan.kind === "fingerpick") return 0.5;
+  const bounded = Math.max(0, Math.min(contacts.length - 1, integer(contactIndex, 0)));
+  return (bounded + 0.5) / contacts.length;
 }
 
 export const GUITAR_STRING_COUNT = STRING_COUNT;

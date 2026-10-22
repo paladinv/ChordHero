@@ -2,6 +2,7 @@
 
 import dynamic from "next/dynamic";
 import { useEffect, useState } from "react";
+import { useLocale } from "../lib/localeClient";
 
 const AccessibilityPanel = dynamic(() => import("./AccessibilityPanel"), {
   ssr: false,
@@ -29,6 +30,7 @@ function applySavedPreferences() {
 }
 
 export default function AppEnhancements() {
+  const { t } = useLocale();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [installPrompt, setInstallPrompt] = useState<Event | null>(null);
   const [offlineReady, setOfflineReady] = useState(false);
@@ -49,7 +51,7 @@ export default function AppEnhancements() {
   return (
     <div className="app-enhancements">
       <button className="accessibility-trigger" type="button" onClick={() => setSettingsOpen((open) => !open)} aria-expanded={settingsOpen} aria-controls="accessibility-panel">
-        <span aria-hidden="true">Aa</span> Accessibility
+        <span aria-hidden="true">Aa</span> {t("accessibility")}
       </button>
       {settingsOpen ? <AccessibilityPanel offlineReady={offlineReady} installPrompt={installPrompt} onInstallHandled={() => setInstallPrompt(null)} onClose={() => setSettingsOpen(false)} /> : null}
     </div>

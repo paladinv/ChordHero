@@ -63,7 +63,7 @@ This catalogue is the product contract for the native iOS 17+ app and the later 
 - **UC-45:** Favorite chords and keep eight profile-specific recent chords.
 - **UC-46:** Preview a chord as a synthesized strum or arpeggio.
 - **UC-47:** Choose clean/steel-equivalent, warm/nylon-equivalent, muted, or picked character and fall back safely to synthesis.
-- **UC-48:** Select standard, Drop D, DADGAD, or half-step-down tuning and inspect note names.
+- **UC-48:** Select standard six-string, Drop D, DADGAD, half-step-down, or standard seven-string tuning and inspect note names.
 - **UC-49:** Set capo 0–7 and see the transposed chord name.
 - **UC-50:** Compare up to three voicings and display primary, comparison, and shared fretboard notes.
 - **UC-51:** Start/stop a chord practice timer and add repetitions.
@@ -91,7 +91,7 @@ This catalogue is the product contract for the native iOS 17+ app and the later 
 
 | Test area | Required assertions |
 | --- | --- |
-| Shared content | Chords/right-hand/settings schema v1 and songs schema v2; stable IDs; valid six-string arrays, frets, fingers, barres, song sections, and variations; 346 chords, 4 levels, 4 packs, 36 exercises, 50 songs, 150 variations, and 4 tunings. |
+| Shared content | Chords/right-hand/settings schema v1 and songs schema v2; stable IDs; valid chord shapes, frets, fingers, barres, song sections, variations, and six-/seven-string tunings; 346 chords, 4 levels, 4 packs, 36 exercises, 50 songs, 150 variations, and 5 tunings. |
 | Chord rules | Stable lookups; base fret/barre rendering; capo transposition; tuning/pitch-class mapping; shared-note heatmap. |
 | Trainer | Immediate first chord; three-second deadlines; ten-item cap; no adjacent duplicate; pause/resume/reset; manual and capped automatic progression. |
 | Right hand | Subdivision interval math; step interpretation; loop wrap; tempo changes; cancellation on selection/filter change. |

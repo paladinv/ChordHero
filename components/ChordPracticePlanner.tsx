@@ -1,5 +1,6 @@
 "use client";
 
+import LocalizedCopy from "./LocalizedCopy";
 import { useEffect, useMemo, useState } from "react";
 import { CHORD_LIBRARY, type ChordLibraryItem } from "../lib/chords";
 import { HARMONY_NOTES, type HarmonyNote } from "../lib/harmony";
@@ -397,8 +398,8 @@ export default function ChordPracticePlanner({
 
         <section className="planner-panel">
           <div className="planner-panel-heading"><div><span className="label">Named transition drills</span><h4>Save this change</h4></div><span className="planner-badge">Local only</span></div>
-          <div className="planner-drill-form"><input value={drillName} onChange={(event) => setDrillName(event.target.value)} placeholder="G -> C -> D" aria-label="Transition drill name" /><input type="number" min="40" max="180" value={drillTempo} onChange={(event) => setDrillTempo(Math.max(40, Math.min(180, Number(event.target.value) || 72)))} aria-label="Transition drill tempo" /><input type="number" min="1" max="50" value={drillReps} onChange={(event) => setDrillReps(Math.max(1, Math.min(50, Number(event.target.value) || 5)))} aria-label="Transition drill target repetitions" /><button className="btn" type="button" onClick={saveTransitionDrill} disabled={!selectedEntry || !comparisonEntry || !drillName.trim()}>Save</button></div>
-          {transitionDrills.length ? <div className="planner-saved-drills">{transitionDrills.map((drill) => <div key={drill.id}><span><strong>{drill.name}</strong><small>{drill.tempo} BPM · {drill.targetReps} reps</small></span><button className="btn ghost" type="button" onClick={() => runTransitionDrill(drill)}>Run</button><button className="text-button" type="button" onClick={() => setTransitionDrills((items) => items.filter((item) => item.id !== drill.id))}>Delete</button></div>)}</div> : <p className="planner-note">Choose two voicings above, name the change, and save it for a future session.</p>}
+          <div className="planner-drill-form"><input value={drillName} onChange={(event) => setDrillName(event.target.value)} placeholder="G -> C -> D" aria-label="Transition drill name" /><input type="number" min="40" max="180" value={drillTempo} onChange={(event) => setDrillTempo(Math.max(40, Math.min(180, Number(event.target.value) || 72)))} aria-label="Transition drill tempo" /><input type="number" min="1" max="50" value={drillReps} onChange={(event) => setDrillReps(Math.max(1, Math.min(50, Number(event.target.value) || 5)))} aria-label="Transition drill target repetitions" /><button className="btn" type="button" onClick={saveTransitionDrill} disabled={!selectedEntry || !comparisonEntry || !drillName.trim()}><LocalizedCopy id="save" /></button></div>
+          {transitionDrills.length ? <div className="planner-saved-drills">{transitionDrills.map((drill) => <div key={drill.id}><span><strong>{drill.name}</strong><small>{drill.tempo} BPM · {drill.targetReps} reps</small></span><button className="btn ghost" type="button" onClick={() => runTransitionDrill(drill)}>Run</button><button className="text-button" type="button" onClick={() => setTransitionDrills((items) => items.filter((item) => item.id !== drill.id))}><LocalizedCopy id="delete" /></button></div>)}</div> : <p className="planner-note">Choose two voicings above, name the change, and save it for a future session.</p>}
         </section>
       </div>
 

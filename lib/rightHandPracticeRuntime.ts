@@ -12,11 +12,12 @@ export const DEFAULT_RIGHT_HAND_MODE_SETTINGS = { targetSound: "clean-electric",
 export function readPracticeAudioPreferences() {
   try {
     const state = JSON.parse(window.localStorage.getItem(PRACTICE_STORAGE_KEY) ?? "null");
-    return { audioMuted: Boolean(state?.accessibility?.audioMuted), audioVolume: Number(state?.accessibility?.audioVolume) || 0.8, haptics: Boolean(state?.accessibility?.haptics), reducedMotion: Boolean(state?.accessibility?.reducedMotion) };
+    const volume = state?.accessibility?.audioVolume;
+    return { audioMuted: Boolean(state?.accessibility?.audioMuted), audioVolume: typeof volume === "number" && Number.isFinite(volume) ? Math.max(0, Math.min(1, volume)) : 0.8, haptics: Boolean(state?.accessibility?.haptics), reducedMotion: Boolean(state?.accessibility?.reducedMotion) };
   } catch { return { audioMuted: false, audioVolume: 0.8, haptics: false, reducedMotion: false }; }
 }
 
-export function saveRightHandPracticeResult(result: { area: "rightHand"; itemId: string; title: string; seconds: number; score?: number; misses?: number; tempo?: number; note?: string }) {
+export function saveRightHandPracticeResult(result: { area: "rightHand"; itemId: string; title: string; seconds: number; score?: number; misses?: number; tempo?: number; note?: string; recordingId?: string; reviewAccepted?: boolean; scoreReliability?: "reliable" | "limited" | "insufficient"; timingEvidenceCount?: number; expectedTimingCount?: number; rightHandContext?: { tempo: number; pattern: string[]; chordProgression: string[]; scoringMode: "timing" | "root" | "quality"; instrumentProfile: "acoustic" | "electric"; retained: boolean } }) {
   void import("./practicePlatform").then(({ recordPracticeResult }) => recordPracticeResult(result));
 }
 
@@ -26,7 +27,7 @@ export function validCustomProgression(value: string) {
 
 export function describeRightHandStep(step: string, technique: RightHandTechnique) {
   const accent = step.endsWith("!"); const clean = step.replace("!", "");
-  if (clean === "·") return { main: "—", detail: "rest", accent, rest: true, strings: [] as number[] };
+  if (clean === "·" || clean === "-") return { main: "—", detail: "rest", accent, rest: true, strings: [] as number[] };
   if (clean === "X") return { main: "×", detail: "mute", accent, rest: false, strings: [1, 2, 3, 4, 5, 6] };
   if (technique === "strumming") return { main: clean === "D" ? "↓" : "↑", detail: clean === "D" ? "down" : "up", accent, rest: false, strings: [1, 2, 3, 4, 5, 6] };
   if (technique === "plectrum") {
@@ -35,6 +36,49 @@ export function describeRightHandStep(step: string, technique: RightHandTechniqu
   }
   const strings = clean.match(/\d/g)?.map(Number) ?? [];
   return { main: clean.replace(/[\d+]/g, "") || clean, detail: strings.length ? `string ${strings.join(" + ")}` : "pinch", accent, rest: false, strings };
+}
+
+/** The small, intentionally conservative grammar shared by routine editing and backup validation. */
+export function validRightHandPatternToken(token: string, technique: RightHandTechnique) {
+  if (typeof token !== "string" || token.length > 16) return false;
+  if (technique === "strumming") return /^(?:[DUX]|·|-)!?$/.test(token);
+  if (technique === "plectrum") return /^(?:[1-6][DUX]|[DUX]|·|-)!?$/.test(token);
+  // Fingerpicking accepts a finger group with an optional string and compact
+  // pinch notation such as P6+ima or im2+3, matching the authored patterns.
+  return /^(?:[Ppima]{1,3}(?:[1-6])?(?:\+(?:[Ppima]{1,3}(?:[1-6])?|[1-6]))*)!?$/.test(token) || token === "·" || token === "-";
+}
+
+export function validRightHandPattern(pattern: readonly string[], technique: RightHandTechnique) {
+  return pattern.length >= 2 && pattern.length <= 32 && pattern.every((token) => validRightHandPatternToken(token, technique));
+}
+
+export type RightHandTimingSlot = { absoluteStep: number; patternIndex: number; expectedAt: number };
+export type RightHandTimingDecision = { kind: "onTime" | "early" | "late" | "missed"; expectedStep: number; consumeStep: number };
+
+/** Return the next sounding slot using an absolute step counter; rests are skipped without rewinding time. */
+export function rightHandTimingSlot(pattern: readonly string[], technique: RightHandTechnique, startAt: number, stepMs: number, fromAbsoluteStep: number): RightHandTimingSlot | null {
+  if (!pattern.length || !Number.isFinite(startAt) || !Number.isFinite(stepMs) || stepMs <= 0) return null;
+  let absoluteStep = Math.max(0, Math.floor(fromAbsoluteStep));
+  for (let guard = 0; guard < pattern.length * 2; guard += 1) {
+    const patternIndex = absoluteStep % pattern.length;
+    if (!describeRightHandStep(pattern[patternIndex], technique).rest) return { absoluteStep, patternIndex, expectedAt: startAt + absoluteStep * stepMs };
+    absoluteStep += 1;
+  }
+  return null;
+}
+
+/** Leave a grace interval before the next expected slot so a just-late onset is not double-counted. */
+export function rightHandTimingMissDeadline(current: RightHandTimingSlot, next: RightHandTimingSlot | null, toleranceMs: number) {
+  return next ? next.expectedAt - toleranceMs : current.expectedAt + toleranceMs;
+}
+
+export function classifyRightHandOnset(now: number, current: RightHandTimingSlot, next: RightHandTimingSlot | null, stepMs: number, toleranceMs: number): RightHandTimingDecision {
+  const signed = now - current.expectedAt;
+  if (signed <= toleranceMs) return { kind: Math.abs(signed) <= stepMs * 0.16 ? "onTime" : signed < 0 ? "early" : "late", expectedStep: current.absoluteStep, consumeStep: current.absoluteStep + 1 };
+  // A stroke beyond the nominal tolerance but before the next slot's grace
+  // boundary still belongs to the current slot as a late stroke.
+  if (next && now < next.expectedAt - toleranceMs) return { kind: "late", expectedStep: current.absoluteStep, consumeStep: current.absoluteStep + 1 };
+  return { kind: "missed", expectedStep: current.absoluteStep, consumeStep: current.absoluteStep + 1 };
 }
 
 export function rightHandCountLabel(index: number, subdivision: RightHandExercise["subdivision"]) {

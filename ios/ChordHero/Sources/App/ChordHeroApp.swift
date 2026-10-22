@@ -37,6 +37,7 @@ struct ChordHeroApp: App {
 private enum AppSection: Hashable { case practice, songLibrary, library, chart, tools }
 
 struct RootView: View {
+    @AppStorage("chordHero.displayLanguage") private var displayLanguage = "auto"
     @EnvironmentObject private var store: ContentStore
     @Environment(\.modelContext) private var context
     @Environment(\.scenePhase) private var scenePhase
@@ -62,6 +63,13 @@ struct RootView: View {
             } else { ProgressView("Loading Chord Hero…") }
         }
         .fontDesign(.rounded)
+        .environment(\.locale, resolvedLocale)
+        .environment(\.layoutDirection, ["ar", "he", "ur"].contains(resolvedLocale.language.languageCode?.identifier ?? "") ? .rightToLeft : .leftToRight)
         .onChange(of: scenePhase) { _, phase in if phase != .active { audio.stop() } }
+    }
+
+    private var resolvedLocale: Locale {
+        guard displayLanguage != "auto" else { return .autoupdatingCurrent }
+        return Locale(identifier: displayLanguage.replacingOccurrences(of: "-", with: "_"))
     }
 }

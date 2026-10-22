@@ -84,6 +84,7 @@ struct ChordDiagramView: View {
             RoundedRectangle(cornerRadius: 18, style: .continuous)
                 .stroke(Color.primary.opacity(0.08), lineWidth: 1)
         }
+        .environment(\.layoutDirection, .leftToRight)
         .accessibilityElement(children: .ignore)
         .accessibilityLabel("Chord diagram for \(chord.name)")
     }

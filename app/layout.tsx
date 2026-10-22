@@ -1,8 +1,6 @@
 import "./globals.css";
 import type { Metadata } from "next";
-import Image from "next/image";
-import Link from "next/link";
-import AppEnhancements from "../components/AppEnhancements";
+import LocalizedSiteShell from "../components/LocalizedSiteShell";
 
 export const metadata: Metadata = {
   title: "Chord Hero",
@@ -18,42 +16,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body>
-        <header className="site-header">
-          <Link href="/" className="brand-link">
-            <Image
-              src="/chord-hero-logo.svg"
-              alt=""
-              className="logo"
-              width={64}
-              height={64}
-              priority
-            />
-            <span className="brand-copy">
-              <strong className="brand-name">Chord <em>Hero</em></strong>
-              <small>Practice Studio</small>
-            </span>
-          </Link>
-          <nav className="site-nav">
-            <Link href="/">Home</Link>
-            <Link href="/practice">Daily Plan</Link>
-            <Link href="/trainer">Trainer</Link>
-            <Link href="/right-hand">Right Hand</Link>
-            <Link href="/songs">Songs</Link>
-            <Link href="/song-builder">Song Builder</Link>
-            <Link href="/song-library">Song Library</Link>
-            <Link href="/library">Library</Link>
-            <Link href="/chords">Chord Chart</Link>
-            <Link href="/about">About</Link>
-          </nav>
-        </header>
-        {children}
-        <AppEnhancements />
-        <footer className="site-footer">
-          <strong>License:</strong> GNU GPL v3.0. You are free to share and adapt this project
-          under the terms of the GPL-3.0 license.
-        </footer>
+      <html lang="en" suppressHydrationWarning>
+        <body>
+          <LocalizedSiteShell>{children}</LocalizedSiteShell>
       </body>
     </html>
   );

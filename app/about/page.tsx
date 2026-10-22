@@ -1,22 +1,23 @@
 "use client";
 
+import { useLocale } from "../../lib/localeClient";
+
 export default function AboutPage() {
+  const { t } = useLocale();
   return (
     <main className="page about focused-page">
       <section className="studio-heading about-hero">
         <div>
           <span className="tag">About</span>
-          <h1>Built to make chord changes feel effortless.</h1>
+          <h1>{t("aboutHeadline")}</h1>
           <p>
-            Chord Hero is a focused practice companion for guitarists who want to switch chords
-            faster, cleaner, and with more confidence. The trainer keeps you on a tight clock while
-            the library and song coach help you explore voicings and musical context.
+            {t("aboutIntro")}
           </p>
         </div>
         <div className="studio-session-note">
           <span className="label">The method</span>
-          <strong>See it · shape it · hear it</strong>
-          <span>Short loops turn deliberate movement into dependable muscle memory.</span>
+          <strong>{t("aboutMethod")}</strong>
+          <span>{t("aboutLoops")}</span>
         </div>
       </section>
 

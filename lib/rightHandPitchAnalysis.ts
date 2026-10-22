@@ -4,14 +4,14 @@ const NOTE_NAMES = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A"
 const ROOTS: Record<string, number> = { C: 0, "C#": 1, DB: 1, D: 2, "D#": 3, EB: 3, E: 4, F: 5, "F#": 6, GB: 6, G: 7, "G#": 8, AB: 8, A: 9, "A#": 10, BB: 10, B: 11 };
 const clampScore = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
 
-function chordTemplate(chord: string) {
-  const match = chord.trim().toUpperCase().match(/^([A-G](?:#|B)?)(M|MIN|MAJ|7|M7|MIN7|SUS2|SUS4)?$/);
-  const root = ROOTS[match?.[1] ?? ""];
+export function chordTemplate(chord: string) {
+  const match = chord.trim().match(/^([A-G](?:#|b)?)(m|min|maj|sus2|sus4|7|m7|maj7)?$/i);
+  const root = ROOTS[match?.[1]?.toUpperCase() ?? ""];
   if (!Number.isFinite(root)) return null;
-  const quality = match?.[2] ?? "MAJ";
-  const intervals = quality === "M" || quality === "MIN" || quality === "MIN7" ? [0, 3, 7] : quality === "SUS2" ? [0, 2, 7] : quality === "SUS4" ? [0, 5, 7] : [0, 4, 7];
-  if (quality === "7") intervals.push(10);
-  if (quality === "M7" || quality === "MAJ7") intervals.push(11);
+  const quality = (match?.[2] ?? "maj").toLowerCase();
+  const intervals = quality === "m" || quality === "min" || quality === "m7" ? [0, 3, 7] : quality === "sus2" ? [0, 2, 7] : quality === "sus4" ? [0, 5, 7] : [0, 4, 7];
+  if (quality === "7" || quality === "m7") intervals.push(10);
+  if (quality === "maj7") intervals.push(11);
   return { root, tones: intervals.map((interval) => (root + interval) % 12) };
 }
 
@@ -66,8 +66,13 @@ function chromaForWindow(channel: Float32Array, sampleRate: number, centerSample
 function scoreChord(chroma: number[], chord: string) {
   const template = chordTemplate(chord);
   if (!template) return 0;
-  const toneEnergy = template.tones.reduce((sum, note) => sum + chroma[note], 0);
-  return clampScore((toneEnergy * 0.82 + chroma[template.root] * 0.45) * 100);
+  let total = 0;
+  for (const value of chroma) total += Math.max(0, value);
+  total = total || 1;
+  let toneEnergy = 0;
+  for (const note of template.tones) toneEnergy += Math.max(0, chroma[note]) / total;
+  // Normalize first so exact chroma with a larger raw amplitude cannot tie a partial overlap at the cap.
+  return clampScore((toneEnergy * 0.82 + Math.max(0, chroma[template.root]) / total * 0.45) * 100);
 }
 
 function rootScore(chroma: number[], chord: string) {
@@ -82,27 +87,28 @@ function signatureSimilarity(left: number[], right: number[]) {
   return clampScore(dot / Math.sqrt(Math.max(1e-9, normLeft * normRight)) * 100);
 }
 
-function bestChord(chroma: number[]) {
-  const candidates = ["C", "D", "E", "F", "G", "A", "B"].flatMap((root) => [root, `${root}m`]);
+export function bestChord(chroma: number[]) {
+  const candidates = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"].flatMap((root) => [root, `${root}m`, `${root}7`, `${root}m7`, `${root}maj7`, `${root}sus2`, `${root}sus4`]);
   return candidates.reduce((best, chord) => {
     const score = scoreChord(chroma, chord);
     return score > best.score ? { chord, score } : best;
   }, { chord: "—", score: 0 });
 }
 
-export function analyzePitchAndHarmony(channel: Float32Array, sampleRate: number, onsets: number[], beatTimings: BeatTiming[], requestedProgression: string[], subdivisions: number, scoringMode: PitchScoringMode = "quality", targetSignatures: Record<string, ChordCalibrationSignature> = {}) {
+export function analyzePitchAndHarmony(channel: Float32Array, sampleRate: number, onsets: number[], beatTimings: BeatTiming[], requestedProgression: string[], subdivisions: number, scoringMode: PitchScoringMode = "quality", targetSignatures: Record<string, ChordCalibrationSignature> = {}, expectedPattern: readonly string[] = []) {
   const pitchCandidates = onsets.slice(0, 10).map((onset) => detectFundamental(channel, sampleRate, Math.floor((onset / 1000 + 0.04) * sampleRate))).filter((item): item is NonNullable<typeof item> => Boolean(item));
   const detectedPitch = pitchCandidates.length ? pitchCandidates.reduce((best, item) => item.confidence > best.confidence ? item : best) : null;
   const progression = requestedProgression.filter((chord) => chordTemplate(chord));
-  const harmonicEvidence: HarmonicEvidence[] = progression.length ? beatTimings.slice(0, Math.min(16, beatTimings.length)).map((beat, index) => {
-    const expectedChord = progression[Math.floor(index / Math.max(1, subdivisions * 4)) % progression.length];
+  const harmonicEvidence: HarmonicEvidence[] = progression.length ? beatTimings.slice(0, Math.min(16, beatTimings.length)).flatMap((beat) => {
+    if (beat.observedMs === null) return [];
+    const expectedChord = progression[Math.floor(beat.step / Math.max(1, subdivisions * 4)) % progression.length];
     const center = Math.floor(((beat.observedMs ?? beat.expectedMs) / 1000) * sampleRate);
     const chroma = chromaForWindow(channel, sampleRate, center);
     const templateConfidence = scoringMode === "root" ? rootScore(chroma, expectedChord) : scoreChord(chroma, expectedChord);
     const saved = targetSignatures[expectedChord.toUpperCase()];
     const signatureMatch = saved ? signatureSimilarity(chroma, saved.chroma) : undefined;
     const confidence = signatureMatch === undefined ? templateConfidence : clampScore(templateConfidence * .4 + signatureMatch * .6);
-    return { expectedChord, detectedChord: bestChord(chroma).chord, confidence, signatureMatch };
+    return [{ step: beat.step, patternToken: expectedPattern.length ? expectedPattern[beat.step % expectedPattern.length] : undefined, expectedMs: beat.expectedMs, observedMs: beat.observedMs, expectedChord, detectedChord: bestChord(chroma).chord, confidence, signatureMatch }];
   }) : [];
   const chordAccuracyScore = harmonicEvidence.length ? clampScore(harmonicEvidence.reduce((sum, item) => sum + item.confidence, 0) / harmonicEvidence.length) : null;
   return { detectedPitch, harmonicEvidence, chordAccuracyScore };

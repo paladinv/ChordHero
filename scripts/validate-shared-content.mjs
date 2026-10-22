@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import path from "node:path";
-import { validateHarmonicNotes } from "./validate-harmonic-notes.mjs";
+import { validateChordQualityDefinitions, validateHarmonicNotes, validateHarmonicReviewBaseline } from "./validate-harmonic-notes.mjs";
 
 const directory = path.join(process.cwd(), "shared/content/v1");
 const read = (name) => JSON.parse(fs.readFileSync(path.join(directory, name), "utf8"));
@@ -8,6 +8,7 @@ const chords = read("chords.json");
 const rightHand = read("right-hand.json");
 const songs = read("songs.json");
 const settings = read("settings.json");
+const harmonicReviewBaseline = read("harmonic-review-baseline.json");
 const fail = (message) => { throw new Error(message); };
 
 for (const document of [chords, rightHand, settings]) {
@@ -68,6 +69,16 @@ if (settings.tunings.length !== 5) fail("Expected five tunings, including seven-
 const sevenString = settings.tunings.find((tuning) => tuning.id === "standard-7");
 if (!sevenString || sevenString.strings.length !== 7 || sevenString.semitoneOffsets.length !== 7) fail("The seven-string tuning must define seven strings and offsets");
 
-const harmonicReport = validateHarmonicNotes(chords.chordLibrary);
+validateChordQualityDefinitions(chords.qualityDefinitions);
+validateHarmonicReviewBaseline(harmonicReviewBaseline);
+const harmonicReport = validateHarmonicNotes(chords.chordLibrary, chords.qualityDefinitions, undefined, harmonicReviewBaseline);
+if (harmonicReport.malformed.length) fail(`Malformed chord charts: ${harmonicReport.malformed.join(", ")}`);
+if (harmonicReport.bassWarnings) fail(`Incorrect slash-bass labels: ${harmonicReport.slashBassWarnings.join(", ")}`);
+if (harmonicReport.unreviewedPartialNotes.length) fail(`New or worsened unreviewed partial-tone charts: ${harmonicReport.unreviewedPartialNotes.map((item) => `${item.id} missing ${item.newIntervals.join(",")}`).join("; ")}`);
 
-console.log(`Shared content is valid: 346 chords, 4 levels, 4 packs, 36 exercises, 50 songs, 5 tunings. Harmonic coverage: ${harmonicReport.complete} complete, ${harmonicReport.partial} intentional/partial, ${harmonicReport.bassWarnings} bass-label warnings.`);
+console.log(`Shared content is valid: 346 chords, 4 levels, 4 packs, 36 exercises, 50 songs, 5 tunings. Harmonic coverage: ${harmonicReport.complete} complete; ${harmonicReport.partial} review-required legacy gaps unresolved (${harmonicReport.partialNotes.filter((item) => item.essentialMissing.length).length} with essential-tone gaps, ${harmonicReport.partialNotes.filter((item) => item.optionalMissing.length).length} with optional-color omissions).`);
+console.log(`Coverage roadmap: ${harmonicReport.coverage.length} root/quality combinations across 12 roots x ${chords.qualityDefinitions.length} canonical qualities; ${harmonicReport.missingCombinations.length} combinations currently have no curated chart.`);
+for (const root of ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", "B"]) {
+  const cells = harmonicReport.coverage.filter((cell) => cell.root === root);
+  console.log(`  ${root}: ${cells.map((cell) => `${cell.quality}=${cell.missing ? "missing" : cell.count}`).join(" ")}`);
+}

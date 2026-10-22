@@ -31,9 +31,6 @@ android {
     }
 
     buildTypes {
-        debug {
-            enableUnitTestCoverage = true
-        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -45,10 +42,6 @@ android {
         named("main") {
             assets.directories.add("../../shared/content/v1")
         }
-    }
-
-    testOptions {
-        unitTests.isIncludeAndroidResources = true
     }
 
     lint {

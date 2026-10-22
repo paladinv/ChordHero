@@ -1,11 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import LocalizedCopy from "../../components/LocalizedCopy";
 import ChordDiagram from "../../components/ChordDiagram";
 import { CHORD_LOOKUP } from "../../lib/chords";
 import { playRecordedClick } from "../../lib/recordedAudio";
 import sharedSongContent from "../../shared/content/v1/songs.json";
-import { readSongLibraryState, simplifyChord, transposeChord } from "../../lib/songLibrary";
+import { readSongLibraryState, saveQueueResumePoint, simplifyChord, transposeChord, writeSongLibraryState, type LibrarySong } from "../../lib/songLibrary";
+import { spellChordName } from "../../lib/songLibraryLearning";
 
 type Song = {
   id?: string;
@@ -21,7 +23,7 @@ type Song = {
   key?: string;
   timeSignature?: string;
   variations?: SongVariation[];
-  sections?: { id: string; title: string; blocks: { type: string; chords?: string[] }[] }[];
+  sections?: { id: string; title: string; blocks: { type: string; chords?: string[]; text?: string; lines?: string[] }[] }[];
 };
 
 type SongVariation = { id: string; name: string; technique: string; key: string; timeSignature: string; bpm: number; tuningId: string; capo: number; pattern: string; feel: string };
@@ -197,6 +199,10 @@ const SONGS: Song[] = (sharedSongContent.songs as unknown as SharedSong[]).map((
   strumPattern: song.variations[0]?.pattern ?? "D - D -",
   strumFeel: song.variations[0]?.feel ?? "Practice the changes slowly."
 }));
+function librarySongForCoach(song: LibrarySong): Song {
+  const first = song.variations[0];
+  return { ...song, chords: song.sections.flatMap((section) => section.blocks.flatMap((block) => block.type === "chords" ? block.chords ?? [] : [])), strumPattern: first?.pattern ?? "D - D -", strumFeel: first?.feel ?? "Practice the changes slowly." };
+}
 const CHORD_TIPS = sharedSongContent.chordTips as Record<
   string,
   { fingering: string; transition: string; commonMistake: string }
@@ -207,6 +213,7 @@ void LEGACY_CHORD_TIPS;
 
 export default function SongsPage() {
   const [songIndex, setSongIndex] = useState(0);
+  const [coachSongs, setCoachSongs] = useState<Song[]>(SONGS);
   const [songStep, setSongStep] = useState(0);
   const [songStatus, setSongStatus] = useState<"idle" | "countin" | "running" | "paused">("idle");
   const [metronomeOn, setMetronomeOn] = useState(true);
@@ -218,6 +225,12 @@ export default function SongsPage() {
   const [transpose, setTranspose] = useState(0);
   const [largePrint, setLargePrint] = useState(false);
   const [handsFree, setHandsFree] = useState(false);
+  const [voiceRecognitionAllowed, setVoiceRecognitionAllowed] = useState(false);
+  const [returnTo, setReturnTo] = useState("");
+  const [showChordNames, setShowChordNames] = useState(true);
+  const [showLyrics, setShowLyrics] = useState(true);
+  const [showTab, setShowTab] = useState(true);
+  const [chordSpelling, setChordSpelling] = useState<"key" | "sharps" | "flats">("key");
   const [simplifyMode, setSimplifyMode] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState("");
   const [midiStatus, setMidiStatus] = useState("MIDI pedal not connected");
@@ -230,19 +243,27 @@ export default function SongsPage() {
   const songTimer = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const midiCleanupRef = useRef<(() => void) | null>(null);
+  const resumeQueueIdRef = useRef("direct");
 
-  const activeSong = SONGS[songIndex];
+  const activeSong = coachSongs[songIndex] ?? coachSongs[0];
   const activeVariation = activeSong.variations?.find((variation) => variation.id === variationId) ?? activeSong.variations?.[0];
-  const displayedChords = (practiceContext?.chords.length ? practiceContext.chords : activeSong.chords).map((chord) => transposeChord(simplifyMode ? simplifyChord(chord) : chord, transpose));
+  const transposedChords = useMemo(() => (practiceContext?.chords.length ? practiceContext.chords : activeSong.chords).map((chord) => transposeChord(simplifyMode ? simplifyChord(chord) : chord, transpose)), [activeSong.chords, practiceContext?.chords, simplifyMode, transpose]);
+  const displayKey = activeVariation?.key ?? activeSong.key ?? "C";
+  const displayedChords = useMemo(() => transposedChords.map((chord) => spellChordName(chord, chordSpelling, displayKey)), [transposedChords, chordSpelling, displayKey]);
   const sectionRanges = useMemo(() => {
     let cursor = 0;
     return (activeSong.sections ?? []).map((section) => { const length = section.blocks.flatMap((block) => block.type === "chords" ? block.chords ?? [] : []).length; const range = { ...section, start: cursor, end: Math.max(cursor, cursor + length - 1) }; cursor += length; return range; });
   }, [activeSong]);
   const loopRange = sectionRanges.find((section) => section.id === loopSectionId);
+  const activePracticeSection = loopRange ?? sectionRanges.find((section) => songStep >= section.start && songStep <= section.end) ?? sectionRanges[0];
+  const resumeSnapshotRef = useRef<{ songId: string; variationId?: string; sectionId?: string; tempoBpm: number; stepIndex: number } | null>(null);
+  resumeSnapshotRef.current = activeSong.id ? { songId: activeSong.id, variationId: activeVariation?.id, sectionId: activePracticeSection?.id, tempoBpm: songTempoBpm, stepIndex: songStep } : null;
   const loopStart = loopRange?.start;
   const loopEnd = loopRange?.end;
-  const currentSongChordName = displayedChords[Math.min(Math.max(songStep, loopRange?.start ?? 0), loopRange?.end ?? displayedChords.length - 1)];
-  const currentSongChord = CHORD_LOOKUP.get(currentSongChordName) ?? null;
+  const currentChordIndex = Math.min(Math.max(songStep, loopRange?.start ?? 0), loopRange?.end ?? displayedChords.length - 1);
+  const currentSongChordName = displayedChords[currentChordIndex];
+  const currentSongChordLookupName = transposedChords[currentChordIndex];
+  const currentSongChord = CHORD_LOOKUP.get(currentSongChordLookupName) ?? null;
   const songTempoMs = Math.round(60000 / songTempoBpm);
 
   const resetSong = useCallback(() => {
@@ -250,28 +271,76 @@ export default function SongsPage() {
   }, [loopStart]);
 
   useEffect(() => {
+    const libraryState = readSongLibraryState();
+    setChordSpelling(libraryState.preferences.chordSpelling);
+    const customSongs = libraryState.songs.filter((song) => !SONGS.some((bundled) => bundled.id === song.id)).map(librarySongForCoach);
+    const availableSongs = [...SONGS, ...customSongs].slice(0, 550);
+    setCoachSongs(availableSongs);
     const params = new URLSearchParams(window.location.search);
     const requestedSongId = params.get("songId");
-    const nextIndex = Math.max(0, SONGS.findIndex((song) => song.id === requestedSongId));
+    if (libraryState.resumePoint?.songId === requestedSongId) resumeQueueIdRef.current = libraryState.resumePoint.queueId;
+    const nextIndex = Math.max(0, availableSongs.findIndex((song) => song.id === requestedSongId));
     const requestedVariationId = params.get("variationId");
     const requestedSetlistId = params.get("setlistId");
+    const requestedReturnTo = params.get("returnTo");
+    if (requestedReturnTo?.startsWith("/song-library") && !requestedReturnTo.startsWith("//")) setReturnTo(requestedReturnTo);
     if (params.get("context") === "right-hand") {
       const chords = (params.get("progression") ?? "").split(",").map((value) => value.trim()).filter((value) => /^[A-G](?:#|b)?(?:m|maj|min|sus[24]|7|m7|maj7)?$/i.test(value)).slice(0, 8);
       setPracticeContext({ exercise: params.get("exercise") ?? "right-hand drill", chords, pattern: (params.get("pattern") ?? "D U").slice(0, 96), style: (params.get("style") ?? "core").slice(0, 32) });
       setSongTempoBpm(Math.max(40, Math.min(180, Number(params.get("tempo")) || 90)));
     }
-    if (requestedSetlistId) setSetlistSongIds(readSongLibraryState().setlists.find((setlist) => setlist.id === requestedSetlistId)?.entries.map((entry) => entry.songId) ?? []);
-    if (requestedSongId && SONGS[nextIndex]) {
+    if (requestedSetlistId) setSetlistSongIds(libraryState.setlists.find((setlist) => setlist.id === requestedSetlistId)?.entries.map((entry) => entry.songId) ?? []);
+    if (requestedSongId && availableSongs[nextIndex]) {
       setSongIndex(nextIndex);
-      setSongTempoBpm(Number(params.get("tempo")) || SONGS[nextIndex].bpm);
-      setVariationId(requestedVariationId ?? SONGS[nextIndex].variations?.[0]?.id ?? "");
+      setSongTempoBpm(Number(params.get("tempo")) || availableSongs[nextIndex].bpm);
+      setVariationId(requestedVariationId ?? availableSongs[nextIndex].variations?.[0]?.id ?? "");
       setTranspose(Number(params.get("transpose") ?? 0));
       setLargePrint(params.get("largePrint") === "1");
       setHandsFree(params.get("handsFree") === "1");
+      setVoiceRecognitionAllowed(params.get("voiceCommands") === "1");
+      setShowChordNames(params.get("displayChords") !== "0");
+      setShowLyrics(params.get("displayLyrics") !== "0");
+      setShowTab(params.get("displayTab") !== "0");
+      const requestedSpelling = params.get("chordSpelling");
+      if (requestedSpelling === "key" || requestedSpelling === "sharps" || requestedSpelling === "flats") setChordSpelling(requestedSpelling);
       setSimplifyMode(params.get("simplify") === "1");
       setResolvedCapo(params.has("capo") ? Number(params.get("capo")) : null);
       setResolvedTuning(params.get("tuning"));
+      const requestedSectionId = params.get("sectionId");
+      const requestedStep = params.get("step");
+      if (requestedSectionId) {
+        const sections = availableSongs[nextIndex].sections ?? [];
+        let chordCursor = 0;
+        for (const section of sections) {
+          const sectionLength = section.blocks.flatMap((block) => block.type === "chords" ? block.chords ?? [] : []).length;
+          if (section.id === requestedSectionId) { setLoopSectionId(section.id); setSongStep(requestedStep ? Math.max(chordCursor, Math.min(chordCursor + Math.max(0, sectionLength - 1), Math.round(Number(requestedStep) || chordCursor))) : chordCursor); break; }
+          chordCursor += sectionLength;
+        }
+      } else if (requestedStep) {
+        const maxStep = Math.max(0, (availableSongs[nextIndex].chords?.length ?? 1) - 1);
+        setSongStep(Math.max(0, Math.min(maxStep, Math.round(Number(requestedStep) || 0))));
+      }
     }
+  }, []);
+
+  useEffect(() => {
+    const persistResumePoint = () => {
+      const point = resumeSnapshotRef.current;
+      if (!point || !point.songId) return;
+      try {
+        const latest = readSongLibraryState();
+        writeSongLibraryState(saveQueueResumePoint(latest, { ...point, queueId: resumeQueueIdRef.current }));
+      } catch {
+        // Resume state is best-effort; a storage quota error must not interrupt practice.
+      }
+    };
+    const onVisibilityChange = () => { if (document.visibilityState === "hidden") persistResumePoint(); };
+    window.addEventListener("pagehide", persistResumePoint);
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.removeEventListener("pagehide", persistResumePoint);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
   }, []);
 
   useEffect(() => {
@@ -281,15 +350,15 @@ export default function SongsPage() {
       if (event.key.toLowerCase() === "r") resetSong();
     };
     window.addEventListener("keydown", handleKey);
-    const Recognition = (window as Window & { webkitSpeechRecognition?: VoiceRecognitionConstructor }).webkitSpeechRecognition;
+    const Recognition = voiceRecognitionAllowed ? (window as Window & { webkitSpeechRecognition?: VoiceRecognitionConstructor }).webkitSpeechRecognition : undefined;
     const recognition = Recognition ? new Recognition() : null;
     if (recognition) {
       recognition.continuous = true; recognition.lang = "en-US";
       recognition.onresult = (event) => { const command = event.results[event.results.length - 1][0].transcript.toLowerCase(); if (command.includes("pause")) setSongStatus("paused"); else if (command.includes("resume") || command.includes("start")) setSongStatus("running"); else if (command.includes("reset")) resetSong(); setVoiceStatus(`Heard: ${command}`); };
       try { recognition.start(); } catch { setVoiceStatus("Use Space to pause/resume; voice control is unavailable."); }
-    } else setVoiceStatus("Use Space to pause/resume; voice control is unavailable.");
+    } else setVoiceStatus(voiceRecognitionAllowed ? "Use Space to pause/resume; browser voice control is unavailable." : "Voice recognition is off. Space pauses/resumes; enable speech only if you accept the browser's privacy terms.");
     return () => { window.removeEventListener("keydown", handleKey); try { recognition?.stop(); } catch { /* no-op */ } };
-  }, [handsFree, resetSong]);
+  }, [handsFree, resetSong, voiceRecognitionAllowed]);
 
   const enableMidi = useCallback(async () => {
     const requestMidi = (navigator as Navigator & { requestMIDIAccess?: () => Promise<WebMidiAccess> }).requestMIDIAccess;
@@ -309,11 +378,11 @@ export default function SongsPage() {
   const advanceToNextSong = () => {
     const setlistPosition = setlistSongIds.indexOf(activeSong?.id ?? "");
     const queuedSongId: string | undefined = setlistPosition >= 0 && setlistSongIds.length > 0 ? setlistSongIds[(setlistPosition + 1) % setlistSongIds.length] : undefined;
-    const queuedIndex = queuedSongId === undefined ? -1 : SONGS.findIndex((song) => song.id === queuedSongId);
-    const nextIndex = queuedIndex >= 0 ? queuedIndex : (songIndex + 1) % SONGS.length;
+    const queuedIndex = queuedSongId === undefined ? -1 : coachSongs.findIndex((song) => song.id === queuedSongId);
+    const nextIndex = queuedIndex >= 0 ? queuedIndex : (songIndex + 1) % coachSongs.length;
     setSongIndex(nextIndex);
-    setSongTempoBpm(SONGS[nextIndex]?.bpm ?? 90);
-    setVariationId(SONGS[nextIndex]?.variations?.[0]?.id ?? "");
+    setSongTempoBpm(coachSongs[nextIndex]?.bpm ?? 90);
+    setVariationId(coachSongs[nextIndex]?.variations?.[0]?.id ?? "");
     setTranspose(0);
     resetSong();
   };
@@ -409,12 +478,12 @@ export default function SongsPage() {
       <section className="studio-heading songs-heading">
         <div>
           <span className="tag">Song Coach</span>
-          <h1>Turn chord changes into music.</h1>
-          <p>Choose a traditional tune, set a comfortable tempo, and follow the progression one change at a time.</p>
+          <h1><LocalizedCopy id="songsTitle" /></h1>
+          <p><LocalizedCopy id="songsIntro" /></p>
         </div>
         <div className="studio-session-note" aria-label="Play-along recommendation">
           <span className="label">A good first pass</span>
-          <strong>{activeSong.title} · {songTempoBpm} BPM</strong>
+          <strong data-user-content>{activeSong.title} · {songTempoBpm} BPM</strong>
           <span>Listen through once, then join after the four-count.{resolvedCapo !== null ? ` Capo ${resolvedCapo}.` : ""}{resolvedTuning ? ` Tuning ${resolvedTuning}.` : ""}</span>
         </div>
       </section>
@@ -432,8 +501,8 @@ export default function SongsPage() {
               onChange={(event) => {
                 const nextIndex = Number(event.target.value);
                 setSongIndex(nextIndex);
-                setSongTempoBpm(SONGS[nextIndex]?.bpm ?? 90);
-                setVariationId(SONGS[nextIndex]?.variations?.[0]?.id ?? "");
+                setSongTempoBpm(coachSongs[nextIndex]?.bpm ?? 90);
+                setVariationId(coachSongs[nextIndex]?.variations?.[0]?.id ?? "");
                 setTranspose(0);
                 setSongStep(0);
                 setSongBeat(0);
@@ -441,7 +510,7 @@ export default function SongsPage() {
                 setSongStatus("idle");
               }}
             >
-              {SONGS.map((song, index) => (
+              {coachSongs.map((song, index) => (
                 <option key={song.title} value={index}>
                   {song.title} - {song.difficulty}
                 </option>
@@ -529,6 +598,8 @@ export default function SongsPage() {
               <button className="btn" onClick={() => void enableMidi()}>Connect MIDI pedal</button>
               <button className="btn" onClick={() => window.print()}>Print lead sheet</button>
             </div>
+            {handsFree && <label className="muted"><input type="checkbox" checked={voiceRecognitionAllowed} onChange={(event) => setVoiceRecognitionAllowed(event.target.checked)} /> Allow browser speech recognition for this session. The browser may process microphone audio using its own service.</label>}
+            {returnTo && <p><a className="text-button" href={returnTo}>Return to Song Library · {activeSong.title}</a></p>}
             {(handsFree || midiStatus !== "MIDI pedal not connected") && <p className="muted" role="status">{voiceStatus || "Space pauses/resumes. Say start, pause, resume, or reset."} · {midiStatus}</p>}
             <div className="song-guidance">
               <div className="song-guidance-card">
@@ -541,10 +612,11 @@ export default function SongsPage() {
                 <p className="muted">4 clicks before we start. Tap start, then get ready.</p>
               </div>
             </div>
+            {activePracticeSection && (showLyrics || showTab) && <section className="song-section-sheet" aria-label={`${activePracticeSection.title} lead sheet`}><span className="label">{activePracticeSection.title} · lead sheet</span>{activePracticeSection.blocks.map((block, index) => block.type === "lyrics" && showLyrics ? <p key={`lyrics-${index}`}>{block.text ?? block.lines?.join("\n")}</p> : block.type === "tab" && showTab ? <pre key={`tab-${index}`}>{block.lines?.join("\n") ?? block.text}</pre> : null)}</section>}
           </div>
           <div className="song-progress">
-            <span className="label">Current chord</span>
-            <h3>{currentSongChordName}</h3>
+            <span className="label">{showChordNames ? "Current chord" : "Practice progress"}</span>
+            {showChordNames ? <h3>{currentSongChordName}</h3> : <p className="muted">Chord names are hidden by this song&apos;s display preferences.</p>}
             <p>
               Step {Math.min(songStep + 1, displayedChords.length)} of {displayedChords.length} -
               Beat {songBeat + 1} of {songBeatsPerChord}
@@ -555,24 +627,24 @@ export default function SongsPage() {
                 <p>Starting in {songCountIn}...</p>
               </div>
             )}
-            <div className="diagram-wrap">
+            {showChordNames && <div className="diagram-wrap">
               {currentSongChord ? <ChordDiagram chord={currentSongChord} /> : <div className="diagram-empty" />}
-            </div>
-            {CHORD_TIPS[currentSongChordName] && (
+            </div>}
+            {showChordNames && CHORD_TIPS[currentSongChordLookupName] && (
               <div className="song-tip">
                 <span className="label">Chord tips</span>
                 <p>
-                  <strong>Fingering:</strong> {CHORD_TIPS[currentSongChordName].fingering}
+                  <strong>Fingering:</strong> {CHORD_TIPS[currentSongChordLookupName].fingering}
                 </p>
                 <p>
-                  <strong>Transition:</strong> {CHORD_TIPS[currentSongChordName].transition}
+                  <strong>Transition:</strong> {CHORD_TIPS[currentSongChordLookupName].transition}
                 </p>
                 <p>
-                  <strong>Common mistake:</strong> {CHORD_TIPS[currentSongChordName].commonMistake}
+                  <strong>Common mistake:</strong> {CHORD_TIPS[currentSongChordLookupName].commonMistake}
                 </p>
               </div>
             )}
-            <div className="song-chords">
+            {showChordNames && <div className="song-chords">
               {displayedChords.map((chord, index) => (
                 <span
                   key={`${chord}-${index}`}
@@ -581,8 +653,8 @@ export default function SongsPage() {
                   {chord}
                 </span>
               ))}
-            </div>
-            {songStatus === "paused" && <button className="btn primary next-song-button" type="button" onClick={advanceToNextSong}>Launch next song · {SONGS[(songIndex + 1) % SONGS.length]?.title}</button>}
+            </div>}
+            {songStatus === "paused" && <button className="btn primary next-song-button" type="button" onClick={advanceToNextSong}>Launch next song · {coachSongs[(songIndex + 1) % coachSongs.length]?.title}</button>}
           </div>
         </div>
       </section>

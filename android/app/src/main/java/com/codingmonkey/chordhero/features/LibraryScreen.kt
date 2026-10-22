@@ -1,5 +1,6 @@
 package com.codingmonkey.chordhero.features
 
+import androidx.compose.ui.res.stringResource
 import android.Manifest
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -143,10 +144,10 @@ fun LibraryScreen(content: ContentBundle, profile: StudentProfileEntity, contain
         }
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterChip(favoritesOnly, { favoritesOnly = !favoritesOnly }, { Text("Favorites") })
+                FilterChip(favoritesOnly, { favoritesOnly = !favoritesOnly }, { Text(stringResource(R.string.favorites)) })
                 FilterChip(recentsOnly, { recentsOnly = !recentsOnly }, { Text("Recent") })
                 OutlinedButton(onClick = { query = ""; root = null; quality = null; packId = null; favoritesOnly = false; recentsOnly = false }) {
-                    Text("Clear")
+                    Text(stringResource(R.string.clear))
                 }
             }
         }
@@ -308,7 +309,7 @@ fun LibraryScreen(content: ContentBundle, profile: StudentProfileEntity, contain
                         context.startActivity(Intent.createChooser(intent, "Share chord comparison"))
                     }) { Text("Share comparison PDF") }
                     OutlinedButton(onClick = { container.documents.print("Chord Hero Chord Comparison", compared) }) {
-                        Text("Print")
+                        Text(stringResource(R.string.print))
                     }
                 }
             }

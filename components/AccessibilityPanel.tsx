@@ -7,6 +7,7 @@ import {
   updatePracticePlatformState,
   type AccessibilityPreferences
 } from "../lib/practicePlatform";
+import { LANGUAGE_OPTIONS, useLocale, type LocalePreference } from "../lib/localeClient";
 
 type Props = {
   offlineReady: boolean;
@@ -27,6 +28,7 @@ function applyPreferences(preferences: AccessibilityPreferences) {
 }
 
 export default function AccessibilityPanel({ offlineReady, installPrompt, onInstallHandled, onClose }: Props) {
+  const { preference, setPreference, t, formatPercent } = useLocale();
   const [preferences, setPreferences] = useState<AccessibilityPreferences>(() => {
     if (typeof window === "undefined") return DEFAULT_ACCESSIBILITY;
     return readPracticePlatformState().accessibility;
@@ -48,20 +50,24 @@ export default function AccessibilityPanel({ offlineReady, installPrompt, onInst
   };
 
   return (
-    <section className="accessibility-panel" id="accessibility-panel" aria-label="Global accessibility controls">
-      <header><strong>Make Chord Hero yours</strong><button type="button" onClick={onClose} aria-label="Close accessibility controls">×</button></header>
-      <label><span>Reduced motion</span><input type="checkbox" checked={preferences.reducedMotion} onChange={(event) => update({ reducedMotion: event.target.checked })} /></label>
-      <label><span>High contrast</span><input type="checkbox" checked={preferences.highContrast} onChange={(event) => update({ highContrast: event.target.checked })} /></label>
-      <label><span>Color-blind-safe heatmaps</span><input type="checkbox" checked={preferences.colorBlindSafe} onChange={(event) => update({ colorBlindSafe: event.target.checked })} /></label>
-      <label><span>Dyslexia-friendly spacing</span><input type="checkbox" checked={preferences.dyslexiaSpacing} onChange={(event) => update({ dyslexiaSpacing: event.target.checked })} /></label>
-      <label><span>Left-handed demos</span><input type="checkbox" checked={preferences.handedness === "left"} onChange={(event) => update({ handedness: event.target.checked ? "left" : "right" })} /></label>
-      <label className="stacked"><span>Diagram size · {Math.round(preferences.diagramScale * 100)}%</span><input type="range" min="0.85" max="1.35" step="0.05" value={preferences.diagramScale} onChange={(event) => update({ diagramScale: Number(event.target.value) })} /></label>
-      <label className="stacked"><span>Audio · {preferences.audioMuted ? "Muted" : `${Math.round(preferences.audioVolume * 100)}%`}</span><input type="range" min="0" max="1" step="0.05" value={preferences.audioVolume} disabled={preferences.audioMuted} onChange={(event) => update({ audioVolume: Number(event.target.value) })} /></label>
-      <label><span>Mute all practice audio</span><input type="checkbox" checked={preferences.audioMuted} onChange={(event) => update({ audioMuted: event.target.checked })} /></label>
-      <label><span>Haptics where supported</span><input type="checkbox" checked={preferences.haptics} onChange={(event) => update({ haptics: event.target.checked })} /></label>
+    <section className="accessibility-panel" id="accessibility-panel" aria-label={t("accessibility")}>
+      <header><strong>{t("makeYours")}</strong><button type="button" onClick={onClose} aria-label={t("close")}>×</button></header>
+      <label className="stacked"><span>{t("displayLanguage")}</span><select value={preference} aria-label={t("selectLanguage")} onChange={(event) => setPreference(event.target.value as LocalePreference)}>
+        <option value="auto">{t("deviceLanguage")}</option>
+        {LANGUAGE_OPTIONS.map(([code, name]) => <option value={code} key={code}>{name}</option>)}
+      </select></label>
+      <label><span>{t("reducedMotion")}</span><input type="checkbox" checked={preferences.reducedMotion} onChange={(event) => update({ reducedMotion: event.target.checked })} /></label>
+      <label><span>{t("highContrast")}</span><input type="checkbox" checked={preferences.highContrast} onChange={(event) => update({ highContrast: event.target.checked })} /></label>
+      <label><span>{t("colorBlindSafe")}</span><input type="checkbox" checked={preferences.colorBlindSafe} onChange={(event) => update({ colorBlindSafe: event.target.checked })} /></label>
+      <label><span>{t("dyslexiaSpacing")}</span><input type="checkbox" checked={preferences.dyslexiaSpacing} onChange={(event) => update({ dyslexiaSpacing: event.target.checked })} /></label>
+      <label><span>{t("leftHandedDemos")}</span><input type="checkbox" checked={preferences.handedness === "left"} onChange={(event) => update({ handedness: event.target.checked ? "left" : "right" })} /></label>
+      <label className="stacked"><span>{t("diagramSize")} · {formatPercent(preferences.diagramScale)}</span><input type="range" min="0.85" max="1.35" step="0.05" value={preferences.diagramScale} onChange={(event) => update({ diagramScale: Number(event.target.value) })} /></label>
+      <label className="stacked"><span>{t("audio")} · {formatPercent(preferences.audioMuted ? 0 : preferences.audioVolume)}</span><input type="range" min="0" max="1" step="0.05" value={preferences.audioVolume} disabled={preferences.audioMuted} onChange={(event) => update({ audioVolume: Number(event.target.value) })} /></label>
+      <label><span>{t("muteAudio")}</span><input type="checkbox" checked={preferences.audioMuted} onChange={(event) => update({ audioMuted: event.target.checked })} /></label>
+      <label><span>{t("haptics")}</span><input type="checkbox" checked={preferences.haptics} onChange={(event) => update({ haptics: event.target.checked })} /></label>
       <footer>
-        <small>{offlineReady ? "Offline exercise cache ready." : "Offline cache activates when supported."}</small>
-        {installPrompt ? <button type="button" onClick={() => void install()}>Install app</button> : null}
+        <small>{offlineReady ? t("offlineReady") : t("offlinePending")}</small>
+        {installPrompt ? <button type="button" onClick={() => void install()}>{t("installApp")}</button> : null}
       </footer>
     </section>
   );

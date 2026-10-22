@@ -2,9 +2,20 @@ import Foundation
 
 struct ChordDocument: Codable, Sendable {
     let schemaVersion: Int
+    let qualityDefinitions: [ChordQualityDefinition]?
     let chordLibrary: [ChordLibraryItem]
     let levels: [LevelDefinition]
     let progressionPacks: [ProgressionPack]
+}
+
+struct ChordQualityDefinition: Codable, Hashable, Sendable {
+    let id: String
+    let label: String
+    let suffix: String
+    let aliases: [String]
+    let intervals: [Int]
+    let essential: [Int]
+    let optional: [Int]
 }
 
 struct ChordDefinition: Codable, Hashable, Sendable {

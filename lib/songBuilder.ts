@@ -11,17 +11,34 @@ export const SONG_BUILDER_TUNINGS: Record<SongInstrument, { label: string; midi:
   ],
   ukulele: [{ label: "Standard · G C E A", midi: [67, 60, 64, 69] }],
   bass: [{ label: "Standard · E A D G", midi: [28, 33, 38, 43] }],
+  piano: [{ label: "MIDI range · C2–C6", midi: [36, 48, 60, 72, 84] }],
+  vocals: [{ label: "MIDI range · C3–C6", midi: [48, 60, 72, 84] }],
+  percussion: [{ label: "General MIDI drum map", midi: [36, 38, 42, 45, 46, 49, 51] }],
 };
 
 const DEFAULT_TUNING: Record<SongInstrument, number[]> = {
   guitar: SONG_BUILDER_TUNINGS.guitar[0].midi,
   ukulele: SONG_BUILDER_TUNINGS.ukulele[0].midi,
   bass: SONG_BUILDER_TUNINGS.bass[0].midi,
+  piano: SONG_BUILDER_TUNINGS.piano[0].midi,
+  vocals: SONG_BUILDER_TUNINGS.vocals[0].midi,
+  percussion: SONG_BUILDER_TUNINGS.percussion[0].midi,
 };
 
 export const SONG_BUILDER_KEYS = ["C", "G", "D", "A", "E", "B", "F#", "C#", "F", "Bb", "Eb", "Ab", "Am", "Em", "Bm", "F#m", "C#m", "G#m", "Dm", "Gm", "Cm", "Fm", "Bbm", "Ebm"];
 export const SONG_BUILDER_METERS = ["2/4", "3/4", "4/4", "5/4", "6/8", "7/8", "12/8"];
 export const SONG_BUILDER_SUBDIVISIONS = [4, 8, 12, 16] as const;
+export const SONG_BUILDER_DRUMS = [
+  { pitch: 35, label: "Acoustic bass drum", shortLabel: "Kick" }, { pitch: 36, label: "Bass drum", shortLabel: "Kick" },
+  { pitch: 37, label: "Side stick", shortLabel: "Stick" }, { pitch: 38, label: "Acoustic snare", shortLabel: "Snare" },
+  { pitch: 39, label: "Hand clap", shortLabel: "Clap" }, { pitch: 40, label: "Electric snare", shortLabel: "Snare" },
+  { pitch: 42, label: "Closed hi-hat", shortLabel: "Hi-hat" }, { pitch: 44, label: "Pedal hi-hat", shortLabel: "Hi-hat" },
+  { pitch: 45, label: "Low tom", shortLabel: "Low tom" }, { pitch: 46, label: "Open hi-hat", shortLabel: "Open hat" },
+  { pitch: 47, label: "Low-mid tom", shortLabel: "Mid tom" }, { pitch: 48, label: "High-mid tom", shortLabel: "Mid tom" },
+  { pitch: 49, label: "Crash cymbal", shortLabel: "Crash" }, { pitch: 50, label: "High tom", shortLabel: "High tom" },
+  { pitch: 51, label: "Ride cymbal", shortLabel: "Ride" }, { pitch: 53, label: "Ride bell", shortLabel: "Ride bell" },
+] as const;
+export const songBuilderDrumName = (pitch: number) => SONG_BUILDER_DRUMS.find((drum) => drum.pitch === pitch)?.shortLabel ?? `Drum ${pitch}`;
 
 const uid = (prefix: string) => `${prefix}-${globalThis.crypto?.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
 const makeMeasures = (count: number): SongCompositionMeasure[] => Array.from({ length: count }, (_, index) => ({ id: uid(`measure-${index + 1}`), events: [] }));
@@ -57,7 +74,9 @@ export function createSongComposition(key = "C", bpm = 90, timeSignature = "4/4"
 
 export function addCompositionTrack(composition: SongComposition, instrument: SongInstrument): SongComposition {
   const tuning = SONG_BUILDER_TUNINGS[instrument][0];
-  const track: SongCompositionTrack = { id: uid("track"), name: instrument === "ukulele" ? "Ukulele" : instrument[0].toUpperCase() + instrument.slice(1), instrument, tuning: [...tuning.midi], tuningLabel: tuning.label, capo: 0 };
+  const baseName = instrument === "ukulele" ? "Ukulele" : instrument === "vocals" ? "Vocals" : instrument === "percussion" ? "Percussion" : instrument[0].toUpperCase() + instrument.slice(1);
+  let name = baseName; let number = 1; while (composition.tracks.some((track) => track.name === name)) name = `${baseName} ${++number}`;
+  const track: SongCompositionTrack = { id: uid("track"), name, instrument, tuning: [...tuning.midi], tuningLabel: tuning.label, capo: 0 };
   return { ...composition, tracks: [...composition.tracks, track], sections: composition.sections.map((section) => {
     const length = Math.max(1, ...Object.values(section.measuresByTrack).map((measures) => measures.length));
     return { ...section, measuresByTrack: { ...section.measuresByTrack, [track.id]: makeMeasures(length) } };
@@ -150,12 +169,14 @@ const PITCH_CLASS: Record<string, number> = { C: 0, "B#": 0, "C#": 1, Db: 1, D: 
 const STANDARD_GUITAR = [40, 45, 50, 55, 59, 64];
 
 export function eventMidiPitches(track: SongCompositionTrack, event: SongCompositionEvent): number[] {
+  if (event.kind === "rest") return [];
+  if (event.midiPitches?.length) return event.midiPitches;
   if (event.kind === "note" && event.string && event.fret !== undefined) {
     const tuningIndex = track.tuning.length - event.string;
     if (tuningIndex < 0 || tuningIndex >= track.tuning.length) return [];
     return [track.tuning[tuningIndex] + track.capo + event.fret];
   }
-  if (event.kind !== "chord") return [];
+  if (event.kind !== "chord" || track.instrument === "percussion") return [];
   if (event.voicing?.length) return event.voicing.flatMap((fret, index) => fret === null || index >= track.tuning.length ? [] : [track.tuning[index] + track.capo + fret]);
   const rootMatch = event.chord?.match(/^([A-G](?:#|b)?)/);
   if (!rootMatch) return [];
@@ -166,7 +187,7 @@ export function eventMidiPitches(track: SongCompositionTrack, event: SongComposi
     if (shape?.length === 6) return shape.flatMap((fret, index) => fret < 0 ? [] : [track.tuning[index] + track.capo + fret]);
   }
   const intervals = chordIntervals(event.chord ?? "");
-  const base = track.instrument === "bass" ? 40 : track.instrument === "ukulele" ? 60 : 48;
+  const base = track.instrument === "bass" ? 40 : track.instrument === "ukulele" || track.instrument === "piano" || track.instrument === "vocals" ? 60 : 48;
   const notes = intervals.map((interval) => {
     const pitchClass = (root + interval) % 12;
     let midi = base + ((pitchClass - base + 120) % 12);
@@ -194,9 +215,21 @@ export type TimelineBar = {
   startsAt: number;
   duration: number;
   events: TimelineEvent[];
+  tempoChanges?: Array<{ beat: number; bpm: number }>;
 };
 type SongSectionSectionKind = SongCompositionSection["kind"];
 export type SongTimeline = { bars: TimelineBar[]; events: TimelineEvent[]; duration: number };
+
+export function barBeatSeconds(bar: Pick<TimelineBar, "bpm" | "tempoChanges">, beat: number) {
+  let at = 0; let bpm = bar.bpm; let seconds = 0;
+  for (const mark of [...(bar.tempoChanges ?? [])].sort((a,b) => a.beat-b.beat)) { if (mark.beat > beat) break; seconds += Math.max(0, mark.beat-at) * 60 / bpm; at = mark.beat; bpm = mark.bpm; }
+  return seconds + Math.max(0, beat-at) * 60 / bpm;
+}
+export function barSecondsBeat(bar: TimelineBar, seconds: number) {
+  let low = 0; let high = bar.measureBeats;
+  for (let i=0;i<24;i++) { const middle=(low+high)/2; if (barBeatSeconds(bar,middle)<seconds) low=middle; else high=middle; }
+  return (low+high)/2;
+}
 
 export function buildSongTimeline(song: LibrarySong, sectionId?: string, tempoScale = 1): SongTimeline {
   const composition = song.composition;
@@ -205,31 +238,61 @@ export function buildSongTimeline(song: LibrarySong, sectionId?: string, tempoSc
   const bars: TimelineBar[] = [];
   const events: TimelineEvent[] = [];
   let cursor = 0;
-  for (const section of sections) {
+  for (const occurrence of sections) {
+    const source = composition.sections.find((item) => item.id === occurrence.linkedTo && !item.linkedTo);
+    const section = source ? { ...source, id: occurrence.id, title: occurrence.title, repeats: occurrence.repeats } : occurrence;
     const meter = section.timeSignature || composition.timeSignature;
     const beats = measureQuarterBeats(meter);
-    const bpm = Math.max(40, Math.min(240, Math.round((section.bpm || composition.bpm) * tempoScale)));
-    const duration = beats * 60 / bpm;
+    const bpm = Math.max(20, Math.min(480, (section.bpm || composition.bpm) * tempoScale));
+
     for (let repeat = 1; repeat <= section.repeats; repeat += 1) {
+      let runningBpm = bpm;
       for (let measureIndex = 0; measureIndex < measureCount(section); measureIndex += 1) {
+        const timing = Object.values(section.measuresByTrack).find((measures) => measures[measureIndex]?.beats || measures[measureIndex]?.tempoChanges?.length)?.[measureIndex];
+        const measureBeats = timing?.beats ?? beats;
+        const tempoChanges = timing?.tempoChanges?.map((mark) => ({ beat: mark.beat, bpm: mark.bpm * tempoScale })).filter((mark) => mark.beat < measureBeats).sort((a,b)=>a.beat-b.beat);
+        const startingBpm=tempoChanges?.find(mark=>mark.beat===0)?.bpm??runningBpm;
+        const duration = barBeatSeconds({ bpm: startingBpm, tempoChanges }, measureBeats);
         const index = bars.length;
-        const bar: TimelineBar = { index, sectionId: section.id, sectionTitle: section.title, sectionKind: section.kind, repeat, measureIndex, meter, bpm, measureBeats: beats, startsAt: cursor, duration, events: [] };
+        const bar: TimelineBar = { index, sectionId: section.id, sectionTitle: section.title, sectionKind: section.kind, repeat, measureIndex, meter, bpm: startingBpm, tempoChanges, measureBeats, startsAt: cursor, duration, events: [] };
         for (const track of composition.tracks) {
           const measure = section.measuresByTrack[track.id]?.[measureIndex];
           for (const event of measure?.events ?? []) {
-            if (event.startBeat >= beats) continue;
-            const cue: TimelineEvent = { at: cursor + event.startBeat * 60 / bpm, duration: Math.min(event.durationBeats, beats - event.startBeat) * 60 / bpm, barIndex: index, track, event, pitches: eventMidiPitches(track, event) };
+            if (event.startBeat >= measureBeats) continue;
+            const swingBeat = (beat: number) => { const whole = Math.floor(beat); const fraction = beat - whole; const swing = event.tuplet || composition.subdivision === 12 ? 0 : composition.swing ?? 0; return whole + (fraction <= 0.5 ? fraction * (1 + swing) : 0.5 * (1 + swing) + (fraction - 0.5) * (1 - swing)); };
+            const shiftedStart = swingBeat(event.startBeat);
+            const duration = event.grace ? .08 : Math.max(0.01, barBeatSeconds(bar, swingBeat(Math.min(measureBeats, event.startBeat + event.durationBeats))) - barBeatSeconds(bar, shiftedStart));
+            const baseAt = cursor + barBeatSeconds(bar, shiftedStart) - (event.grace ? .06 : 0);
+            const humanize = composition.humanize ?? 0;
+            const jitter = humanize ? (Math.random() * 2 - 1) * .018 * humanize / 100 : 0;
+            const velocity = humanize && event.kind !== "rest" ? Math.max(.05, Math.min(1, (event.velocity ?? .75) + (Math.random() * 2 - 1) * .07 * humanize / 100)) : event.velocity;
+            const cue: TimelineEvent = { at: Math.max(cursor, Math.min(cursor + bar.duration - duration, baseAt + jitter)), duration, barIndex: index, track, event: velocity === undefined ? event : { ...event, velocity }, pitches: eventMidiPitches(track, event) };
             bar.events.push(cue);
             events.push(cue);
           }
         }
         bars.push(bar);
         cursor += duration;
+        runningBpm = tempoChanges?.at(-1)?.bpm ?? runningBpm;
       }
     }
   }
   events.sort((left, right) => left.at - right.at || left.track.id.localeCompare(right.track.id));
-  return { bars, events, duration: cursor };
+  // Preserve written events in bars; collapse tied sounds in the playback event list.
+  const playbackEvents: TimelineEvent[] = [];
+  const pending = new Map<string, TimelineEvent>();
+  for (const cue of events) {
+    const key = `${cue.track.id}:${cue.pitches.slice().sort().join()}`;
+    const previous = pending.get(key);
+    if (!cue.event.grace && previous && Math.abs(previous.at + previous.duration - cue.at) < 0.01 && cue.pitches.length) {
+      previous.duration += cue.duration;
+      if (!cue.event.tie) pending.delete(key);
+    } else {
+      const sound = { ...cue }; playbackEvents.push(sound);
+      if (cue.event.tie) pending.set(key, sound); else pending.delete(key);
+    }
+  }
+  return { bars, events: playbackEvents, duration: cursor };
 }
 
 export function addOrRemoveEvent(composition: SongComposition, sectionId: string, trackId: string, measureIndex: number, event: SongCompositionEvent): SongComposition {

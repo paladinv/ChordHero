@@ -1,0 +1,137 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
+import { authoredHandReadyState, authoredMeshDrawableState } from "../components/guitar3d/authoredHandValidation.ts";
+
+for (const [side, bytes, hash] of [["left", 94572, "bc67783144944ea1cda54d9247885825ea5fb9d4651469fe7d00be517a5c2b87"], ["right", 94004, "291790c14f7f88a7f9bd35330c47392ed8e8d395ae6728f4bb7089f1bc1f2b96"]]) {
+  const buffer = readFileSync(`public/models/guitar-technique/${side}.glb`);
+  assert.equal(buffer.length, bytes, `${side} authored hand byte size is stable`);
+  assert.equal(buffer.toString("ascii", 0, 4), "glTF", `${side} is a GLB asset`);
+  assert.equal(buffer.readUInt32LE(4), 2, `${side} uses GLB version 2`);
+  assert.equal(createHash("sha256").update(buffer).digest("hex"), hash, `${side} authored hand hash is stable`);
+  const jsonLength = buffer.readUInt32LE(12); const json = JSON.parse(buffer.toString("utf8", 20, 20 + jsonLength));
+  assert.equal(json.meshes?.length, 1, `${side} has one hand mesh`);
+  assert.equal(json.meshes?.[0]?.primitives?.length, 1, `${side} has one drawable primitive`);
+  const primitive = json.meshes[0].primitives[0];
+  assert.equal(primitive.material, 0, `${side} primitive uses its authored material`);
+  assert.equal(json.materials?.length, 1, `${side} uses one material without groups`);
+  assert.equal(json.accessors?.[primitive.attributes.POSITION]?.count, 1360, `${side} position accessor is populated`);
+  assert.equal(json.accessors?.[primitive.indices]?.count, 6942, `${side} index accessor is populated`);
+  assert.equal(authoredMeshDrawableState({ isSkinnedMesh: true, hasMaterial: true, materialCount: 1, groupCount: 0, positionCount: 1360, indexCount: 6942 }), true, `${side} zero-group single-material mesh remains drawable`);
+  assert.equal(authoredMeshDrawableState({ isSkinnedMesh: true, hasMaterial: true, materialCount: 2, groupCount: 0, positionCount: 1360, indexCount: 6942 }), false, `${side} rejects ungrouped multi-material meshes`);
+  assert.equal(authoredMeshDrawableState({ isSkinnedMesh: true, hasMaterial: true, materialCount: 2, groupCount: 2, positionCount: 1360, indexCount: 6942 }), true, `${side} accepts grouped multi-material meshes`);
+  assert.equal(authoredHandReadyState({ drawable: true, bounds: { min: [-1, 0, -1], max: [1, 2, 1] }, sceneRegion: { min: [-2, -1, -2], max: [2, 3, 2] } }), true, `${side} finite authored bounds are ready`);
+  assert.equal(authoredHandReadyState({ drawable: true, bounds: { min: [Number.NaN, 0, 0], max: [1, 2, 1] }, sceneRegion: { min: [-2, -1, -2], max: [2, 3, 2] } }), false, `${side} rejects non-finite authored bounds`);
+  assert.equal(authoredHandReadyState({ drawable: true, bounds: { min: [20, 0, 0], max: [21, 2, 1] }, sceneRegion: { min: [-2, -1, -2], max: [2, 3, 2] } }), false, `${side} rejects out-of-region authored bounds`);
+  assert.equal(json.skins?.[0]?.joints?.length, 25, `${side} has the expected 25-joint skin`);
+  const names = new Set((json.nodes ?? []).map((node) => node.name));
+  const jointNames = (json.skins?.[0]?.joints ?? []).map((index) => json.nodes?.[index]?.name);
+  const expectedJointNames = [
+    "wrist",
+    "thumb-metacarpal", "thumb-phalanx-proximal", "thumb-phalanx-distal", "thumb-tip",
+    ...["index-finger", "middle-finger", "ring-finger", "pinky-finger"].flatMap((finger) => [
+      `${finger}-metacarpal`, `${finger}-phalanx-proximal`, `${finger}-phalanx-intermediate`, `${finger}-phalanx-distal`, `${finger}-tip`
+    ])
+  ];
+  assert.deepEqual(new Set(jointNames), new Set(expectedJointNames), `${side} uses the canonical 25-joint hand schema`);
+  assert.ok(!names.has("thumb-phalanx-intermediate"), `${side} does not require a nonexistent thumb-intermediate joint`);
+  assert.ok(jointNames.includes("wrist") && jointNames.includes("middle-finger-tip"), `${side} supports wrist-to-middle-tip calibration`);
+  ["wrist", "thumb-metacarpal", "index-finger-metacarpal", "middle-finger-metacarpal", "ring-finger-metacarpal", "pinky-finger-metacarpal", "index-finger-tip", "middle-finger-tip", "ring-finger-tip", "pinky-finger-tip", "thumb-tip"].forEach((name) => assert.ok(names.has(name), `${side} exposes ${name}`));
+}
+const anatomicalHand = readFileSync("public/models/guitar-technique/hand-posable.glb");
+assert.equal(anatomicalHand.length, 506476, "bundled anatomical hand byte size is stable");
+assert.equal(createHash("sha256").update(anatomicalHand).digest("hex"), "d1705ec1317516e79deb5c5ce4ef34e69bf6315bba9025e8a7374fbd0c745f47", "bundled anatomical hand hash is stable");
+assert.equal(anatomicalHand.toString("ascii", 0, 4), "glTF", "bundled anatomical hand is a GLB asset");
+assert.equal(anatomicalHand.readUInt32LE(4), 2, "bundled anatomical hand uses GLB version 2");
+const anatomicalJsonLength = anatomicalHand.readUInt32LE(12);
+const anatomicalJson = JSON.parse(anatomicalHand.toString("utf8", 20, 20 + anatomicalJsonLength));
+const anatomicalNodes = new Map((anatomicalJson.nodes ?? []).map((node) => [node.name, node]));
+const anatomicalJointNames = (anatomicalJson.skins?.[0]?.joints ?? []).map((index) => anatomicalJson.nodes?.[index]?.name);
+assert.equal(anatomicalJointNames.length, 16, "anatomical hand keeps its compact 16-bone rig");
+["hand_r", "index_01_r", "index_02_r", "index_03_r", "middle_01_r", "middle_02_r", "middle_03_r", "ring_01_r", "ring_02_r", "ring_03_r", "pinky_01_r", "pinky_02_r", "pinky_03_r", "thumb_01_r", "thumb_02_r", "thumb_03_r"].forEach((name) => assert.ok(anatomicalNodes.has(name) && anatomicalJointNames.includes(name), `anatomical hand exposes ${name}`));
+const licenseText = readFileSync("public/models/guitar-technique/LICENSE.md", "utf8");
+assert.match(licenseText, /posable-anatomical-right-hand-f6098b4f/, "anatomical hand source is attributed");
+assert.match(licenseText, /Public domain \(CC0\)/, "anatomical hand license is recorded as CC0");
+const rendererSource = readFileSync("components/GuitarTechnique3D.tsx", "utf8");
+const professionalSource = readFileSync("components/guitar3d/professionalAcousticGuitar.ts", "utf8");
+const authoredSource = readFileSync("components/guitar3d/authoredHands.ts", "utf8");
+const authoredGuitarSource = readFileSync("scripts/author-chord-guitar-asset.py", "utf8");
+const authoredGuitarLoader = readFileSync("components/guitar3d/authoredAcousticGuitar.ts", "utf8");
+assert.equal((rendererSource.match(/createProfessionalAcousticGuitar\(renderer\)/g) ?? []).length, 1, "renderer instantiates the professional guitar exactly once");
+assert.doesNotMatch(rendererSource, /bodyPart\(|taperedPrism\(|makeWoodGrainTexture|new THREE\.InstancedMesh\(fretGeometry/, "legacy guitar construction is absent from the renderer");
+assert.match(professionalSource, /new THREE\.InstancedMesh\(fretGeometry, fretMaterial, GUITAR_VISIBLE_FRET_COUNT\)/, "frets remain a twenty-instance draw");
+assert.match(professionalSource, /for \(let string = 0; string < 6; string \+= 1\)/, "professional engine keeps six guitar strings");
+assert.match(rendererSource, /setPixelRatio\(Math\.min\(window\.devicePixelRatio \|\| 1, 1\.5\)\)/, "renderer caps device pixel ratio");
+// Keep this invariant resilient to the development-only diagnostics that are
+// emitted immediately after the render call. The guard itself must remain
+// paired with the actual render invocation; formatting/braces are incidental.
+assert.match(rendererSource, /if\s*\(!disposed && inViewport && documentVisible\)\s*\{\s*renderer\.render\(scene, camera\)/, "renderer remains event-driven and viewport/visibility gated");
+assert.match(professionalSource, /makeRadiusedBoardGeometry/, "fretboard uses a genuinely radiused surface");
+assert.match(professionalSource, /makeTaperedBindingRailGeometry/, "binding follows tapered radiused fretboard edges");
+assert.match(professionalSource, /new THREE\.ShapeGeometry\(bodyOutline\(true\)/, "soundboard uses an explicit triangulated skin with an aperture");
+assert.match(professionalSource, /geometry\.scale\(GUITAR_BODY_PROFILE_X_SCALE, GUITAR_BODY_LENGTH \/ 8\.1, 1\)/, "soundboard longitudinal scale matches the shell orientation");
+assert.match(professionalSource, /geometry\.rotateX\(Math\.PI \/ 2\)/, "soundboard skin follows the shell transform");
+assert.doesNotMatch(professionalSource, /geometry\.scale\(GUITAR_BODY_PROFILE_X_SCALE, -GUITAR_BODY_LENGTH/, "soundboard avoids a negative longitudinal determinant");
+assert.match(professionalSource, /new Uint8Array\(WOOD_TEXTURE_SIZE \* WOOD_TEXTURE_SIZE \* 4\)/, "procedural wood uses an explicit RGBA buffer");
+assert.match(professionalSource, /new THREE\.DataTexture\(data, WOOD_TEXTURE_SIZE, WOOD_TEXTURE_SIZE, THREE\.RGBAFormat\)/, "procedural wood declares RGBA texture format");
+assert.match(professionalSource, /data\[offset \+ 3\] = 255/, "procedural wood initializes opaque alpha");
+assert.match(professionalSource, /woodTexture\(0xf1cf9f, 0xc48a55, true\)/, "soundboard palette is light warm spruce");
+assert.match(professionalSource, /woodTexture\(0x5d2f25, 0x261614, false\)/, "shell palette is restrained dark mahogany");
+assert.match(professionalSource, /const fingerboardTexture = woodTexture/, "fingerboard has a dedicated directional wood texture");
+assert.match(professionalSource, /new THREE\.CapsuleGeometry\(0\.11, GUITAR_SADDLE_STRING_SPREAD/, "bridge includes a raised rounded saddle bed");
+assert.match(professionalSource, /soundHoleLip/, "sound hole includes a raised acoustic lip");
+assert.match(professionalSource, /color: 0xffffff, map: topTexture/, "soundboard texture carries warm spruce albedo without a dark multiplier");
+assert.match(professionalSource, /new THREE\.Mesh\(makeSoundboardGeometry\(\), topMaterial\)/, "the visible top uses the one explicit soundboard skin");
+assert.doesNotMatch(professionalSource, /bodyPart\(topMaterial/, "the visible top does not rely on an extruded cap");
+assert.match(professionalSource, /bodyPart\(\[topMaterial, sideMaterial\]/, "deep shell caps use spruce while extruded side walls use mahogany");
+assert.match(professionalSource, /ExtrudeGeometry uses material index 0 for caps and index 1 for walls/, "shell material grouping documents cap and side intent");
+assert.match(professionalSource, /top\.position\.set\(0, 0, BODY_CENTER_Z\)/, "single soundboard skin sits above the deep shell");
+assert.match(professionalSource, /makePerimeterBindingGeometry/, "purfling is a perimeter binding rather than a full-body overlay");
+assert.match(professionalSource, /makeCrownedFretGeometry/, "frets use a normalized crowned geometry");
+assert.match(professionalSource, /new THREE\.InstancedMesh\(fretGeometry, fretMaterial, GUITAR_VISIBLE_FRET_COUNT\)/, "professional frets remain instanced");
+assert.match(authoredSource, /millimetersToWorld\(AUTHORED_PICK_DIMENSIONS_MM\.width\)/, "authored pick uses physical width conversion");
+assert.match(authoredSource, /pick\.scale\.setScalar\(1 \/ Math\.max\(scale/, "authored pick cancels the calibrated hand-root scale");
+assert.match(authoredSource, /export function splayAuthoredFingers/, "authored picking hand exposes a reusable finger-splay helper");
+assert.match(authoredSource, /\[-0\.16, -0\.05, 0\.06, 0\.15\]/, "authored finger splay uses a conservative anatomical fan");
+assert.match(authoredSource, /AUTHORED_HAND_POSE_LIMITS\.metacarpal/, "finger splay is clamped by the metacarpal pose limit");
+assert.match(authoredSource, /color: 0xf0442d/, "authored plectrum uses a high-contrast red-orange material");
+assert.match(rendererSource, /makePhysicalPickGeometry/, "fallback hand uses a rounded physical pick geometry");
+assert.match(rendererSource, /fns\.splay\(rig\)/, "picking pose applies the authored finger splay");
+assert.match(rendererSource, /const authoredThumbTipPosition = new THREE\.Vector3\(\)/, "authored thumb-tip placement vector is preallocated");
+assert.match(rendererSource, /const authoredIndexTipPosition = new THREE\.Vector3\(\)/, "authored index-tip placement vector is preallocated");
+assert.match(rendererSource, /thumbTip\.getWorldPosition\(authoredThumbTipPosition\)/, "authored plectrum reads the posed thumb tip in world space");
+assert.match(rendererSource, /indexTip\.getWorldPosition\(authoredIndexTipPosition\)/, "authored plectrum reads the posed index tip in world space");
+assert.match(rendererSource, /authoredPickPosition\.copy\(authoredThumbTipPosition\)\.add\(authoredIndexTipPosition\)\.multiplyScalar\(0\.5\)/, "authored plectrum uses the anatomical tip midpoint");
+assert.match(rendererSource, /authoredPickPosition\.y \+= 0\.1; authoredPickPosition\.z \+= 0\.04/, "authored plectrum adds small contact clearance");
+assert.doesNotMatch(rendererSource, /authoredPickPosition\.set\(guitarStringXAt/, "authored plectrum avoids guessed direct string placement");
+assert.match(rendererSource, /right\.pick\.position\.set\(STRING_X\([\s\S]*?0\.72 -[\s\S]*?strumZ \+ 0\.5/, "fallback plectrum stays in the thumb-index tip zone above the strings");
+assert.match(rendererSource, /rig\.root\.remove\(rig\.pick\)/, "authored plectrums detach from the calibrated hand root");
+assert.match(rendererSource, /rig\.pick\.scale\.setScalar\(1\)/, "detached authored plectrums restore exact world scale");
+assert.match(rendererSource, /rig\.pick\.position\.set\(0, 0, 0\)/, "detached authored plectrums reset inherited position");
+assert.match(rendererSource, /rig\.pick\.quaternion\.identity\(\)/, "detached authored plectrums reset inherited orientation");
+assert.match(rendererSource, /scene\.add\(rig\.pick\)/, "authored plectrums are added directly to scene world space");
+assert.doesNotMatch(rendererSource, /scene\.attach\(rig\.pick\)/, "authored plectrums avoid compound attach decomposition");
+assert.doesNotMatch(rendererSource, /rig\.root\.worldToLocal\(authoredPickPosition\)/, "detached authored plectrums use world-space placement");
+assert.match(rendererSource, /rig\.pick\.rotation\.set\(0, handSign \*/, "detached authored plectrum keeps its broad face parallel to the soundboard");
+assert.match(rendererSource, /rig\.pick\.visible = pickingVisible && plan\.kind === "pick"/, "authored plectrum visibility is route and technique gated");
+assert.match(rendererSource, /rigs\.left\?\.pick\) rigs\.left\.pick\.visible = false/, "non-picking authored picks are hidden");
+assert.doesNotMatch(rendererSource, /RELAXED_PICKING_FINGERS|plan\.kind !== "fingerpick"/, "inactive picking fingers retain their authored bind-pose spread");
+assert.doesNotMatch(rendererSource, /if \(plan\.kind !== "pick"\) pose\("thumb"/, "strumming leaves the authored thumb in its bind pose");
+assert.match(rendererSource, /if \(!plan\.rest && plan\.kind === "fingerpick"\).*pose\("thumb"/, "fingerpicking assigns the thumb while written rests suppress string contact");
+assert.match(rendererSource, /assignments\.forEach\(\(assignment\) => pose\(assignment\.finger === "thumb" \? "thumb"/, "explicit finger assignments route the written thumb to its own rig chain");
+assert.match(rendererSource, /if \(plan\.kind === "pick"\) pose\("thumb"/, "plectrum still actively assigns the thumb for the pinch");
+assert.match(rendererSource, /initialPresetRef = useRef<PresetName>\(guitarPresetForMode\(mode\)\)/, "React state derives the initial camera view from mode");
+assert.match(rendererSource, /requestedPresetRef = useRef<PresetName>\(initialPresetRef\.current\)/, "requested camera preset starts with the mode-specific view");
+assert.match(rendererSource, /GUITAR_CAMERA_PRESETS\[guitarPresetForMode\(initialModeRef\.current\)\]/, "scene initialization reads the stable mode ref through its supported camera preset");
+assert.match(authoredGuitarSource, /25\.5 inch scale/, "Blender guitar authoring records the physical 25.5 inch scale");
+assert.match(authoredGuitarSource, /Body \| spruce soundboard annulus/, "Blender guitar authoring cuts a real soundboard annulus");
+assert.match(authoredGuitarSource, /Soundhole \| recessed backing/, "Blender guitar authoring includes a recessed soundhole backing");
+assert.match(authoredGuitarSource, /Soundhole \| inner wall/, "Blender guitar authoring includes an inner soundhole wall");
+assert.match(authoredGuitarSource, /(?:Catmull-Rom interpolation|monotone cubic)/, "Blender guitar authoring smooths the body contour");
+assert.match(authoredGuitarSource, /Fret crown/, "Blender guitar authoring uses rounded fret crowns");
+assert.match(authoredGuitarSource, /embed_grain\(SPRUCE/, "Blender guitar authoring embeds compact spruce grain");
+assert.match(authoredGuitarSource, /image\.pack\(\)/, "Blender guitar authoring packs texture data into the exported asset");
+assert.match(authoredGuitarSource, /acoustic-guitar-authored\.glb/, "Blender guitar authoring has a stable runtime output");
+assert.match(authoredGuitarLoader, /acoustic-guitar-authored\.glb/, "runtime loader targets the Blender-authored guitar");
+assert.match(rendererSource, /procedural fallback/, "runtime labels the procedural guitar as an explicit fallback");
+console.log("Guitar technique 3D asset validation passed.");

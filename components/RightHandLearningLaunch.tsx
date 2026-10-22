@@ -1,0 +1,3 @@
+export default function RightHandLearningLaunch({ layout, onLayout, open, onToggle }: { layout: "beginner" | "advanced"; onLayout: (layout: "beginner" | "advanced") => void; open: boolean; onToggle: () => void }) {
+  return <section className="learning-launch"><label>Studio layout<select value={layout} onChange={(event) => onLayout(event.target.value as "beginner" | "advanced")}><option value="beginner">Beginner · focused</option><option value="advanced">Advanced · all settings</option></select></label><button type="button" aria-expanded={open} onClick={onToggle}>{open ? "Close learning journey" : "Quick start & learning journey"}</button><small>3D preview and recording stay available in both layouts.</small></section>;
+}

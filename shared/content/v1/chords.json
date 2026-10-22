@@ -1,5 +1,30 @@
 {
   "schemaVersion": 1,
+  "qualityDefinitions": [
+    { "id": "major", "label": "Major", "suffix": "", "aliases": ["", "maj", "major"], "intervals": [0, 4, 7], "essential": [0, 4, 7], "optional": [] },
+    { "id": "minor", "label": "Minor", "suffix": "m", "aliases": ["m", "min", "minor"], "intervals": [0, 3, 7], "essential": [0, 3, 7], "optional": [] },
+    { "id": "augmented", "label": "Augmented", "suffix": "+", "aliases": ["+", "aug", "augmented"], "intervals": [0, 4, 8], "essential": [0, 4, 8], "optional": [] },
+    { "id": "diminished", "label": "Diminished", "suffix": "dim", "aliases": ["dim", "°", "o", "diminished"], "intervals": [0, 3, 6], "essential": [0, 3, 6], "optional": [] },
+    { "id": "halfDiminished7", "label": "Half-diminished 7", "suffix": "m7b5", "aliases": ["m7b5", "m7♭5", "ø", "ø7", "halfdim", "halfdiminished", "halfdiminished7"], "intervals": [0, 3, 6, 10], "essential": [0, 3, 6, 10], "optional": [] },
+    { "id": "diminished7", "label": "Diminished 7", "suffix": "dim7", "aliases": ["dim7", "°7", "o7", "diminished7"], "intervals": [0, 3, 6, 9], "essential": [0, 3, 6, 9], "optional": [] },
+    { "id": "major6", "label": "Major 6", "suffix": "6", "aliases": ["6", "maj6", "major6"], "intervals": [0, 4, 7, 9], "essential": [0, 4, 9], "optional": [7] },
+    { "id": "minor6", "label": "Minor 6", "suffix": "m6", "aliases": ["m6", "min6", "minor6", "-6"], "intervals": [0, 3, 7, 9], "essential": [0, 3, 9], "optional": [7] },
+    { "id": "dominant7", "label": "Dominant 7", "suffix": "7", "aliases": ["7", "dom7", "dominant7"], "intervals": [0, 4, 7, 10], "essential": [0, 4, 10], "optional": [7] },
+    { "id": "minor7", "label": "Minor 7", "suffix": "m7", "aliases": ["m7", "min7", "minor7", "-7"], "intervals": [0, 3, 7, 10], "essential": [0, 3, 10], "optional": [7] },
+    { "id": "major7", "label": "Major 7", "suffix": "maj7", "aliases": ["maj7", "ma7", "Δ7", "major7"], "intervals": [0, 4, 7, 11], "essential": [0, 4, 11], "optional": [7] },
+    { "id": "dominant9", "label": "Dominant 9", "suffix": "9", "aliases": ["9", "dom9", "dominant9"], "intervals": [0, 2, 4, 7, 10], "essential": [0, 2, 4, 10], "optional": [7] },
+    { "id": "minor9", "label": "Minor 9", "suffix": "m9", "aliases": ["m9", "min9", "minor9", "-9"], "intervals": [0, 2, 3, 7, 10], "essential": [0, 2, 3, 10], "optional": [7] },
+    { "id": "major9", "label": "Major 9", "suffix": "maj9", "aliases": ["maj9", "ma9", "Δ9", "major9"], "intervals": [0, 2, 4, 7, 11], "essential": [0, 2, 4, 11], "optional": [7] },
+    { "id": "dominant11", "label": "Dominant 11", "suffix": "11", "aliases": ["11", "dom11", "dominant11"], "intervals": [0, 2, 4, 5, 7, 10], "essential": [0, 4, 5, 10], "optional": [2, 7] },
+    { "id": "minor11", "label": "Minor 11", "suffix": "m11", "aliases": ["m11", "min11", "minor11", "-11"], "intervals": [0, 2, 3, 5, 7, 10], "essential": [0, 3, 5, 10], "optional": [2, 7] },
+    { "id": "major11", "label": "Major 11", "suffix": "maj11", "aliases": ["maj11", "ma11", "Δ11", "major11"], "intervals": [0, 2, 4, 5, 7, 11], "essential": [0, 4, 5, 11], "optional": [2, 7] },
+    { "id": "dominant13", "label": "Dominant 13", "suffix": "13", "aliases": ["13", "dom13", "dominant13"], "intervals": [0, 2, 4, 7, 9, 10], "essential": [0, 4, 9, 10], "optional": [2, 7] },
+    { "id": "minor13", "label": "Minor 13", "suffix": "m13", "aliases": ["m13", "min13", "minor13", "-13"], "intervals": [0, 2, 3, 7, 9, 10], "essential": [0, 3, 9, 10], "optional": [2, 7] },
+    { "id": "major13", "label": "Major 13", "suffix": "maj13", "aliases": ["maj13", "ma13", "Δ13", "major13"], "intervals": [0, 2, 4, 7, 9, 11], "essential": [0, 4, 9, 11], "optional": [2, 7] },
+    { "id": "sus2", "label": "Suspended 2", "suffix": "sus2", "aliases": ["sus2"], "intervals": [0, 2, 7], "essential": [0, 2, 7], "optional": [] },
+    { "id": "sus4", "label": "Suspended 4", "suffix": "sus4", "aliases": ["sus4", "sus"], "intervals": [0, 5, 7], "essential": [0, 5, 7], "optional": [] },
+    { "id": "add9", "label": "Add 9", "suffix": "add9", "aliases": ["add9", "add2"], "intervals": [0, 2, 4, 7], "essential": [0, 4, 7], "optional": [2] }
+  ],
   "chordLibrary": [
     {
       "id": "c-major-open",

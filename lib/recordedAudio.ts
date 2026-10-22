@@ -1,6 +1,6 @@
-const buffersByContext = new WeakMap<AudioContext, Map<string, Promise<AudioBuffer | null>>>();
+const buffersByContext = new WeakMap<BaseAudioContext, Map<string, Promise<AudioBuffer | null>>>();
 
-export function loadRecordedAudio(context: AudioContext, path: string) {
+export function loadRecordedAudio(context: BaseAudioContext, path: string) {
   let contextCache = buffersByContext.get(context);
   if (!contextCache) {
     contextCache = new Map();

@@ -1,4 +1,5 @@
 import { RIGHT_HAND_EXERCISES, type RightHandTechnique } from "./rightHandExercises";
+import { normalizePracticeAssignment, normalizePracticeResult } from "./practicePlatformNormalization";
 
 export type PracticeArea = "chords" | "songs" | "rightHand";
 
@@ -13,6 +14,20 @@ export type PracticeResult = {
   misses?: number;
   tempo?: number;
   note?: string;
+  recordingId?: string;
+  reviewAccepted?: boolean;
+  scoreReliability?: "reliable" | "limited" | "insufficient";
+  timingEvidenceCount?: number;
+  expectedTimingCount?: number;
+  /** Exact conditions required before a recorded right-hand take can join a trend cohort. */
+  rightHandContext?: {
+    tempo: number;
+    pattern: string[];
+    chordProgression: string[];
+    scoringMode: "timing" | "root" | "quality";
+    instrumentProfile: "acoustic" | "electric";
+    retained: boolean;
+  };
 };
 
 export type DailyPracticeTask = {
@@ -38,11 +53,14 @@ export type PracticeAssignment = {
   area: PracticeArea;
   itemId?: string;
   targetMinutes: number;
+  targetTempo?: number;
+  targetScore?: number;
   dueAt?: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string;
   feedbackAttachments?: PracticeFeedbackAttachment[];
+  feedbackNotes?: { id: string; body: string; createdAt: string }[];
 };
 
 export type PracticeFeedbackAttachment = {
@@ -54,6 +72,7 @@ export type PracticeFeedbackAttachment = {
   createdAt: string;
   consentNote: string;
   timestampSeconds?: number;
+  consent?: "shared" | "redacted";
 };
 
 export type WeeklyRightHandGoal = { targetMinutes: number; minimumTechniquePercent: number };
@@ -125,9 +144,9 @@ export function normalizePracticePlatformState(value: unknown): PracticePlatform
   return {
     schemaVersion: 1,
     updatedAt: typeof source.updatedAt === "string" ? source.updatedAt : fallback.updatedAt,
-    events: Array.isArray(source.events) ? source.events.slice(-500) : [],
+    events: Array.isArray(source.events) ? source.events.map(normalizePracticeResult).filter((event): event is PracticeResult => Boolean(event)).slice(-500) : [],
     plans: Array.isArray(source.plans) ? source.plans.slice(-31) : [],
-    assignments: Array.isArray(source.assignments) ? source.assignments : [],
+    assignments: Array.isArray(source.assignments) ? source.assignments.map(normalizePracticeAssignment).filter((assignment): assignment is PracticeAssignment => Boolean(assignment)) : [],
     customRoutines: Array.isArray(source.customRoutines) ? source.customRoutines : [],
     accessibility: { ...DEFAULT_ACCESSIBILITY, ...(source.accessibility ?? {}) },
     weeklyRightHandGoal: { targetMinutes: 45, minimumTechniquePercent: 20, ...(source.weeklyRightHandGoal ?? {}) }
@@ -171,7 +190,7 @@ const dateKey = (date = new Date()) => date.toISOString().slice(0, 10);
 
 function weakestRightHandExercise(state: PracticePlatformState) {
   const scoreByItem = new Map<string, { total: number; count: number; misses: number }>();
-  state.events.filter((event) => event.area === "rightHand").forEach((event) => {
+  state.events.filter((event) => event.area === "rightHand" && event.reviewAccepted !== false).forEach((event) => {
     const current = scoreByItem.get(event.itemId) ?? { total: 0, count: 0, misses: 0 };
     current.total += event.score ?? 70;
     current.count += 1;

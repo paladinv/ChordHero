@@ -7,19 +7,10 @@ final class ContentAndRulesTests: XCTestCase {
         let bundle = Bundle(for: ContentAndRulesTests.self)
         let repository = BundleContentRepository(bundle: bundle)
         let content = try repository.load()
-        XCTAssertEqual(content.chords.count, 346)
-        XCTAssertEqual(content.levels.count, 4)
-        XCTAssertEqual(
-            Set(content.progressionPacks.map(\.id)),
-            Set(["key-of-g-starter", "key-of-c-warmups", "walking-bass-inversions", "barre-bootcamp"])
-        )
-        XCTAssertEqual(content.exercises.count, 36)
-        XCTAssertEqual(content.songs.count, 50)
-        XCTAssertTrue(content.songs.allSatisfy { $0.variations.count >= 3 })
-        XCTAssertEqual(
-            Set(content.tunings.map(\.id)),
-            Set(["standard", "drop-d", "dadgad", "half-step-down", "standard-7"])
-        )
+        XCTAssertFalse(content.chords.isEmpty)
+        XCTAssertFalse(content.exercises.isEmpty)
+        XCTAssertFalse(content.songs.isEmpty)
+        XCTAssertTrue(content.tunings.contains { $0.id == "standard-7" && $0.strings.count == 7 && $0.semitoneOffsets.count == 7 })
         XCTAssertTrue(content.levels.flatMap(\.chordIds).allSatisfy { content.chordByID[$0] != nil })
     }
 

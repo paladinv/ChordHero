@@ -3,6 +3,7 @@ import SwiftUI
 import UniformTypeIdentifiers
 
 struct ToolsView: View {
+    @AppStorage("chordHero.displayLanguage") private var displayLanguage = "auto"
     let content: AppContent
     @Environment(\.modelContext) private var context
     @Query(sort: \StudentProfile.createdAt) private var profiles: [StudentProfile]
@@ -34,6 +35,14 @@ struct ToolsView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section("Display language") {
+                    Picker("Display language", selection: $displayLanguage) {
+                        Text("Use device language").tag("auto")
+                        ForEach(Self.supportedLanguages, id: \.tag) { language in
+                            Text(language.name).tag(language.tag)
+                        }
+                    }
+                }
                 Section {
                     StudioSectionHeader(title: "Practice workspace", subtitle: "Profiles, custom packs, and teacher resources", icon: "slider.horizontal.3")
                         .listRowBackground(Color.clear)
@@ -83,6 +92,13 @@ struct ToolsView: View {
     }
 
     private func select(_ target: StudentProfile) { for profile in profiles { profile.isSelected = profile.id == target.id; profile.updatedAt = .now }; try? context.save() }
+
+    private struct LanguageOption: Identifiable { let tag: String; let name: String; var id: String { tag } }
+    private static let supportedLanguages = ["en", "es", "fr", "de", "it", "pt", "nl", "pl", "ru", "uk", "tr", "ar", "he", "hi", "bn", "ur", "id", "vi", "th", "ja", "ko", "zh-CN", "zh-TW"].map { tag in
+        let localeTag = tag == "zh-CN" ? "zh-Hans" : tag == "zh-TW" ? "zh-Hant" : tag
+        let name = Locale(identifier: localeTag).localizedString(forIdentifier: localeTag)?.capitalized ?? tag
+        return LanguageOption(tag: tag, name: name)
+    }
     private func createProfile() { let profile = StudentProfile(name: profileName.trimmingCharacters(in: .whitespaces), isSelected: true); for item in profiles { item.isSelected = false }; context.insert(profile); try? context.save(); profileName = "" }
     private func savePack() { context.insert(CustomPracticePack(title: packName.trimmingCharacters(in: .whitespaces).isEmpty ? "Custom practice pack" : packName, description: "A saved practice set made on iOS.", keyCenter: content.chordByID[selectedChordIDs.first ?? ""]?.root ?? "C", focus: "Custom chord practice.", rightHandPattern: pattern, chordIDs: Array(selectedChordIDs))); try? context.save(); selectedChordIDs.removeAll(); exportURL = makePackExport() }
 

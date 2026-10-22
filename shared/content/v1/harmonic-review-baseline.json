@@ -1,0 +1,1259 @@
+{
+  "schemaVersion": 1,
+  "policy": "review-required-unresolved",
+  "updatePolicy": "Regenerate only after reviewing each changed chart; entries are unresolved gaps, never intentional omissions or expert approvals.",
+  "entries": [
+    {
+      "id": "a7-over-csharp-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "a7-over-e-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "a7-over-g-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "aadd9-over-b-1-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "aadd9-over-csharp-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "aadd9-over-e-3-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ab7-over-c-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ab7-over-eb-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ab7-over-fsharp-3-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "abadd9-over-bb-1-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "abadd9-over-c-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "abadd9-over-eb-3-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "abm7-over-b-1-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "abm7-over-eb-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "abm7-over-fsharp-3-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "abmaj7-over-c-1-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "abmaj7-over-eb-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "abmaj7-over-g-3-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "absus4-over-csharp-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "am7-over-c-1-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "am7-over-e-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "am7-over-g-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "amaj7-over-csharp-1-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "amaj7-over-e-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "b-over-fsharp-2-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "b7-over-a-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "b7-over-eb-1-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "b7-over-fsharp-2-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "badd9-over-csharp-1-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "badd9-over-fsharp-3-inversion-generated",
+      "missingIntervals": [
+        2,
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bb7-over-ab-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bb7-over-d-1-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bb7-over-f-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bbadd9-over-c-1-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bbadd9-over-d-2-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bbadd9-over-f-3-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bbm7-over-ab-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bbm7-over-csharp-1-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bbm7-over-f-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bbmaj7-over-d-1-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bbmaj7-over-f-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bm-over-fsharp-2-inversion-generated",
+      "missingIntervals": [
+        3
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bm7-over-a-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bm7-over-d-1-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bm7-over-fsharp-2-inversion-generated",
+      "missingIntervals": [
+        3
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bmaj7-over-eb-1-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bmaj7-over-fsharp-2-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bsus2-over-fsharp-2-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "bsus4-over-e-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "c-dominant7-open",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "c7-over-bb-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "c7-over-e-1-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "c7-over-g-2-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "cadd9-over-d-1-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "cadd9-over-e-2-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "cadd9-over-g-3-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "cm-over-g-2-inversion-generated",
+      "missingIntervals": [
+        3
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "cm7-over-bb-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "cm7-over-eb-1-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "cm7-over-g-2-inversion-generated",
+      "missingIntervals": [
+        3,
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "cmaj7-over-e-1-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "cmaj7-over-g-2-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "csharp7-over-ab-2-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "csharp7-over-b-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "csharp7-over-f-1-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "csharpadd9-over-ab-3-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "csharpadd9-over-eb-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "csharpadd9-over-f-2-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "csharpm7-over-ab-2-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "csharpm7-over-b-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "csharpm7-over-e-1-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "csharpmaj7-over-ab-2-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "csharpmaj7-over-f-1-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "csharpsus2-over-ab-2-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "csus2-over-g-2-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "d7-over-a-2-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "d7-over-c-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "d7-over-fsharp-1-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "dadd9-over-a-3-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "dadd9-over-e-1-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "dm7-over-a-2-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "dm7-over-c-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "dm7-over-f-1-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "dmaj7-over-a-2-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "dmaj7-over-fsharp-1-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "dsus2-over-a-2-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "dsus4-over-g-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "e7-over-ab-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "e7-over-b-2-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "e7-over-d-3-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "eadd9-over-ab-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "eadd9-over-b-3-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "eb-over-g-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "eb7-over-bb-2-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "eb7-over-csharp-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "eb7-over-g-1-inversion-generated",
+      "missingIntervals": [
+        0,
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ebadd9-over-bb-3-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ebadd9-over-f-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ebadd9-over-g-2-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ebm7-over-bb-2-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ebm7-over-csharp-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ebm7-over-fsharp-1-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ebmaj7-over-bb-2-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ebmaj7-over-d-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ebmaj7-over-g-1-inversion-generated",
+      "missingIntervals": [
+        0,
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ebsus2-over-bb-2-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "ebsus4-over-ab-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "em7-over-b-2-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "em7-over-d-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "em7-over-g-1-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "emaj7-over-ab-1-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "emaj7-over-b-2-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "emaj7-over-eb-3-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "esus2-over-b-2-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "esus4-over-a-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "f7-over-a-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "f7-over-c-2-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "f7-over-eb-3-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fadd9-over-a-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fadd9-over-c-3-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fadd9-over-g-1-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fm7-over-ab-1-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fm7-over-c-2-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fm7-over-eb-3-inversion-generated",
+      "missingIntervals": [
+        3
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fmaj7-over-a-1-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fmaj7-over-c-2-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fmaj7-over-e-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharp7-over-bb-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharp7-over-c#-2-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharp7-over-e-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharpadd9-over-ab-1-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharpadd9-over-bb-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharpadd9-over-c#-3-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharpm7-over-a-1-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharpm7-over-c#-2-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharpm7-over-e-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharpmaj7-over-bb-1-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharpmaj7-over-c#-2-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharpmaj7-over-f-3-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharpsus2-over-c#-2-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsharpsus4-over-b-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsus2-over-c-2-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "fsus4-over-bb-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "g7-over-b-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "g7-over-d-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "g7-over-f-3-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "gadd9-over-a-1-inversion-generated",
+      "missingIntervals": [
+        4
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "gadd9-over-b-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "gadd9-over-d-3-inversion-generated",
+      "missingIntervals": [
+        2
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "gm7-over-bb-1-inversion-generated",
+      "missingIntervals": [
+        10
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "gm7-over-d-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "gm7-over-f-3-inversion-generated",
+      "missingIntervals": [
+        3
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "gmaj7-over-b-1-inversion-generated",
+      "missingIntervals": [
+        11
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "gmaj7-over-d-2-inversion-generated",
+      "missingIntervals": [
+        0
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "gmaj7-over-fsharp-3-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    },
+    {
+      "id": "gsus4-over-c-1-inversion-generated",
+      "missingIntervals": [
+        7
+      ],
+      "reviewRequired": true,
+      "status": "unresolved"
+    }
+  ]
+}

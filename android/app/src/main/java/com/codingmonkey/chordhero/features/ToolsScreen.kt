@@ -1,17 +1,24 @@
 package com.codingmonkey.chordhero.features
 
+import android.app.LocaleManager
 import android.content.Intent
+import android.os.LocaleList
+import java.util.Locale
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -23,10 +30,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.codingmonkey.chordhero.app.AppContainer
+import com.codingmonkey.chordhero.R
 import com.codingmonkey.chordhero.data.CustomPracticePackEntity
 import com.codingmonkey.chordhero.data.PackJson
 import com.codingmonkey.chordhero.data.StudentProfileEntity
@@ -53,6 +62,12 @@ fun ToolsScreen(
     var teacherKey by remember { mutableStateOf("C") }
     var teacherSkill by remember { mutableStateOf("beginner") }
     var teacherPackId by remember { mutableStateOf<String?>(null) }
+    var languageMenuOpen by remember { mutableStateOf(false) }
+    val localeManager = remember(context) { context.getSystemService(LocaleManager::class.java) }
+    val appLanguage = localeManager.applicationLocales.toLanguageTags().ifBlank { "auto" }
+    val languageOptions = listOf("auto", "en", "es", "fr", "de", "it", "pt", "nl", "pl", "ru", "uk", "tr", "ar", "he", "hi", "bn", "ur", "id", "vi", "th", "ja", "ko", "zh-CN", "zh-TW")
+    @Composable
+    fun languageName(tag: String): String = if (tag == "auto") stringResource(R.string.device_language) else Locale.forLanguageTag(tag).getDisplayName(Locale.forLanguageTag(tag))
 
     val exportLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.CreateDocument("application/json"),
@@ -102,6 +117,25 @@ fun ToolsScreen(
     }
 
     FeatureList("Profiles & Teacher Tools", "Local profiles, web-compatible packs, and printable practice sheets") {
+        item {
+            Column {
+                Text(stringResource(R.string.display_language), style = MaterialTheme.typography.titleMedium)
+                Box {
+                    OutlinedButton(onClick = { languageMenuOpen = true }) { Text(languageName(appLanguage)) }
+                    DropdownMenu(expanded = languageMenuOpen, onDismissRequest = { languageMenuOpen = false }) {
+                        languageOptions.forEach { tag ->
+                            DropdownMenuItem(
+                                text = { Text(languageName(tag)) },
+                                onClick = {
+                                    localeManager.applicationLocales = if (tag == "auto") LocaleList.getEmptyLocaleList() else LocaleList.forLanguageTags(tag)
+                                    languageMenuOpen = false
+                                },
+                            )
+                        }
+                    }
+                }
+            }
+        }
         item { Text("Profiles", style = MaterialTheme.typography.titleLarge) }
         items(profiles) { profile ->
             FilterChip(
@@ -125,7 +159,7 @@ fun ToolsScreen(
                         onProfile(profile.copy(isSelected = true))
                         profileName = ""
                     }
-                }) { Text("Create") }
+                }) { Text(stringResource(R.string.create)) }
             }
         }
         item { Text("Built-in progression packs", style = MaterialTheme.typography.titleLarge) }
@@ -180,7 +214,7 @@ fun ToolsScreen(
             items(customPacks) { pack ->
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text("${pack.title} · ${pack.chordIds.size} chords", modifier = Modifier.weight(1f))
-                    OutlinedButton(onClick = { scope.launch { container.progress.deletePack(pack.id) } }) { Text("Delete") }
+                    OutlinedButton(onClick = { scope.launch { container.progress.deletePack(pack.id) } }) { Text(stringResource(R.string.delete)) }
                 }
             }
         }
@@ -224,7 +258,7 @@ fun ToolsScreen(
                 OutlinedButton(
                     enabled = teacherChords.isNotEmpty(),
                     onClick = { container.documents.print("Chord Hero Teacher Sheet", teacherChords) },
-                ) { Text("Print") }
+                ) { Text(stringResource(R.string.print)) }
             }
         }
     }

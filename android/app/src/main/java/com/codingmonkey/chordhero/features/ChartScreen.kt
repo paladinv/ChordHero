@@ -1,5 +1,6 @@
 package com.codingmonkey.chordhero.features
 
+import androidx.compose.ui.res.stringResource
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.FlowRow
@@ -50,7 +51,7 @@ fun ChartScreen(content: ContentBundle, container: AppContainer) {
                     val intent = container.documents.createShareIntent("Chord Chart", chords)
                     context.startActivity(Intent.createChooser(intent, "Share chord chart"))
                 }) { Text("Share PDF") }
-                OutlinedButton(onClick = { container.documents.print("Chord Hero Chord Chart", chords) }) { Text("Print") }
+                OutlinedButton(onClick = { container.documents.print("Chord Hero Chord Chart", chords) }) { Text(stringResource(R.string.print)) }
             }
         }
         items(chords) { item ->

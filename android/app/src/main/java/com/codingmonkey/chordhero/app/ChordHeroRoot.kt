@@ -24,6 +24,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -52,16 +53,16 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
 
 @Serializable
-enum class Destination(val label: String, val symbol: String) : NavKey {
-    Dashboard("Home", "⌂"),
-    Trainer("Trainer", "♩"),
-    RightHand("Studio", "↕"),
-    Songs("Songs", "♫"),
-    SongLibrary("Song Library", "♪"),
-    Library("Library", "◫"),
-    Chart("Chart", "▦"),
-    Tools("Tools", "⚙"),
-    About("About", "ⓘ"),
+enum class Destination(val label: Int, val symbol: String) : NavKey {
+    Dashboard(com.codingmonkey.chordhero.R.string.home, "⌂"),
+    Trainer(com.codingmonkey.chordhero.R.string.trainer, "♩"),
+    RightHand(com.codingmonkey.chordhero.R.string.right_hand, "↕"),
+    Songs(com.codingmonkey.chordhero.R.string.songs, "♫"),
+    SongLibrary(com.codingmonkey.chordhero.R.string.song_library, "♪"),
+    Library(com.codingmonkey.chordhero.R.string.library, "◫"),
+    Chart(com.codingmonkey.chordhero.R.string.chord_chart, "▦"),
+    Tools(com.codingmonkey.chordhero.R.string.settings, "⚙"),
+    About(com.codingmonkey.chordhero.R.string.about, "ⓘ"),
 }
 
 private val compactDestinations = listOf(
@@ -136,7 +137,7 @@ fun ChordHeroRoot(container: AppContainer) {
                                     selected = destination == item,
                                     onClick = { navigate(item) },
                                     icon = { Text(item.symbol) },
-                                    label = { Text(item.label) },
+                                    label = { Text(stringResource(item.label)) },
                                 )
                             }
                         }
@@ -163,7 +164,7 @@ fun ChordHeroRoot(container: AppContainer) {
                                         selected = destination == item,
                                         onClick = { navigate(item) },
                                         icon = { Text(item.symbol) },
-                                        label = { Text(item.label) },
+                                        label = { Text(stringResource(item.label)) },
                                     )
                                 }
                             }

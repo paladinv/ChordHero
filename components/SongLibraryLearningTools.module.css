@@ -1,0 +1,34 @@
+.root { display:grid; gap:12px; }
+.root > :global(details) { border:1px solid var(--line); border-radius:12px; padding:12px; background:var(--surface); }
+.root :global(summary) { cursor:pointer; font-weight:700; }
+.root :global(.study-harmony) { display:flex; flex-wrap:wrap; gap:8px; margin:12px 0; }
+.root :global(.study-harmony-row) { display:grid; gap:3px; min-width:68px; padding:8px 10px; border:1px solid var(--line); border-radius:9px; text-align:center; }
+.root :global(.study-harmony-row span) { color:var(--accent); font-weight:700; }
+.root :global(.study-measure-section) { margin:14px 0; }
+.root :global(.study-measure-section h3) { font-size:1rem; }
+.root :global(.study-track) { margin:10px 0; }
+.root :global(.study-measure-grid) { display:grid; grid-template-columns:repeat(auto-fill,minmax(165px,1fr)); gap:8px; margin-top:6px; }
+.root :global(.study-measure) { display:grid; align-content:start; gap:7px; border:1px solid var(--line); border-radius:9px; padding:9px; min-width:0; }
+.root :global(.study-measure > div) { display:grid; gap:3px; font-size:.88rem; overflow-wrap:anywhere; }
+.root :global(.study-measure small), .root :global(.study-backing-tracks small) { display:block; color:var(--muted); }
+.root :global(.recall-card) { display:grid; gap:9px; margin-top:12px; padding:12px; border:1px solid var(--line); border-radius:10px; }
+.root :global(.recall-answer) { white-space:pre-wrap; font-size:1.1em; }
+.root :global(.study-profile-form), .root :global(.study-track-form) { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:10px; margin:12px 0; }
+.root :global(.study-profile-form > label), .root :global(.study-track-form > label) { display:grid; gap:5px; align-content:start; }
+.root :global(.study-profile-form > label:has(input[type="checkbox"])), .root :global(.study-track-form > label:has(input[type="checkbox"])) { display:flex; align-items:center; }
+.root :global(.study-playability-list) { columns:2; padding-left:20px; }
+.root :global(.study-playability-list li) { break-inside:avoid; margin:4px 0; }
+.root :global(.study-backing-tracks) { display:grid; gap:9px; margin-top:12px; }
+.root :global(.study-backing-tracks article) { display:grid; grid-template-columns:minmax(140px,1fr) minmax(180px,2fr) auto; align-items:center; gap:10px; padding:10px; border:1px solid var(--line); border-radius:10px; }
+.root :global(.study-backing-tracks audio) { width:100%; }
+.root :global(.button-row) { display:flex; flex-wrap:wrap; gap:8px; }
+.root :global(.study-tour), .root :global(.storage-health) { border:1px solid var(--line); border-radius:10px; padding:10px 12px; background:var(--surface); }
+.root :global(.study-tour p) { margin:0 0 6px; }
+.root :global(.storage-health) { display:grid; gap:5px; margin:10px 0; }
+.root :global(.study-harmony-row.out-of-key) { border-color:#c98439; }
+.root :global(.study-harmony-row.out-of-key small), .root :global(.study-quality-list) { color:#9b4d18; }
+.root :global(.study-quality-list) { padding-left:22px; }
+.root :global(.study-quality-ok) { color:var(--accent); font-weight:700; }
+.root :global(.reattach-audio) { display:grid; gap:4px; margin-top:8px; }
+@media(max-width:700px) { .root :global(.study-backing-tracks article) { grid-template-columns:1fr; } .root :global(.study-playability-list) { columns:1; } }
+@media print { .root > :global(details:not([open])) { display:none; } .root :global(.study-measure button) { display:none; } }

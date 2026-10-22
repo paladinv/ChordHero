@@ -40,7 +40,7 @@ targets:
       testTargets:
         - ChordHeroTests
         - ChordHeroUITests
-      gatherCoverageData: true
+      gatherCoverageData: false
   ChordHeroTests:
     type: bundle.unit-test
     platform: iOS

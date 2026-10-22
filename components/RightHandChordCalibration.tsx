@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { analyzeChordCalibration, type ChordCalibrationSignature } from "../lib/songRecordingAnalysis";
+import { useRightHandCapture } from "../lib/rightHandCapture";
 
 export type ChordCalibrationProfile = {
   instrument: "acoustic" | "electric";
@@ -14,6 +15,8 @@ type Props = {
   chords: string[];
   instrument: "acoustic" | "electric";
   onChange: (profile: ChordCalibrationProfile | null) => void;
+  onBeforeRecord?: () => void | Promise<void>;
+  onBusyChange?: (busy: boolean) => void;
 };
 
 const STORAGE_KEY = "chord-hero:right-hand:chord-calibration:v1";
@@ -23,14 +26,15 @@ function readProfiles(): Record<string, ChordCalibrationProfile> {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "{}"); } catch { return {}; }
 }
 
-export default function RightHandChordCalibration({ chords, instrument, onChange }: Props) {
+export default function RightHandChordCalibration({ chords, instrument, onChange, onBeforeRecord, onBusyChange }: Props) {
   const [tuning, setTuning] = useState("E A D G B E");
   const [profile, setProfile] = useState<ChordCalibrationProfile | null>(null);
   const [recordingChord, setRecordingChord] = useState<string | null>(null);
   const [message, setMessage] = useState("Play each target chord once. Only its compact frequency signature is kept.");
-  const recorderRef = useRef<MediaRecorder | null>(null);
   const uniqueChords = useMemo(() => [...new Set(chords.map(normalizeChord).filter(Boolean))].slice(0, 8), [chords]);
   const profileKey = `${instrument}:${tuning.trim().toUpperCase()}`;
+  const capture = useRightHandCapture(`${profileKey}:${uniqueChords.join(",")}`);
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
 
   useEffect(() => {
     const next = readProfiles()[profileKey] ?? null;
@@ -46,25 +50,30 @@ export default function RightHandChordCalibration({ chords, instrument, onChange
 
   const recordChord = async (chord: string) => {
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") { setMessage("Chord calibration is unavailable in this browser."); return; }
+    const token = capture.begin(); if (token === null) return;
+    setRecordingChord(chord); onBusyChange?.(true);
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } });
+      await onBeforeRecord?.(); if (!capture.valid(token)) return;
+      const stream = await capture.microphone(token); if (!stream) return;
       const chunks: Blob[] = [];
-      const recorder = new MediaRecorder(stream); recorderRef.current = recorder; setRecordingChord(chord);
+      const recorder = new MediaRecorder(stream); capture.recorder.current = recorder;
       recorder.ondataavailable = (event) => { if (event.data.size) chunks.push(event.data); };
       recorder.onstop = async () => {
+        if (!capture.valid(token)) return;
         stream.getTracks().forEach((track) => track.stop());
         setMessage(`Analysing ${chord}…`);
         try {
           const signature = await analyzeChordCalibration(new Blob(chunks, { type: recorder.mimeType || "audio/webm" }), chord);
-          if (signature.signalConfidence < 20) { setMessage(`${chord} was too quiet to learn reliably. Move closer and play it again.`); setRecordingChord(null); return; }
+          if (!capture.valid(token)) return;
+          if (signature.signalConfidence < 20) { setMessage(`${chord} was too quiet to learn reliably. Move closer and play it again.`); setRecordingChord(null); capture.cleanup(); onBusyChange?.(false); return; }
           const next: ChordCalibrationProfile = { instrument, tuning: tuning.trim(), updatedAt: new Date().toISOString(), signatures: { ...(profile?.signatures ?? {}), [normalizeChord(chord)]: signature } };
           persist(next); setMessage(`${chord} learned locally at ${signature.signalConfidence}% signal confidence.`);
-        } catch { setMessage(`${chord} could not be decoded. Try one clean, sustained chord.`); }
-        setRecordingChord(null);
+        } catch { if (!capture.valid(token)) return; setMessage(`${chord} could not be decoded. Try one clean, sustained chord.`); }
+        setRecordingChord(null); capture.cleanup(); onBusyChange?.(false);
       };
       recorder.start(); setMessage(`Recording ${chord}… play once and let it ring.`);
-      window.setTimeout(() => { if (recorder.state === "recording") recorder.stop(); }, 2200);
-    } catch { setMessage("Microphone permission was not granted. Existing signatures remain available."); setRecordingChord(null); }
+      capture.later(token, () => { if (recorder.state === "recording") recorder.stop(); }, 2200);
+    } catch { if (capture.valid(token)) { capture.cleanup(); setMessage("Microphone permission was not granted. Existing signatures remain available."); setRecordingChord(null); onBusyChange?.(false); } }
   };
 
   if (!uniqueChords.length) return <p className="calibration-empty">Choose a chord progression to calibrate chord recognition.</p>;
@@ -72,7 +81,7 @@ export default function RightHandChordCalibration({ chords, instrument, onChange
   return (
     <section className="chord-calibration-wizard" aria-labelledby="chord-calibration-title">
       <header><div><span className="label">Private chord calibration</span><h4 id="chord-calibration-title">Teach this guitar&apos;s target chords</h4></div><strong>{completed} / {uniqueChords.length}</strong></header>
-      <label>Tuning<input value={tuning} onChange={(event) => setTuning(event.target.value.slice(0, 24))} aria-label="Guitar tuning for chord calibration" /></label>
+      <label>Tuning<input value={tuning} disabled={Boolean(recordingChord)} onChange={(event) => setTuning(event.target.value.slice(0, 24))} aria-label="Guitar tuning for chord calibration" /></label>
       <div className="chord-calibration-steps">{uniqueChords.map((chord) => {
         const saved = profile?.signatures[normalizeChord(chord)];
         return <button key={chord} type="button" className={saved ? "complete" : ""} disabled={Boolean(recordingChord)} onClick={() => void recordChord(chord)} aria-label={`${saved ? "Redo" : "Record"} ${chord} calibration`}><strong>{chord}</strong><span>{recordingChord === chord ? "Listening…" : saved ? `Redo · ${saved.signalConfidence}%` : "Record once"}</span></button>;

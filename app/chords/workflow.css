@@ -1,0 +1,171 @@
+/* Isolated styles for the chord workflow panels. Import from the chart route when enabled. */
+.chord-arrangement-preview {
+  margin-top: 1rem;
+  color: var(--foreground, #17202a);
+}
+
+.chord-arrangement-screen { display: block; }
+.chord-workflow-print-artifact { display: none; }
+.chord-arrangement-preview[data-printable="true"] .chord-arrangement-screen { display: none; }
+.chord-arrangement-preview[data-printable="true"] .chord-workflow-print-artifact[data-enabled="true"] { display: block; }
+
+.chord-workflow-pages { display: grid; gap: 1rem; }
+.chord-workflow-page {
+  border: 1px solid var(--line, #d6dbe0);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  padding: 1rem;
+}
+.chord-workflow-page__heading {
+  display: flex;
+  justify-content: space-between;
+  gap: .75rem;
+  margin-bottom: .75rem;
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--muted, #59636e);
+}
+.chord-workflow-bars { display: grid; gap: .65rem; }
+.chord-workflow-bar {
+  overflow: hidden;
+  border: 1px solid var(--line, #d6dbe0);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface, #fff) 94%, var(--accent, #5a67d8) 6%);
+}
+.chord-workflow-bar__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: .5rem .8rem;
+  padding: .5rem .65rem;
+  border-bottom: 1px solid var(--line, #d6dbe0);
+  font-size: .78rem;
+}
+.chord-workflow-bar__header span:last-child { margin-left: auto; color: var(--muted, #59636e); }
+.chord-workflow-beats {
+  display: grid;
+  grid-template-columns: repeat(var(--beat-count, 4), 1fr);
+  gap: 0;
+  padding: .35rem .65rem 0;
+  color: var(--muted, #59636e);
+  font-size: .68rem;
+}
+.chord-workflow-beats span { text-align: left; }
+.chord-workflow-events {
+  display: grid;
+  grid-template-columns: repeat(calc(var(--beat-count, 4) * 8), minmax(0, 1fr));
+  gap: .25rem;
+  min-height: 3.2rem;
+  padding: .2rem .65rem .65rem;
+  background-image: linear-gradient(to right, transparent calc(25% - 1px), var(--line, #d6dbe0) 25%);
+  background-size: calc(100% / var(--beat-count, 4)) 100%;
+}
+.chord-workflow-event {
+  grid-column: calc(var(--event-start) + 1) / span max(1, var(--event-span));
+  display: grid;
+  align-content: center;
+  min-width: 0;
+  padding: .35rem .45rem;
+  border-left: 3px solid var(--accent, #5a67d8);
+  border-radius: 4px;
+  background: color-mix(in srgb, var(--accent, #5a67d8) 14%, var(--surface, #fff));
+}
+.chord-workflow-event.is-held { border-left-style: dashed; }
+.chord-workflow-event__chord { overflow: hidden; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.chord-workflow-event__held, .chord-workflow-event__ending { color: var(--muted, #59636e); font-size: .7rem; }
+.chord-workflow-event__ending { color: var(--accent, #5a67d8); font-weight: 700; }
+.chord-workflow-cue {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .35rem .8rem;
+  padding: .5rem .65rem;
+  border-top: 1px solid var(--line, #d6dbe0);
+  color: var(--muted, #59636e);
+  font-size: .78rem;
+}
+.chord-workflow-cue p { margin: 0; }
+.chord-workflow-empty { padding: 1rem; border: 1px dashed var(--line, #d6dbe0); border-radius: 8px; color: var(--muted, #59636e); }
+
+.chord-workflow-dialog-backdrop {
+  position: fixed;
+  z-index: 1000;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  background: rgb(0 0 0 / 48%);
+}
+.chord-workflow-dialog {
+  width: min(100%, 34rem);
+  display: grid;
+  gap: .75rem;
+  padding: 1.25rem;
+  border: 1px solid var(--line, #d6dbe0);
+  border-radius: 12px;
+  background: var(--surface, #fff);
+  box-shadow: 0 18px 55px rgb(0 0 0 / 22%);
+}
+.chord-workflow-dialog h2, .chord-workflow-dialog p { margin: 0; }
+.chord-workflow-dialog__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; margin-top: .35rem; }
+
+.chart-deep-tools { grid-column: 1 / -1; }
+.chart-deep-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr)); gap: 1rem; margin-top: 1rem; }
+.chart-deep-grid > article { min-width: 0; padding: 1rem; border: 1px solid var(--line, #d6dbe0); border-radius: 12px; background: color-mix(in srgb, var(--surface, #fff) 94%, var(--accent, #3957d7)); }
+.chart-deep-grid h3 { margin-top: 0; }
+.chart-position-map { display: grid; gap: .45rem; padding-left: 1.25rem; }
+.chart-position-map li { display: flex; align-items: center; justify-content: space-between; gap: .6rem; }
+.chart-position-map li > span { min-width: 0; }
+.chart-position-map li > span > span { display: block; color: var(--muted, #59636e); }
+.chart-position-map .is-current { padding: .4rem; border-left: 4px solid var(--accent, #3957d7); background: color-mix(in srgb, var(--accent, #3957d7) 10%, transparent); }
+.chart-generated-list { display: grid; gap: .65rem; margin-top: .75rem; }
+.chart-generated-voicing { display: grid; gap: .45rem; padding: .75rem; border: 1px solid var(--line, #d6dbe0); border-radius: 10px; }
+.chart-generated-strings { display: grid; grid-template-columns: repeat(auto-fit, minmax(2.8rem, 1fr)); gap: .25rem; overflow-x: auto; }
+.chart-generated-strings span { display: grid; place-items: center; min-width: 2.4rem; padding: .25rem; border-radius: 8px; background: color-mix(in srgb, var(--surface, #fff) 82%, #8393aa); }
+.chart-generated-strings span.is-root { outline: 2px solid #d05a34; }
+.chart-generated-strings small, .chart-generated-strings em { font-size: .68rem; font-style: normal; white-space: nowrap; }
+.chart-family-table { width: 100%; margin-top: .75rem; border-collapse: collapse; font-size: .86rem; }
+.chart-family-table th, .chart-family-table td { padding: .42rem; border-bottom: 1px solid var(--line, #d6dbe0); text-align: left; vertical-align: top; }
+.chart-neck-panel { grid-column: 1 / -1; }
+.chart-neck-map { display: grid; gap: .35rem; margin-top: .75rem; overflow-x: auto; }
+.chart-neck-map > div { display: grid; grid-template-columns: 2.5rem repeat(13, minmax(2.2rem, 1fr)); gap: .2rem; min-width: 40rem; align-items: center; }
+.chart-neck-map span { display: grid; place-items: center; min-height: 2rem; border: 1px solid var(--line, #d6dbe0); border-radius: 5px; }
+.chart-neck-map .is-tone { background: color-mix(in srgb, #5b8def 20%, var(--surface, #fff)); font-weight: 700; }
+.chart-neck-map .is-root { background: color-mix(in srgb, #e67244 28%, var(--surface, #fff)); font-weight: 800; }
+.chart-neck-map .is-shape-a { outline: 2px solid #146c43; outline-offset: -2px; }
+.chart-neck-map .is-shape-b { box-shadow: inset 0 0 0 2px #6a3dad; }
+.chart-neck-frets { color: var(--muted, #59636e); font-size: .72rem; }
+.chart-diagram-legend { margin: .75rem 0; padding: .65rem .8rem; border: 1px solid var(--line, #d6dbe0); border-radius: 8px; }
+.chart-diagram-legend p { margin: .5rem 0 0; }
+.chart-print-legend { margin: .25rem 0 .75rem; padding: .35rem .5rem; border: 1px solid #888; font-size: 8pt; }
+.chart-version-diff { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .6rem; margin-top: .75rem; }
+.chart-version-diff > div { display: grid; align-content: start; gap: .25rem; padding: .65rem; border-radius: 8px; background: color-mix(in srgb, var(--surface, #fff) 80%, #8393aa); }
+.chart-version-diff .added { border-left: 4px solid #25834a; }
+.chart-version-diff .removed { border-left: 4px solid #b64040; }
+.diagram-tone-root { fill: #c3482b; }
+.diagram-tone-third { fill: #4b63c8; }
+.diagram-tone-fifth { fill: #377b54; }
+.diagram-tone-seventh { fill: #8a4bb2; }
+.diagram-open-tone-root { fill: #c3482b; font-weight: 900; }
+.diagram-open-tone-third { fill: #4b63c8; font-weight: 800; }
+.diagram-open-tone-fifth { fill: #377b54; font-weight: 800; }
+.diagram-open-tone-seventh { fill: #8a4bb2; font-weight: 800; }
+
+@media (max-width: 700px) {
+  .chord-workflow-bar__header span:last-child { width: 100%; margin-left: 0; }
+  .chord-workflow-event { font-size: .85rem; }
+  .chord-workflow-page { padding: .65rem; }
+  .chart-version-diff { grid-template-columns: 1fr; }
+  .chart-family-table { display: block; overflow-x: auto; }
+}
+
+@media print {
+  .chart-diagram-legend { display: none; }
+  .chord-arrangement-preview[data-printable="true"] .chord-arrangement-screen { display: none; }
+  .chord-arrangement-preview[data-printable="true"] .chord-workflow-print-artifact[data-enabled="true"] { display: block; }
+  .chord-workflow-page { border: 0; border-radius: 0; padding: 0; }
+  .chord-workflow-page.has-print-break { break-before: page; page-break-before: always; }
+  .chord-workflow-page__heading { border-bottom: 1px solid #999; }
+  .chord-workflow-bar { break-inside: avoid; }
+}

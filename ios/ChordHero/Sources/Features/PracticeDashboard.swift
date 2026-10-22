@@ -8,13 +8,13 @@ struct PracticeDashboard: View {
                 VStack(spacing: 18) {
                     DashboardHero()
                     HStack {
-                        StudioSectionHeader(title: "Choose your session", subtitle: "Focused tools for deliberate practice")
+                        StudioSectionHeader(title: "Start here", subtitle: "Focused tools make it easy to choose the page that fits today's session.")
                         Spacer()
                     }
                     LazyVGrid(columns: [GridItem(.adaptive(minimum: 280), spacing: 16)], spacing: 16) {
-                        NavigationLink { TrainerView(content: content) } label: { FeatureCard(number: "01", title: "Chord Trainer", subtitle: "Build speed and accuracy through ten focused changes.", icon: "timer", color: ChordHeroStyle.accent) }
-                        NavigationLink { RightHandView(content: content) } label: { FeatureCard(number: "02", title: "Rhythm Studio", subtitle: "Develop a steady feel with guided picking and strumming drills.", icon: "waveform.path", color: ChordHeroStyle.indigo) }
-                        NavigationLink { SongCoachView(content: content) } label: { FeatureCard(number: "03", title: "Song Coach", subtitle: "Turn chord shapes into music with paced progressions and tips.", icon: "music.note.list", color: .pink) }
+                        NavigationLink { TrainerView(content: content) } label: { FeatureCard(number: "01", title: "Trainer", subtitle: "Practice ten chord changes with timed rounds.", icon: "timer", color: ChordHeroStyle.accent) }
+                        NavigationLink { RightHandView(content: content) } label: { FeatureCard(number: "02", title: "Right Hand", subtitle: "Follow guided strumming and picking drills.", icon: "waveform.path", color: ChordHeroStyle.indigo) }
+                        NavigationLink { SongCoachView(content: content) } label: { FeatureCard(number: "03", title: "Songs", subtitle: "Play traditional songs with chord guidance.", icon: "music.note.list", color: .pink) }
                     }.buttonStyle(.plain)
                 }
                 .padding(ChordHeroStyle.pagePadding)
@@ -48,11 +48,11 @@ private struct DashboardHero: View {
                 .offset(x: 220, y: -35)
             VStack(alignment: .leading, spacing: 10) {
                 StudioEyebrow(text: "Chord Hero")
-                Text("Make every\nchange count.")
+                Text("Pick one practice mode and get straight to work.")
                     .font(.system(size: 36, weight: .heavy, design: .rounded))
                     .foregroundStyle(.white)
                     .lineSpacing(-2)
-                Text("Short, intentional sessions build confident hands.")
+                Text("Focused tools make it easy to choose the page that fits today's session.")
                     .font(.subheadline)
                     .foregroundStyle(.white.opacity(0.7))
             }

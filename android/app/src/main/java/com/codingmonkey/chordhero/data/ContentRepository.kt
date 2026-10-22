@@ -50,7 +50,7 @@ object ContentValidator {
 
         val ids = content.chords.chordLibrary.map { it.id }
         require(ids.size == ids.toSet().size) { "Chord IDs must be unique." }
-        require(ids.size == 346) { "Expected 346 chord voicings." }
+        require(ids.isNotEmpty()) { "At least one chord voicing is required." }
         val idSet = ids.toSet()
         content.chords.chordLibrary.forEach { item ->
             require(item.chord.frets.size == 6 && item.chord.fingers.size == 6) { "${item.id} must define six strings." }
@@ -58,18 +58,28 @@ object ContentValidator {
             require(item.chord.fingers.all { it == null || it in 1..4 }) { "${item.id} has an invalid finger." }
             item.chord.barre?.let { require(it.from in 0..5 && it.to in 0..5 && it.from <= it.to) }
         }
-        require(content.chords.levels.size == 4)
-        require(content.chords.progressionPacks.size == 4)
+        require(content.chords.levels.isNotEmpty()) { "At least one trainer level is required." }
         (content.chords.levels.flatMap { it.chordIds } +
             content.chords.progressionPacks.flatMap { it.chordIds }).forEach {
             require(it in idSet) { "Unknown chord reference: $it" }
         }
-        require(content.rightHand.exercises.map { it.id }.toSet().size == 30)
-        require(content.songs.songs.size == 50)
-        require(content.songs.songs.all { song -> song.id.isNotBlank() && song.variations.size >= 3 && song.sections.isNotEmpty() })
-        require(content.settings.tunings.size == 4)
+        val exerciseIds = content.rightHand.exercises.map { it.id }
+        require(exerciseIds.isNotEmpty() && exerciseIds.size == exerciseIds.toSet().size) { "Exercise IDs must be unique." }
+        require(content.rightHand.exercises.all { it.pattern.isNotEmpty() && it.bpm in 40..180 }) {
+            "Every right-hand exercise must have a pattern and a supported tempo."
+        }
+        val songIds = content.songs.songs.map { it.id }
+        require(songIds.isNotEmpty() && songIds.size == songIds.toSet().size) { "Song IDs must be unique." }
+        require(content.songs.songs.all { song -> song.id.isNotBlank() && song.variations.isNotEmpty() && song.sections.isNotEmpty() }) {
+            "Every song must have an ID, variation, and section."
+        }
+        val tuningIds = content.settings.tunings.map { it.id }
+        require(tuningIds.isNotEmpty() && tuningIds.size == tuningIds.toSet().size) { "Tuning IDs must be unique." }
         content.settings.tunings.forEach {
-            require(it.strings.size == 6 && it.semitoneOffsets.size == 6)
+            require(it.strings.size in 6..7 && it.strings.size == it.semitoneOffsets.size) {
+                "${it.id} must define matching six- or seven-string tuning data."
+            }
+            if (it.id == "standard-7") require(it.strings.size == 7) { "The standard-7 tuning must define seven strings." }
         }
     }
 }

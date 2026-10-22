@@ -1,5 +1,6 @@
 package com.codingmonkey.chordhero.features
 
+import androidx.compose.ui.res.stringResource
 import android.Manifest
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -31,6 +32,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.codingmonkey.chordhero.R
 import com.codingmonkey.chordhero.designsystem.ChordDiagram
 import com.codingmonkey.chordhero.domain.ContentBundle
 import com.codingmonkey.chordhero.domain.PlaybackStatus
@@ -100,7 +102,7 @@ fun SongCoachScreen(content: ContentBundle, audio: AudioService, recorder: SongR
         }
     }
 
-    FeatureList("Song Coach", "Count in, follow the progression, and focus on each transition") {
+    FeatureList(stringResource(R.string.songs), stringResource(R.string.songs_intro)) {
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 listOf(2, 4, 6).forEach { beats ->
@@ -154,7 +156,7 @@ fun SongCoachScreen(content: ContentBundle, audio: AudioService, recorder: SongR
                         PlaybackStatus.Paused -> state.copy(status = PlaybackStatus.Running)
                     }
                 }) { Text(if (state.status == PlaybackStatus.Running) "Pause" else if (state.status == PlaybackStatus.Paused) "Resume" else "Start") }
-                OutlinedButton(onClick = { state = SongPlaybackState(); audio.stop() }) { Text("Reset") }
+                OutlinedButton(onClick = { state = SongPlaybackState(); audio.stop() }) { Text(stringResource(R.string.reset)) }
                 OutlinedButton(onClick = { midi.start() }) { Text(if (midiState is com.codingmonkey.chordhero.services.MidiConnectionState.Connected) "MIDI ready" else "Connect MIDI") }
             }
         }

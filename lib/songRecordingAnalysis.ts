@@ -1,3 +1,8 @@
+import { isRestToken, measureAudioEvidence, type AudioIndicator, type DynamicsEvidence } from "./rightHandAudioEvidence";
+import { matchTimingTargets, timingProfile, type TimingProfile } from "./rightHandTimingReview";
+import type { ReferenceVoice } from "./rightHandReferenceAudio";
+import { measureRecordingSignal, type RecordingSignalDiagnostics } from "./rightHandRecordingQuality";
+
 export type BeatTiming = {
   step: number;
   expectedMs: number;
@@ -7,6 +12,10 @@ export type BeatTiming = {
 };
 
 export type HarmonicEvidence = {
+  step: number;
+  patternToken?: string;
+  expectedMs: number;
+  observedMs: number;
   expectedChord: string;
   detectedChord: string;
   confidence: number;
@@ -30,6 +39,7 @@ export type RecordingAnalysis = {
   timingConsistencyPercent: number;
   analysisNote: string;
   onsetMs: number[];
+  allOnsetMs?: number[];
   timingScore: number;
   averageOffsetMs: number;
   timingTendency: "rushing" | "dragging" | "steady";
@@ -41,7 +51,53 @@ export type RecordingAnalysis = {
   chordAccuracyScore: number | null;
   calibrationConfidence: number;
   recordingSuitability: "good" | "noisy" | "quiet";
+  scoreReliability?: "reliable" | "limited" | "insufficient";
+  timingEvidenceCount?: number;
+  expectedTimingCount?: number;
+  chordEvidenceExcluded?: number;
+  latencyOffsetMs?: number;
+  scoreScope?: string;
+  recordingId?: string;
+  reviewAccepted?: boolean;
+  audioIndicators?: AudioIndicator[];
+  dynamics?: DynamicsEvidence;
+  timingProfile?: TimingProfile;
+  personalizedTiming?: { score: number; beatTimings: BeatTiming[] };
+  scoringWindow?: { startMs: number; endMs: number; sourceDurationMs: number; originalRecordingId?: string };
+  practiceContext?: { bpm: number; pattern: string[]; chordProgression: string[] };
+  retained?: boolean;
+  analysisOptions?: AnalysisOptions;
+  referenceVoice?: ReferenceVoice;
+  signalDiagnostics?: RecordingSignalDiagnostics;
 };
+
+export type HarmonicListeningClue = {
+  kind: "transition" | "mismatch";
+  step: number;
+  patternToken?: string;
+  expectedChord: string;
+  detectedChord: string;
+  fromChord?: string;
+  label: string;
+};
+
+/**
+ * Keep chord feedback inspectable without presenting template matching as pitch truth.
+ * These are deliberately limited to expected chord transitions and retained mismatches.
+ */
+export function summarizeHarmonicListeningClues(evidence: readonly HarmonicEvidence[], pattern: readonly string[] = []) {
+  const ordered = [...evidence].sort((left, right) => left.step - right.step);
+  const transitions: HarmonicListeningClue[] = [];
+  const mismatches: HarmonicListeningClue[] = [];
+  ordered.forEach((item, index) => {
+    const step = Number.isFinite(item.step) ? item.step : index;
+    const patternToken = item.patternToken ?? (pattern.length ? pattern[step % pattern.length] : undefined);
+    if (item.detectedChord !== item.expectedChord) mismatches.push({ kind: "mismatch", step, patternToken, expectedChord: item.expectedChord, detectedChord: item.detectedChord, label: `Step ${step + 1}${patternToken ? ` (${patternToken})` : ""}: expected ${item.expectedChord}, closest template ${item.detectedChord}.` });
+    const previous = ordered[index - 1];
+    if (previous && previous.expectedChord !== item.expectedChord) transitions.push({ kind: "transition", step, patternToken, expectedChord: item.expectedChord, detectedChord: item.detectedChord, fromChord: previous.expectedChord, label: `Step ${step + 1}${patternToken ? ` (${patternToken})` : ""}: listen for ${previous.expectedChord} → ${item.expectedChord}; retained evidence is closest to ${item.detectedChord}.` });
+  });
+  return { transitions, mismatches };
+}
 
 export type AnalysisOptions = {
   referenceBpm?: number;
@@ -52,6 +108,13 @@ export type AnalysisOptions = {
   instrumentProfile?: "acoustic" | "electric";
   pitchScoringMode?: PitchScoringMode;
   targetSignatures?: Record<string, ChordCalibrationSignature>;
+  inputLatencyMs?: number;
+  expectedFirstOnsetMs?: number;
+  expectedPattern?: string[];
+  expectedAccents?: number[];
+  maxDurationMs?: number;
+  scoringWindow?: { startMs: number; endMs: number; originalRecordingId?: string };
+  timingProfile?: TimingProfile;
 };
 
 const clampScore = (value: number) => Math.max(0, Math.min(100, Math.round(value)));
@@ -91,73 +154,106 @@ export async function analyzePracticeRecording(blob: Blob, options: AnalysisOpti
   const context = new AudioContext();
   try {
     const buffer = await context.decodeAudioData(await blob.arrayBuffer());
-    const channel = buffer.getChannelData(0);
+    if (options.maxDurationMs && buffer.duration * 1000 > options.maxDurationMs) throw new Error(`Recording exceeds the ${Math.round(options.maxDurationMs / 1000)}-second analysis limit.`);
+    const sourceDurationMs = buffer.duration * 1000;
+    if (options.scoringWindow && (!Number.isFinite(options.scoringWindow.startMs) || !Number.isFinite(options.scoringWindow.endMs))) throw new Error("Window boundaries must be finite milliseconds.");
+    const windowStartMs = Math.max(0, Math.min(sourceDurationMs, options.scoringWindow?.startMs ?? 0));
+    const windowEndMs = Math.min(sourceDurationMs, options.scoringWindow?.endMs ?? sourceDurationMs);
+    if (windowEndMs - windowStartMs < 200) throw new Error("Select at least 200 ms of recorded audio.");
+    const channel = buffer.getChannelData(0).slice(Math.floor(windowStartMs * buffer.sampleRate / 1000), Math.floor(windowEndMs * buffer.sampleRate / 1000));
+    const signalDiagnostics = measureRecordingSignal(channel, buffer.sampleRate);
     const bucketSize = Math.max(1, Math.floor(channel.length / bucketCount));
     const peaks = Array.from({ length: Math.min(bucketCount, Math.ceil(channel.length / bucketSize)) }, (_, bucket) => {
       let peak = 0;
       for (let index = bucket * bucketSize; index < Math.min(channel.length, (bucket + 1) * bucketSize); index += 1) peak = Math.max(peak, Math.abs(channel[index]));
       return Math.round(peak * 100) / 100;
     });
-    const { onsets, energy, noiseFloor, peakEnergy } = detectOnsets(channel, buffer.sampleRate, options);
+    const detected = detectOnsets(channel, buffer.sampleRate, options);
+    const latencyOffsetMs = Math.max(0, Math.min(500, Math.round(options.inputLatencyMs ?? 0)));
+    const allOnsets = detected.onsets.map((onset) => Math.max(windowStartMs, onset + windowStartMs - latencyOffsetMs));
+    const onsets = allOnsets.filter((onset) => options.expectedFirstOnsetMs === undefined || onset >= options.expectedFirstOnsetMs - 35);
+    const { energy, noiseFloor, peakEnergy } = detected;
     const intervals = onsets.slice(1).map((value, index) => value - onsets[index]).filter((value) => value > 70);
     const averageInterval = intervals.length ? intervals.reduce((sum, value) => sum + value, 0) / intervals.length : 0;
     const subdivisions = Math.max(1, options.subdivisionsPerBeat ?? 1);
     const expectedInterval = options.referenceBpm ? 60000 / options.referenceBpm / subdivisions : averageInterval;
-    const tempoDriftPercent = expectedInterval && averageInterval ? Math.round(((averageInterval - expectedInterval) / expectedInterval) * 100) : 0;
-    const timingConsistencyPercent = intervals.length > 1 && averageInterval
+    let tempoDriftPercent = expectedInterval && averageInterval ? Math.round(((averageInterval - expectedInterval) / expectedInterval) * 100) : 0;
+    let timingConsistencyPercent = intervals.length > 1 && averageInterval
       ? clampScore(100 - (Math.sqrt(intervals.reduce((sum, value) => sum + (value - averageInterval) ** 2, 0) / intervals.length) / averageInterval) * 125)
       : 0;
-    const first = onsets[0] ?? 0;
-    const durationStepCount = Math.floor((buffer.duration * 1000 - first) / Math.max(1, expectedInterval)) + 1;
-    const expectedCount = Math.max(0, Math.min(64, options.expectedSteps ? Math.max(options.expectedSteps, durationStepCount) : durationStepCount));
-    const usedOnsets = new Set<number>();
-    const tolerance = Math.min(170, expectedInterval * 0.42);
-    const beatTimings: BeatTiming[] = [];
-    for (let step = 0; step < expectedCount; step += 1) {
+    const first = options.expectedFirstOnsetMs === undefined
+      ? (onsets[0] ?? 0)
+      : Math.max(0, options.expectedFirstOnsetMs);
+    const firstStep = Math.max(0, Math.ceil((windowStartMs - first) / Math.max(1, expectedInterval)));
+    const expectedCount = Math.max(0, Math.min(firstStep + 64, Math.ceil((windowEndMs - first) / Math.max(1, expectedInterval))));
+    const targets: { step: number; ms: number }[] = [];
+    for (let step = firstStep; step < expectedCount; step += 1) {
+      if (options.expectedPattern?.length && isRestToken(options.expectedPattern[step % options.expectedPattern.length])) continue;
       const target = first + step * expectedInterval;
-      let nearestIndex = -1;
-      let nearestDistance = Infinity;
-      onsets.forEach((onset, index) => {
-        const distance = Math.abs(onset - target);
-        if (!usedOnsets.has(index) && distance < nearestDistance) { nearestDistance = distance; nearestIndex = index; }
-      });
-      if (nearestIndex < 0 || nearestDistance > tolerance) {
-        beatTimings.push({ step, expectedMs: Math.round(target), observedMs: null, offsetMs: null, status: "missed" });
-      } else {
-        usedOnsets.add(nearestIndex);
-        const observed = onsets[nearestIndex];
-        const offset = Math.round(observed - target);
-        beatTimings.push({ step, expectedMs: Math.round(target), observedMs: Math.round(observed), offsetMs: offset, status: offset < -35 ? "early" : offset > 35 ? "late" : "on-time" });
-      }
+      if (target >= windowStartMs && target < windowEndMs) targets.push({ step, ms: target });
     }
+    const canonical = matchTimingTargets(onsets, targets, expectedInterval);
+    const beatTimings = canonical.beats;
+    const profile = timingProfile(options.timingProfile);
+    const personalized = matchTimingTargets(onsets, targets, expectedInterval, profile);
     const deviations = beatTimings.flatMap((beat) => beat.offsetMs === null ? [] : [beat.offsetMs]);
+    if (options.expectedPattern?.length) {
+      const matched = beatTimings.filter((beat) => beat.observedMs !== null);
+      const normalized = matched.slice(1).map((beat, i) => (beat.observedMs! - matched[i].observedMs!) / (beat.step - matched[i].step));
+      const mean = normalized.reduce((sum, n) => sum + n, 0) / Math.max(1, normalized.length);
+      tempoDriftPercent = mean && expectedInterval ? Math.round((mean - expectedInterval) / expectedInterval * 100) : 0;
+      timingConsistencyPercent = normalized.length > 1 && mean ? clampScore(100 - Math.sqrt(normalized.reduce((sum, n) => sum + (n - mean) ** 2, 0) / normalized.length) / mean * 125) : 0;
+    }
     const troubleBeats = beatTimings.filter((beat) => beat.status !== "on-time").map((beat) => beat.step);
     const averageOffsetMs = deviations.length ? Math.round(deviations.reduce((sum, value) => sum + value, 0) / deviations.length) : 0;
-    const meanAbsoluteOffset = deviations.length ? deviations.reduce((sum, value) => sum + Math.abs(value), 0) / deviations.length : expectedInterval;
-    const timingScore = expectedInterval ? clampScore(100 - (meanAbsoluteOffset / expectedInterval) * 125 - troubleBeats.length * 3) : timingConsistencyPercent;
+    const timingScore = expectedInterval ? canonical.score : timingConsistencyPercent;
     const timingTendency = averageOffsetMs < -25 ? "rushing" : averageOffsetMs > 25 ? "dragging" : "steady";
-    const transientEnergy = onsets.reduce((sum, onset) => sum + (energy[Math.round(onset / 12)] ?? 0), 0) / Math.max(1, onsets.length);
+    const transientEnergy = detected.onsets.reduce((sum, onset) => sum + (energy[Math.round(onset / 12)] ?? 0), 0) / Math.max(1, onsets.length);
     const chordAttackScore = clampScore((transientEnergy / Math.max(0.02, noiseFloor * 4)) * 65 + timingScore * 0.35);
     const calibrationConfidence = clampScore((peakEnergy / Math.max(0.008, noiseFloor * 5)) * 40);
     const recordingSuitability = peakEnergy < Math.max(0.025, noiseFloor * 2.1) ? "quiet" : noiseFloor > peakEnergy * 0.28 ? "noisy" : "good";
 
+    const timingEvidenceCount = beatTimings.filter((beat) => beat.observedMs !== null).length;
+    const expectedAttackCount = beatTimings.length;
+    const evidenceCoverage = expectedAttackCount ? timingEvidenceCount / expectedAttackCount : 0;
+    const scoreReliability: RecordingAnalysis["scoreReliability"] = signalDiagnostics.materiallyClipped || recordingSuitability !== "good" || calibrationConfidence < 35 || timingEvidenceCount < 2
+      ? "insufficient"
+      : calibrationConfidence < 60 || evidenceCoverage < .55
+        ? "limited"
+        : "reliable";
     const scoringMode = options.pitchScoringMode ?? "quality";
     const shouldAnalyzePitch = scoringMode !== "timing" && Boolean(options.expectedSteps || options.expectedChordProgression?.length || options.instrumentProfile);
     const pitchAndHarmony = shouldAnalyzePitch
-      ? await import("./rightHandPitchAnalysis").then(({ analyzePitchAndHarmony }) => analyzePitchAndHarmony(channel, buffer.sampleRate, onsets, beatTimings, options.expectedChordProgression ?? [], subdivisions, scoringMode, options.targetSignatures ?? {}))
+      ? await import("./rightHandPitchAnalysis").then(({ analyzePitchAndHarmony }) => analyzePitchAndHarmony(channel, buffer.sampleRate, detected.onsets, beatTimings.map((beat) => ({ ...beat, expectedMs: beat.expectedMs - windowStartMs, observedMs: beat.observedMs === null ? null : beat.observedMs - windowStartMs + latencyOffsetMs })), options.expectedChordProgression ?? [], subdivisions, scoringMode, options.targetSignatures ?? {}, options.expectedPattern ?? []))
       : { detectedPitch: null, harmonicEvidence: [] as HarmonicEvidence[], chordAccuracyScore: null };
-    const { detectedPitch, harmonicEvidence, chordAccuracyScore } = pitchAndHarmony;
+    const { detectedPitch, harmonicEvidence: rawHarmonicEvidence } = pitchAndHarmony;
+    const minimumChordConfidence = scoreReliability === "reliable" ? 35 : 55;
+    const harmonicEvidence = rawHarmonicEvidence.filter((item) => item.confidence >= minimumChordConfidence);
+    const chordEvidenceExcluded = rawHarmonicEvidence.length - harmonicEvidence.length;
+    const chordAccuracyScore = scoreReliability === "reliable" && harmonicEvidence.length > 0 && harmonicEvidence.length >= Math.min(2, rawHarmonicEvidence.length)
+      ? clampScore(harmonicEvidence.reduce((sum, item) => sum + item.confidence, 0) / harmonicEvidence.length)
+      : null;
     const hasProgression = harmonicEvidence.length > 0;
+    const accentPattern = options.expectedAccents ?? (options.expectedPattern?.some((token) => token.includes("!")) ? options.expectedPattern.map((token) => token.includes("!") ? 1 : 0) : undefined);
+    const audioEvidence = measureAudioEvidence(channel, buffer.sampleRate, beatTimings.flatMap((beat) => beat.observedMs === null ? [] : [{ ms: beat.observedMs - windowStartMs + latencyOffsetMs, step: beat.step }]), noiseFloor, accentPattern);
 
     return {
       peaks, durationMs: Math.round(buffer.duration * 1000), sampleRate: buffer.sampleRate, tempoDriftPercent,
-      timingConsistencyPercent, onsetMs: onsets.map(Math.round), timingScore, averageOffsetMs, timingTendency,
+      timingConsistencyPercent, onsetMs: onsets.map(Math.round), allOnsetMs: allOnsets.map(Math.round), timingScore, averageOffsetMs, timingTendency,
       troubleBeats: [...new Set(troubleBeats)], chordAttackScore, beatTimings, detectedPitch, harmonicEvidence,
-      chordAccuracyScore, calibrationConfidence, recordingSuitability,
-      analysisNote: scoringMode === "timing"
+      chordAccuracyScore, calibrationConfidence, recordingSuitability, scoreReliability,
+      timingEvidenceCount, expectedTimingCount: expectedAttackCount, chordEvidenceExcluded, latencyOffsetMs, ...audioEvidence,
+      signalDiagnostics,
+      timingProfile: profile, personalizedTiming: { score: personalized.score, beatTimings: personalized.beats },
+      scoringWindow: { startMs: windowStartMs, endMs: windowEndMs, sourceDurationMs, originalRecordingId: options.scoringWindow?.originalRecordingId },
+      analysisOptions: structuredClone(options),
+      scoreScope: `Timing uses ${timingEvidenceCount}/${expectedAttackCount} matched attacks${options.expectedFirstOnsetMs === undefined ? " with relative first-attack alignment" : " against the recorded play cue; pre-PLAY attacks excluded"}. Intended rests are not graded as missed attacks. Chord evidence excludes low-confidence detections and never identifies individual strings.`,
+      analysisNote: signalDiagnostics.materiallyClipped
+        ? `Possible clipping or strong saturation: ${signalDiagnostics.nearFullScalePercent}% near-full-scale samples, longest run ${signalDiagnostics.longestNearFullScaleMs} ms. Lower microphone/input gain and make another take. This take stays available to hear but is excluded from reliable progress scoring.`
+        : scoringMode === "timing"
         ? "Timing-only mode ignores pitch. Scores use onset placement and should be treated as practice guidance, not grading."
         : hasProgression
-          ? `${scoringMode === "root" ? "Root" : "Root-and-quality"} evidence is a confidence estimate${Object.keys(options.targetSignatures ?? {}).length ? " compared with your saved local chord signatures" : " from harmonic templates"}, not certain polyphonic recognition. Confirm by listening back.`
+          ? `${scoringMode === "root" ? "Root" : "Root-and-quality"} evidence is a confidence estimate${Object.keys(options.targetSignatures ?? {}).length ? " compared with your saved local chord signatures" : " from harmonic templates"}, not certain polyphonic recognition. ${chordEvidenceExcluded ? `${chordEvidenceExcluded} uncertain detection${chordEvidenceExcluded === 1 ? " was" : "s were"} excluded. ` : ""}Confirm by listening back.`
           : "Pitch is a monophonic root estimate; timing and attack scores use onset placement. Select a chord progression to enable chord evidence."
     };
   } finally {

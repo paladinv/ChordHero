@@ -13,8 +13,10 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.codingmonkey.chordhero.R
 import com.codingmonkey.chordhero.app.Destination
 
 @Composable
@@ -22,7 +24,7 @@ fun DashboardScreen(onNavigate: (Destination) -> Unit) {
     val destinations = Destination.entries.filterNot { it == Destination.Dashboard }
     Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text("Chord Hero", style = MaterialTheme.typography.displaySmall)
-        Text("Practice chord changes, right-hand control, songs, and musical understanding—all offline.")
+        Text(stringResource(R.string.home_intro))
         LazyVerticalGrid(
             columns = GridCells.Adaptive(180.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -34,7 +36,7 @@ fun DashboardScreen(onNavigate: (Destination) -> Unit) {
                         Text(destination.symbol, style = MaterialTheme.typography.headlineMedium)
                         Column {
                             Text(destination.label, style = MaterialTheme.typography.titleMedium)
-                            Text(description(destination), style = MaterialTheme.typography.bodySmall)
+                            Text(stringResource(descriptionResource(destination)), style = MaterialTheme.typography.bodySmall)
                         }
                     }
                 }
@@ -43,13 +45,13 @@ fun DashboardScreen(onNavigate: (Destination) -> Unit) {
     }
 }
 
-private fun description(destination: Destination): String = when (destination) {
-    Destination.Trainer -> "Timed chord-change rounds"
-    Destination.RightHand -> "36 guided technique exercises"
-    Destination.Songs -> "50 guided traditional songs"
-    Destination.Library -> "346 chord voicings and study tools"
-    Destination.Chart -> "Browse levels and roots"
-    Destination.Tools -> "Profiles, packs, and teacher sheets"
-    Destination.About -> "Purpose, philosophy, and license"
-    Destination.Dashboard -> ""
+private fun descriptionResource(destination: Destination): Int = when (destination) {
+    Destination.Trainer -> R.string.trainer_description
+    Destination.RightHand -> R.string.right_hand_description
+    Destination.Songs, Destination.SongLibrary -> R.string.song_coach_description
+    Destination.Library -> R.string.library_description
+    Destination.Chart -> R.string.chord_chart_description
+    Destination.Tools -> R.string.home_intro
+    Destination.About -> R.string.about_description
+    Destination.Dashboard -> R.string.home_intro
 }

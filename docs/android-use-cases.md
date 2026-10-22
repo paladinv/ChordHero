@@ -63,7 +63,7 @@ This document applies the shared UC-01–69 mobile contract to the native Androi
 - **UC-45:** Persist favorites and eight recents per profile.
 - **UC-46:** Preview synthesized strum or arpeggio.
 - **UC-47:** Select steel, nylon, muted, or picked synthesis.
-- **UC-48:** Select four tunings and show note names.
+- **UC-48:** Select the four six-string tunings or standard seven-string tuning and show note names.
 - **UC-49:** Set capo 0–7 and show transposition.
 - **UC-50:** Compare up to three voicings with shared/unique marks.
 - **UC-51:** Time practice and add repetitions.
@@ -91,7 +91,7 @@ This document applies the shared UC-01–69 mobile contract to the native Androi
 
 | Area | Required Android assertions |
 | --- | --- |
-| Content | Chord/right-hand/settings schema v1 plus songs schema v2; IDs, six-string shapes, ranges, references, and exact 346/4/4/36/50/150/4 inventories. |
+| Content | Chord/right-hand/settings schema v1 plus songs schema v2; unique IDs, six-string chord shapes, valid six-/seven-string tuning arrays, ranges, and references. |
 | Domain | Base fret, capo, tuning, pitch classes, comparison, filters, recents, recommendations, and review intervals. |
 | State | Trainer cadence/cap/pause; exercise subdivision/wrap/cancellation; song count-in/progression/final bounds. |
 | Storage | Profile seed/selection/isolation, CRUD, atomic import, ten-item pack cap, DataStore recovery, and schema v1. |

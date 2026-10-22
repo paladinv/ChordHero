@@ -14,15 +14,21 @@ import {
   guitarFretPosition,
   guitarStringXAt,
   GUITAR_VISIBLE_FRET_COUNT,
+  INCH_TO_WORLD,
 } from "../../lib/guitarTechnique3d";
 
 const BODY_CENTER_Z = 5.8;
 const BOARD_END_Z = guitarFretPosition(GUITAR_VISIBLE_FRET_COUNT) + 0.28;
-const WOOD_TEXTURE_SIZE = 48;
+// A 25.5in steel-string acoustic has a compact, slightly flared headstock
+// beyond the nut. Keeping these dimensions in the same world-space scale as
+// the body prevents the old silhouette from ending abruptly at the nut.
+const HEADSTOCK_END_Z = GUITAR_NUT_Z - 2.32;
+const HEADSTOCK_END_WIDTH = 3.5 * INCH_TO_WORLD;
+const WOOD_TEXTURE_SIZE = 256;
 
 function woodTexture(baseHex: number, grainHex: number, grainAlongZ: boolean) {
-  const base = new THREE.Color(baseHex);
-  const grain = new THREE.Color(grainHex);
+  const base = new THREE.Color(baseHex).multiplyScalar(grainAlongZ ? 0.68 : 1.16);
+  const grain = new THREE.Color(grainHex).multiplyScalar(grainAlongZ ? 0.62 : 1.1);
   // Use an explicit RGBA buffer. Three.js versions without RGBFormat fall
   // back to RGBA interpretation, which would stride through this 3-byte
   // buffer incorrectly and turn the wood albedo black.
@@ -31,9 +37,18 @@ function woodTexture(baseHex: number, grainHex: number, grainAlongZ: boolean) {
     for (let x = 0; x < WOOD_TEXTURE_SIZE; x += 1) {
       const along = grainAlongZ ? y : x;
       const across = grainAlongZ ? x : y;
-      const broad = (Math.sin(along * 0.34 + Math.sin(across * 0.19) * 1.6) + 1) * 0.5;
-      const fine = (Math.sin((along + across) * 1.45) + 1) * 0.045;
-      const amount = Math.min(0.34, broad * 0.18 + fine);
+      // Multi-scale deterministic grain avoids the obvious periodic bands of
+      // the old 48px sine texture while retaining a restrained spruce/wood
+      // direction. Hash cells are generated once at load time, not per frame.
+      const hash = (ix: number, iy: number) => {
+        const value = Math.sin(ix * 127.1 + iy * 311.7) * 43758.5453;
+        return value - Math.floor(value);
+      };
+      const coarse = hash(Math.floor(along / 14), Math.floor(across / 5));
+      const medium = hash(Math.floor(along / 4), Math.floor(across / 2));
+      const fine = hash(along, across);
+      const directional = (Math.sin(along * 0.11 + coarse * 1.4) + 1) * 0.5;
+      const amount = THREE.MathUtils.clamp(0.08 + directional * 0.05 + (coarse - 0.5) * 0.075 + (medium - 0.5) * 0.038 + (fine - 0.5) * 0.02, 0.025, 0.2);
       const color = base.clone().lerp(grain, amount);
       const offset = (y * WOOD_TEXTURE_SIZE + x) * 4;
       data[offset] = Math.round(color.r * 255);
@@ -46,7 +61,7 @@ function woodTexture(baseHex: number, grainHex: number, grainAlongZ: boolean) {
   texture.colorSpace = THREE.SRGBColorSpace;
   texture.wrapS = THREE.RepeatWrapping;
   texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(grainAlongZ ? 1.4 : 3.2, grainAlongZ ? 5.4 : 2.3);
+  texture.repeat.set(grainAlongZ ? 1.15 : 2.4, grainAlongZ ? 2.6 : 1.8);
   texture.needsUpdate = true;
   return texture;
 }
@@ -123,6 +138,31 @@ function taperedPrism(material: THREE.Material, startZ: number, endZ: number, st
   const geometry = new THREE.ExtrudeGeometry(shape, { depth, bevelEnabled: true, bevelSegments: 3, bevelSize: 0.035, bevelThickness: 0.035, curveSegments: 4 });
   geometry.rotateX(Math.PI / 2); geometry.translate(0, depth / 2, 0);
   return new THREE.Mesh(geometry, material);
+}
+
+function tunerPostPosition(string: number) {
+  const side = string < 3 ? -1 : 1;
+  const row = string < 3 ? string : string - 3;
+  // Stagger the posts so the strings leave the nut in a natural, shallow fan
+  // rather than colliding at a single point on the headstock.
+  // The nut-side row sits on the narrowest part of the taper; all centers stay
+  // inside the wood with a small margin while the buttons can still overhang.
+  return { x: side * (0.29 + row * 0.075), z: GUITAR_NUT_Z - 0.52 - row * 0.66 };
+}
+
+const wireAxis = new THREE.Vector3();
+const wireMidpoint = new THREE.Vector3();
+const wireQuaternion = new THREE.Quaternion();
+const wireScale = new THREE.Vector3();
+const wireUp = new THREE.Vector3(0, 1, 0);
+
+function setWireMatrix(matrix: THREE.Matrix4, from: THREE.Vector3, to: THREE.Vector3, radius: number) {
+  wireAxis.subVectors(to, from);
+  const length = wireAxis.length();
+  wireMidpoint.copy(from).add(to).multiplyScalar(0.5);
+  wireQuaternion.setFromUnitVectors(wireUp, wireAxis.normalize());
+  wireScale.set(radius, length, radius);
+  matrix.compose(wireMidpoint, wireQuaternion, wireScale);
 }
 
 function makeRadiusedBoardGeometry(startZ: number, endZ: number, startWidth: number, endWidth: number) {
@@ -222,15 +262,16 @@ export function createProfessionalAcousticGuitar(renderer: THREE.WebGLRenderer) 
   // lower shell must not become a bright orange second soundboard.
   const topTexture = woodTexture(0xf1cf9f, 0xc48a55, true);
   const backTexture = woodTexture(0x5d2f25, 0x261614, false);
+  const fingerboardTexture = woodTexture(0x241917, 0x684338, true);
   const anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 4);
   topTexture.anisotropy = anisotropy; backTexture.anisotropy = anisotropy;
   // Keep material albedo neutral: the small shared textures already contain
   // the spruce/mahogany color, so a second dark multiplier would blacken the
   // instrument under ACES tone mapping.
-  const topMaterial = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: topTexture, roughness: 0.47, clearcoat: 0.2, clearcoatRoughness: 0.3, side: THREE.DoubleSide });
-  const sideMaterial = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: backTexture, roughness: 0.4, clearcoat: 0.24, clearcoatRoughness: 0.26, side: THREE.DoubleSide });
+  const topMaterial = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: topTexture, roughness: 0.4, clearcoat: 0.3, clearcoatRoughness: 0.24, side: THREE.DoubleSide });
+  const sideMaterial = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: backTexture, roughness: 0.46, clearcoat: 0.22, clearcoatRoughness: 0.28, emissive: 0x8c432a, emissiveIntensity: 0.46, side: THREE.DoubleSide });
   const neckMaterial = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: backTexture, roughness: 0.48, clearcoat: 0.18 });
-  const fingerboardMaterial = new THREE.MeshStandardMaterial({ color: 0x30231f, roughness: 0.34 });
+  const fingerboardMaterial = new THREE.MeshPhysicalMaterial({ color: 0xffffff, map: fingerboardTexture, roughness: 0.31, clearcoat: 0.12, clearcoatRoughness: 0.32 });
   const bindingMaterial = new THREE.MeshStandardMaterial({ color: 0xe4c995, roughness: 0.28, metalness: 0.08 });
   const fretMaterial = new THREE.MeshStandardMaterial({ color: 0xc7ced0, metalness: 0.88, roughness: 0.2 });
   const stringMaterial = new THREE.MeshStandardMaterial({ color: 0xdad8d0, metalness: 0.82, roughness: 0.26 });
@@ -247,6 +288,11 @@ export function createProfessionalAcousticGuitar(renderer: THREE.WebGLRenderer) 
   const purfling = new THREE.Mesh(makePerimeterBindingGeometry(), bindingMaterial); group.add(purfling);
 
   const neck = taperedPrism(neckMaterial, GUITAR_NUT_Z - 0.26, BOARD_END_Z + 0.45, GUITAR_NUT_OVERALL_WIDTH * 0.92, GUITAR_TWELFTH_FRET_BOARD_WIDTH * 1.08, 0.34); neck.position.y = -0.02; group.add(neck);
+  // The headstock is a separate, gently flared piece so the nut-to-machine
+  // transition reads as a real acoustic guitar instead of a neck terminating
+  // at a square edge. A shallow cap adds a visible top-plane highlight.
+  const headstock = taperedPrism(neckMaterial, HEADSTOCK_END_Z, GUITAR_NUT_Z + 0.04, HEADSTOCK_END_WIDTH, GUITAR_NUT_OVERALL_WIDTH * 0.94, 0.34); headstock.position.y = -0.02; group.add(headstock);
+  const headstockCap = taperedPrism(neckMaterial, HEADSTOCK_END_Z + 0.08, GUITAR_NUT_Z - 0.02, HEADSTOCK_END_WIDTH * 0.92, GUITAR_NUT_OVERALL_WIDTH * 0.84, 0.035); headstockCap.position.y = 0.16; group.add(headstockCap);
   const heel = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.7, 8, 14), neckMaterial); heel.rotation.x = Math.PI / 2; heel.position.set(0, 0.09, guitarFretPosition(15) + 0.28); group.add(heel);
   const board = new THREE.Mesh(makeRadiusedBoardGeometry(GUITAR_NUT_Z - 0.08, BOARD_END_Z, GUITAR_NUT_STRING_SPREAD, GUITAR_TWELFTH_FRET_BOARD_WIDTH), fingerboardMaterial); board.position.y = 0.31; group.add(board);
   const nut = new THREE.Mesh(new THREE.BoxGeometry(GUITAR_NUT_OVERALL_WIDTH, 0.13, 0.075), bindingMaterial); nut.position.set(0, 0.49, GUITAR_NUT_Z); group.add(nut);
@@ -255,6 +301,12 @@ export function createProfessionalAcousticGuitar(renderer: THREE.WebGLRenderer) 
   const bindingRight = new THREE.Mesh(bindingRailGeometry, bindingMaterial); bindingRight.scale.x = -1; bindingRight.position.y = 0.31; group.add(bindingRight);
 
   const bridge = new THREE.Mesh(new THREE.BoxGeometry(GUITAR_SADDLE_STRING_SPREAD + 0.22, 0.2, 0.34), neckMaterial); bridge.position.set(0, 0.46, 7.1); bridge.rotation.y = 0.018; group.add(bridge);
+  // A raised, rounded bridge saddle bed gives the lower bout a readable
+  // acoustic construction instead of a flat rectangular block.
+  const bridgeCap = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, GUITAR_SADDLE_STRING_SPREAD * 0.48, 8, 16), neckMaterial);
+  bridgeCap.rotation.z = Math.PI / 2;
+  bridgeCap.position.set(0, 0.58, 7.08);
+  group.add(bridgeCap);
   const saddle = new THREE.Mesh(new THREE.BoxGeometry(GUITAR_SADDLE_STRING_SPREAD, 0.11, 0.07), bindingMaterial); saddle.position.set(0, 0.61, GUITAR_SADDLE_Z); group.add(saddle);
 
   const fretGeometry = makeCrownedFretGeometry();
@@ -273,18 +325,65 @@ export function createProfessionalAcousticGuitar(renderer: THREE.WebGLRenderer) 
 
   const rosette = new THREE.Group(); rosette.position.set(0, 0.565, GUITAR_SOUND_HOLE_CENTER_Z); group.add(rosette);
   addRing(rosette, 0.85, 0.018, neckMaterial); addRing(rosette, 0.9, 0.03, bindingMaterial); addRing(rosette, 0.96, 0.02, neckMaterial); addRing(rosette, 1.02, 0.028, bindingMaterial); addRing(rosette, 1.08, 0.014, neckMaterial);
+  const soundHoleLip = new THREE.Mesh(new THREE.TorusGeometry(GUITAR_SOUND_HOLE_RADIUS * 0.99, 0.045, 10, 64), bindingMaterial);
+  soundHoleLip.rotation.x = Math.PI / 2;
+  rosette.add(soundHoleLip);
   const cavity = new THREE.Mesh(new THREE.CylinderGeometry(GUITAR_SOUND_HOLE_RADIUS * 0.985, GUITAR_SOUND_HOLE_RADIUS * 0.94, 0.42, 64), cavityMaterial); cavity.position.set(0, 0.29, GUITAR_SOUND_HOLE_CENTER_Z); group.add(cavity);
   const innerWall = new THREE.Mesh(new THREE.CylinderGeometry(GUITAR_SOUND_HOLE_RADIUS * 1.015, GUITAR_SOUND_HOLE_RADIUS * 1.015, 0.26, 64, 1, true), new THREE.MeshStandardMaterial({ color: 0x3b1a13, roughness: 0.72, side: THREE.DoubleSide })); innerWall.position.set(0, 0.43, GUITAR_SOUND_HOLE_CENTER_Z); group.add(innerWall);
 
   const stringGeometry = new THREE.CylinderGeometry(1, 1, 1, 6);
-  const stringStart = GUITAR_NUT_Z - 0.15;
+  // Keep the two physical string finishes batched: each InstancedMesh holds
+  // the saddle-to-nut and nut-to-post segments for three strings.
+  const plainStrings = new THREE.InstancedMesh(stringGeometry, stringMaterial, 6);
+  const woundStrings = new THREE.InstancedMesh(stringGeometry, woundMaterial, 6);
+  const stringMatrix = new THREE.Matrix4();
+  let plainIndex = 0;
+  let woundIndex = 0;
+  const nutY = 0.56;
+  const headstockY = 0.57;
   for (let string = 0; string < 6; string += 1) {
     const material = string < 3 ? stringMaterial : woundMaterial;
-    const wire = new THREE.Mesh(stringGeometry, material);
-    const from = new THREE.Vector3(guitarStringXAt(string, stringStart), 0.56, stringStart);
-    const to = new THREE.Vector3(guitarStringXAt(string, GUITAR_SADDLE_Z), 0.58, GUITAR_SADDLE_Z);
-    const axis = to.clone().sub(from); wire.position.copy(from).add(to).multiplyScalar(0.5); wire.scale.set(0.009 + string * 0.0021, axis.length(), 0.009 + string * 0.0021); wire.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), axis.normalize()); group.add(wire);
+    const stringRadius = 0.009 + string * 0.0021;
+    const nut = new THREE.Vector3(guitarStringXAt(string, GUITAR_NUT_Z), nutY, GUITAR_NUT_Z);
+    const saddle = new THREE.Vector3(guitarStringXAt(string, GUITAR_SADDLE_Z), 0.58, GUITAR_SADDLE_Z);
+    const postPosition = tunerPostPosition(string);
+    const post = new THREE.Vector3(postPosition.x, headstockY, postPosition.z);
+    // Preserve a hard, visible break at the nut and continue each string to
+    // its own tuning post. This also makes the six string termination legible
+    // in the overview camera instead of leaving strings floating at the nut.
+    const batch = string < 3 ? plainStrings : woundStrings;
+    const firstIndex = string < 3 ? plainIndex : woundIndex;
+    setWireMatrix(stringMatrix, saddle, nut, stringRadius); batch.setMatrixAt(firstIndex, stringMatrix);
+    setWireMatrix(stringMatrix, nut, post, stringRadius); batch.setMatrixAt(firstIndex + 1, stringMatrix);
+    if (string < 3) plainIndex += 2;
+    else woundIndex += 2;
   }
+  plainStrings.instanceMatrix.needsUpdate = true; woundStrings.instanceMatrix.needsUpdate = true;
+  group.add(plainStrings, woundStrings);
+  const tunerMetal = new THREE.MeshPhysicalMaterial({ color: 0xb7c0c2, metalness: 0.9, roughness: 0.2, clearcoat: 0.25 });
+  const tunerDark = new THREE.MeshStandardMaterial({ color: 0x30383a, metalness: 0.82, roughness: 0.25 });
+  const tunerShaftGeometry = new THREE.CylinderGeometry(0.045, 0.055, 0.34, 12);
+  const tunerButtonGeometry = new THREE.BoxGeometry(0.26, 0.11, 0.16);
+  const tunerCollarGeometry = new THREE.CylinderGeometry(0.095, 0.095, 0.035, 16);
+  const tunerShafts = new THREE.InstancedMesh(tunerShaftGeometry, tunerMetal, 6);
+  const tunerCollars = new THREE.InstancedMesh(tunerCollarGeometry, tunerDark, 6);
+  const tunerButtons = new THREE.InstancedMesh(tunerButtonGeometry, tunerDark, 6);
+  const tunerMatrix = new THREE.Matrix4();
+  const tunerPosition = new THREE.Vector3();
+  const tunerScale = new THREE.Vector3(1, 1, 1);
+  const shaftRotation = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 0, 1), Math.PI / 2);
+  const buttonRotation = new THREE.Quaternion();
+  const buttonEuler = new THREE.Euler(0, 0, 0);
+  for (let string = 0; string < 6; string += 1) {
+    const { x, z } = tunerPostPosition(string);
+    const side = string < 3 ? -1 : 1;
+    const postX = Math.abs(x);
+    tunerPosition.set(x, 0.59, z); tunerMatrix.compose(tunerPosition, shaftRotation, tunerScale); tunerShafts.setMatrixAt(string, tunerMatrix);
+    tunerPosition.set(side * (postX + 0.18), 0.59, z); tunerMatrix.compose(tunerPosition, shaftRotation, tunerScale); tunerCollars.setMatrixAt(string, tunerMatrix);
+    buttonEuler.set(0, side * 0.12, 0); buttonRotation.setFromEuler(buttonEuler); tunerPosition.set(side * (postX + 0.48), 0.59, z); tunerMatrix.compose(tunerPosition, buttonRotation, tunerScale); tunerButtons.setMatrixAt(string, tunerMatrix);
+  }
+  tunerShafts.instanceMatrix.needsUpdate = true; tunerCollars.instanceMatrix.needsUpdate = true; tunerButtons.instanceMatrix.needsUpdate = true;
+  group.add(tunerShafts, tunerCollars, tunerButtons);
   const pinGeometry = new THREE.SphereGeometry(0.075, 10, 8); const pins = new THREE.InstancedMesh(pinGeometry, bindingMaterial, 6);
   for (let string = 0; string < 6; string += 1) { matrix.makeScale(1, 1, 0.58); matrix.setPosition(guitarStringXAt(string, GUITAR_SADDLE_Z), 0.64, 7.13); pins.setMatrixAt(string, matrix); } pins.instanceMatrix.needsUpdate = true; group.add(pins);
   return group;

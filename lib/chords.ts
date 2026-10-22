@@ -1252,18 +1252,7 @@ const NOTE_NAMES = ["C", "C#", "D", "Eb", "E", "F", "F#", "G", "Ab", "A", "Bb", 
 
 const NOTE_TO_INDEX = new Map(NOTE_NAMES.map((note, index) => [note, index]));
 
-const QUALITY_LABELS = new Map<string, string>(
-  [
-    ["major", "Major"],
-    ["minor", "Minor"],
-    ["dominant7", "Dominant 7"],
-    ["minor7", "Minor 7"],
-    ["major7", "Major 7"],
-    ["sus2", "Suspended 2"],
-    ["sus4", "Suspended 4"],
-    ["add9", "Add 9"]
-  ] as const
-);
+const QUALITY_LABELS = new Map<string, string>([["major", "Major"], ["minor", "Minor"], ["dominant7", "Dominant 7"], ["minor7", "Minor 7"], ["major7", "Major 7"], ["sus2", "Suspended 2"], ["sus4", "Suspended 4"], ["add9", "Add 9"]]);
 
 const MAJOR_SCALE_ROLES: Array<[offset: number, role: HarmonicRole]> = [
   [0, "I"],

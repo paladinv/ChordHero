@@ -1,0 +1,17 @@
+"use client";
+import { useEffect, useMemo, useState } from "react";
+import type { PracticeResult } from "../lib/practicePlatform";
+import { rightHandFourWeekTrend, rightHandTrendCohorts } from "../lib/rightHandTrends";
+
+export default function RightHandTrends({ events }: { events: PracticeResult[] }) {
+  const cohorts = useMemo(() => rightHandTrendCohorts(events), [events]);
+  const [selectedKey, setSelectedKey] = useState("");
+  useEffect(() => {
+    if (!cohorts.some((cohort) => cohort.key === selectedKey)) setSelectedKey(cohorts[0]?.key ?? "");
+  }, [cohorts, selectedKey]);
+  const selected = cohorts.find((cohort) => cohort.key === selectedKey) ?? cohorts[0];
+  const weeks = selected ? rightHandFourWeekTrend(events, Date.now(), selected.key) : [];
+  const total = weeks.reduce((sum, week) => sum + Object.values(week.techniques).reduce((count, technique) => count + (technique?.count ?? 0), 0), 0);
+  const techniqueLabel = selected?.technique === "plectrum" ? "Plectrum" : selected?.technique === "fingerpicking" ? "Fingerpicking" : "Strumming";
+  return <section className="right-hand-trends" aria-labelledby="right-hand-trends-title"><h3 id="right-hand-trends-title">Four weeks of like-for-like recorded timing</h3><p>Only device-retained, accepted, reliable full takes are eligible. Each view keeps one exercise, tempo, written pattern, chord progression, scoring mode, and guitar mode together; older or incomplete records are not averaged.</p>{cohorts.length ? <label>Comparison cohort<select value={selected?.key ?? ""} onChange={(event) => setSelectedKey(event.target.value)}>{cohorts.map((cohort) => <option key={cohort.key} value={cohort.key}>{cohort.exerciseTitle} · {cohort.tempo} BPM · {cohort.instrumentProfile} · {cohort.scoringMode} · {cohort.chordProgression.length ? cohort.chordProgression.join("–") : "no chords"} · {cohort.count} retained</option>)}</select></label> : null}{selected ? <p><small>Pattern: <code>{selected.pattern.join(" ")}</code> · {selected.count} retained sample{selected.count === 1 ? "" : "s"} in this cohort. {selected.count < 3 ? "Evidence is limited; do not infer a stable trend yet." : "Sample size is still local and descriptive, not a validated skill rank."}</small></p> : null}{total ? <div className="timing-table-wrap"><table><caption>Weekly average timing score and recorded sample count for the selected cohort</caption><thead><tr><th>{techniqueLabel}</th>{weeks.map((week) => <th key={week.from}>{new Date(week.from).toLocaleDateString([], { month: "short", day: "numeric" })}–{new Date(week.to - 1).toLocaleDateString([], { month: "short", day: "numeric" })}</th>)}</tr></thead><tbody><tr><th scope="row">{selected?.exerciseTitle ?? techniqueLabel}</th>{weeks.map((week) => { const sample = selected ? week.techniques[selected.technique] : undefined; return <td key={week.from}>{!sample || sample.average === null ? "No samples" : <>{sample.average}%<small>{sample.count} take{sample.count === 1 ? "" : "s"}{sample.count < 3 ? " · limited sample" : ""}</small></>}</td>; })}</tr></tbody></table></div> : <p>No full accepted samples for this cohort in the last 28 days. Keep the setup and written exercise fixed for several sessions before drawing a trend.</p>}{!cohorts.length && events.some((event) => event.area === "rightHand" && event.recordingId) ? <small>Recorded history exists, but it lacks the exact context/retention metadata required for a like-for-like comparison. It is intentionally excluded.</small> : null}</section>;
+}
